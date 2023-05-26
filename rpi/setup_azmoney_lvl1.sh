@@ -1,6 +1,6 @@
-### Login as satoshi #############################################################################################################################################################
-######## who are we logged in at?? root or satoshi ###############################################################################################################################
+#!/bin/bash
 
+# Run latest updates and upgrades
 sudo apt-get -y update
 sudo apt-get -y upgrade
 
@@ -10,7 +10,10 @@ sudo apt-get -y install wget psmisc ufw ssh autossh build-essential yasm autocon
 # Download, Verify Checksum
 cd ~
 wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-arm-linux-gnueabihf.tar.gz
-sha256sum ~/bitcoin-arm-linux-gnueabihf.tar.gz # df74eb09096a722c42e0b84ff96bc29f01380b4460729ea30cacba96ad6af7a6   ################ Verify Checksum###############################
+if [[ ! "$(sha256sum ~/bitcoin-arm-linux-gnueabihf.tar.gz)" == *"df74eb09096a722c42e0b84ff96bc29f01380b4460729ea30cacba96ad6af7a6"* ]]; then
+        echo "Error: sha256sum for file \"bitcoin-arm-linux-gnueabihf.tar.gz\" was not what was expected!"
+        exit 1
+fi
 
 # Install Binaries
 tar -xzf bitcoin-arm-linux-gnueabihf.tar.gz
@@ -130,7 +133,7 @@ sudo chown -R stratum:stratum /home/stratum/.ssh
 sudo chmod 700 /home/stratum/.ssh
 sudo chmod 600 /home/stratum/.ssh/authorized_keys
 
-# Generate public/private keys (non-encytped)
+# Generate public/private keys (non-encrytped)
 sudo ssh-keygen -t ed25519 -f /root/.ssh/p2pkey -N "" -C ""
 
 # Create known_hosts file
@@ -191,37 +194,45 @@ sudo install -C -m 400 -o satoshi -g satoshi /var/lib/bitcoin/micro/wallets/mini
 sudo install -C -m 400 -o satoshi -g satoshi /var/lib/bitcoin/micro/wallets/bank/wallet.dat ~/backup/bank.dat
 sudo install -C -m 400 -o satoshi -g satoshi ~/.ssh/ssh_key_failsafe ~/backup
 
+# Record (by Hand) the Passphrase
+echo "The wallets and the \"ssh fail safe key\" are encrypted with a passphrase."
+echo "Write down (by hand) to backup this passphrase: $(sudo cat /root/passphrase)"
+read -p "Press any key to continue ..."
 
+# Verify HandWritten Passphrase
+clear; read -p "enter the passphrase: "
+if [[ ! "$(sudo cat /root/passphrase)" == "$REPLY" ]]; then
+  echo "Passphrase incorrect. Try again!"
+  echo "Write down (by hand) to backup this passphrase: $(sudo cat /root/passphrase)"
+  read -p "Press any key to continue ..."
+  
+  clear; read -p "enter the passphrase: "
+  if [[ ! "$(sudo cat /root/passphrase)" == "$REPLY" ]]; then
+    echo "Passphrase incorrect. Try again (last chance)!"
+    echo "Write down (by hand) to backup this passphrase: $(sudo cat /root/passphrase)"
+    read -p "Press any key to continue ..."
+    
+    clear; read -p "enter the passphrase: "
+    if [[ ! "$(sudo cat /root/passphrase)" == "$REPLY" ]]; then
+      echo "Error: passphrase not recorded and/or entered by the user successfully!"
+      exit 1
+    fi
+  fi
+fi
 
-
-
-
-
-
-
-
-
-
-
-# Reload/Enable System Control for new Processes and Restart
+# Reload/Enable System Control for new processes, erase bash history, and restart
 sudo systemctl daemon-reload
 sudo systemctl enable bitcoind
 sudo systemctl enable ssh
-
-###reboot now
-
-
+history -c
+sudo reboot
 
 
-# Record (by Hand) the Passphrase ############################################################################################################################################
-sudo cat /root/passphrase
 
-# Verify Hand Written Passphrase ###########################################################################
-echo # Type in the passphrase in substitution of $TYPED_HANDWRITTENPASSPHRASE (keep the quotes) #########################################################
-sudo cat /root/passphrase | grep "$(readline)" | wc -l  # 0 indicates it was not recorded/entered correctly    # 1 indicates that it was recorded/entered correctly ################
-history -c # Clear the password from bash's history
 
-STRONGPASSPF="" # Erase from memory
+
+
+
 
 
 
@@ -234,3 +245,7 @@ btc -rpcwallet=bank walletpassphrase $(sudo cat /root/passphrase) 1 # No message
 # Verify Passphrase is Enforced ############################################################################################################# need to automate this ###################################
 echo "passphrase:" $(sudo cat /root/passphrase) # Verify a strong passphrase is being referenced
 ssh-keygen -y -P $(sudo cat /root/passphrase) -f ~/.ssh/ssh_key_failsafe # If output matches pub key, referenced passphrase is in use!
+
+
+### Login as satoshi #############################################################################################################################################################
+######## who are we logged in at?? root or satoshi ###############################################################################################################################
