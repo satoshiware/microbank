@@ -1,3 +1,6 @@
+### Login as satoshi #############################################################################################################################################################
+######## who are we logged in at?? root or satoshi ###############################################################################################################################
+
 #!/bin/bash
 
 # Run latest updates and upgrades
@@ -183,9 +186,7 @@ btc --named createwallet wallet_name="mining" passphrase=$(sudo cat /root/passph
 btc --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
 # Create Alias Unlocks wallets for 24 Hours
-alias unlockwallets="btc -rpcwallet=mining walletpassphrase \$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \$(sudo cat /root/passphrase) 86400"
 echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc # Restores alias @ boot
-alias lockwallets="btc -rpcwallet=mining walletlock; btc -rpcwallet=bank walletlock"
 echo "alias lockwallets=\"btc -rpcwallet=mining walletlock; btc -rpcwallet=bank walletlock\"" | sudo tee -a /etc/bash.bashrc # Restores alias @ boot
 
 # Backup Wallets and SSH Fail Safe Key ("watch" and "import" wallets not included)
@@ -223,8 +224,4 @@ fi
 # Reload/Enable System Control for new processes, erase bash history, and restart
 sudo systemctl daemon-reload
 sudo systemctl enable bitcoind
-sudo systemctl enable ssh
 sudo reboot
-
-### Login as satoshi #############################################################################################################################################################
-######## who are we logged in at?? root or satoshi ###############################################################################################################################
