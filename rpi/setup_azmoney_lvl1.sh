@@ -73,7 +73,7 @@ alias btc="sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin
 echo "alias btc=\"sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf\"" | sudo tee -a /etc/bash.bashrc # Reestablish alias @ boot
 
 # Generate Bitcoin Configuration File with the Appropriate Permissions
-at << EOF | sudo tee /etc/bitcoin.conf
+cat << EOF | sudo tee /etc/bitcoin.conf
 #server=0 # Accept JSON-RPC commands.
 #rpcauth=satoshi:e826...267$R07...070d # Username and hashed password for JSON-RPC connections
 [micro]
