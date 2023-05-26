@@ -5,7 +5,9 @@ sudo apt-get -y update
 sudo apt-get -y upgrade
 
 # Install Packages
-sudo apt-get -y install wget psmisc ufw ssh autossh build-essential yasm autoconf automake libtool libzmq3-dev git
+sudo apt-get -y install wget ufw autossh
+###psmisc (kill all)#####################################################################################################################################################################################
+### does it already have curl? Can't we donwload with that??? and get rid of wget########################################################################################################################
 
 # Download, Verify Checksum
 cd ~
@@ -72,10 +74,8 @@ echo "alias btc=\"sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/
 
 # Generate Bitcoin Configuration File with the Appropriate Permissions
 at << EOF | sudo tee /etc/bitcoin.conf
-server=1 # Accept JSON-RPC commands.
+#server=0 # Accept JSON-RPC commands.
 #rpcauth=satoshi:e826...267$R07...070d # Username and hashed password for JSON-RPC connections
-#rest=0 # Accept public REST requests.
-txindex=1 # Maintain a full transaction index.
 [micro]
 #### Add nodes here via ssh tunneling (e.g. addnode=localhost:19335). ####
 EOF
@@ -227,24 +227,6 @@ sudo systemctl enable ssh
 history -c
 sudo reboot
 
-
-
-
-
-
-
-
-
-
-# Verification ################################################
-lockwallets # Lock wallets
-btc -rpcwallet=mining walletpassphrase $(sudo cat /root/passphrase) 1 # No messages indicates passphrase is working
-btc -rpcwallet=bank walletpassphrase $(sudo cat /root/passphrase) 1 # No messages indicates passphrase is working
-
-
-# Verify Passphrase is Enforced ############################################################################################################# need to automate this ###################################
-echo "passphrase:" $(sudo cat /root/passphrase) # Verify a strong passphrase is being referenced
-ssh-keygen -y -P $(sudo cat /root/passphrase) -f ~/.ssh/ssh_key_failsafe # If output matches pub key, referenced passphrase is in use!
 
 
 ### Login as satoshi #############################################################################################################################################################
