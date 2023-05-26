@@ -224,10 +224,7 @@ fi
 sudo systemctl daemon-reload
 sudo systemctl enable bitcoind
 sudo systemctl enable ssh
-history -c
 sudo reboot
-
-
 
 ### Login as satoshi #############################################################################################################################################################
 ######## who are we logged in at?? root or satoshi ###############################################################################################################################
