@@ -20,5 +20,4 @@ echo "default=${REPLY}" | sudo tee -a /etc/wsl.conf
 
 # User Reminder
 clear
-echo "Don\'t forget to exit to powershell and restart this instance"
-echo "wsl --unregister \$INSTANCE"
+echo "Don't forget to exit to PowerShell and restart this instance: \"wsl --unregister \$INSTANCE\""
