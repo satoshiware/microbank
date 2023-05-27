@@ -46,5 +46,5 @@ wsl -d $INSTANCE -u $USERNAME # Run instance with desired user on startup<br/>
 wsl -t $INSTANCE # Stop (Turn Off)<br/>
 wsl -l -v # List WSL instances and their status<br/>
 wsl --unregister $INSTANCE # Uninstall desired instance<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rm $HOME\$INSTANCE
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rm $HOME\$INSTANCE<br/>
 wsl --shutdown # Shutdown (restart) WSL and all instances
