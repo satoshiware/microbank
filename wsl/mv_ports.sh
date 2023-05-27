@@ -9,6 +9,10 @@ read -p "enter new SSH port: "; SSHPORT="$REPLY"
 # Change SSH port in sshd config
 sudo sed -i "s/#Port 22/Port ${SSHPORT}/g" /etc/ssh/sshd_config
 
+# Update firewall
+sudo ufw delete allow 22/tcp
+sudo ufw allow ${SSHPORT}/tcp
+
 # Change Bitcoin Core (micro) port in p2pssh service
 sudo sed -i "s/19333/${MICROPORT}/g" /etc/systemd/system/p2pssh@.service
 
