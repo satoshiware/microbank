@@ -193,7 +193,7 @@ sudo install -C -m 400 -o $USER -g $USER /var/lib/bitcoin/micro/wallets/mining/w
 sudo install -C -m 400 -o $USER -g $USER /var/lib/bitcoin/micro/wallets/bank/wallet.dat ~/backup/bank.dat
 
 # Record (by Hand) the Passphrase
-echo "The wallets and the \"ssh fail safe key\" are encrypted with a passphrase."
+echo "The wallets are encrypted with a passphrase."
 echo "Write down (by hand) to backup this passphrase: $(sudo cat /root/passphrase)"
 read -p "Press any key to continue ..."
 
