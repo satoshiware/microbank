@@ -172,7 +172,13 @@ STRONGPASSPF=${STRONGPASSPF//l/1} # Replace 'l' (L) characters with '1'
 echo $STRONGPASSPF | sudo tee /root/passphrase
 sudo chmod 400 /root/passphrase
 
-# Generate Wallets <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< we have to run bitcoin for this too work!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Reload/Enable System Control for new processes
+sudo systemctl daemon-reload
+sudo systemctl enable ssh
+sudo systemctl enable bitcoind --now
+echo "waiting a few seconds for bitcoind to start"; sleep 15
+
+# Generate Wallets
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="watch" disable_private_keys=true descriptors=false load_on_startup=true
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="import" descriptors=false load_on_startup=true
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="mining" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
@@ -212,9 +218,3 @@ if [[ ! "$(sudo cat /root/passphrase)" == "$REPLY" ]]; then
     fi
   fi
 fi
-
-# Reload/Enable System Control for new processes, erase bash history, and restart
-sudo systemctl daemon-reload
-sudo systemctl enable bitcoind
-sudo systemctl enable ssh
-sudo reboot
