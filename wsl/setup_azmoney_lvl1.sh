@@ -8,6 +8,7 @@ sudo apt-get -y upgrade
 sudo apt-get -y install wget psmisc autossh ssh ufw
 
 # Download, Verify Checksum
+cd ~
 wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-x86_64-linux-gnu.tar.gz
 if [[ ! "$(sha256sum ~/bitcoin-x86_64-linux-gnu.tar.gz)" == *"d868e59d59e338d5dedd25e9093c9812a764b6c6dc438871caacf8e692a9e04d"* ]]; then
         echo "Error: sha256sum for file \"bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
