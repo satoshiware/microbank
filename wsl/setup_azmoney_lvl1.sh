@@ -1,60 +1,3 @@
-(Run as administrator) PowerShell
-	wsl --install
-      dism /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart # Makes sure Virtual Machines are enabled. Required for WSL
-	# IMPORTANT! Restart the Computer.
-
-Update the Kernel
-	# Download and install the wsl_update_x64 MSI file
-	# IMPORTANT! Restart the Computer... Again!
-
-(Run as administrator) PowerShell
-	wsl --set-default-version 2 # Sets WSL to version 2 by default for new Linux distribution installations
-      wsl --update # Make sure the latest version is being used
-     	wsl --unregister Debian # Let's start with a fresh install
-      wsl --install -d Debian
-	# Bash Shell: Enter desire username (e.g. satoshi) and password then "exit" back to PowerShell
-	wsl --terminate Debian
-
-# Create a new instance from the Debian install
-	$INSTANCE = Read-Host -Prompt 'Enter the desired name for the wsl micro node instance'
-	wsl --export Debian $HOME\debian.tar
-	wsl --import $INSTANCE $HOME\$INSTANCE $HOME\debian.tar
-	wsl --unregister Debian # Remove the Debian Instance (no longer needed)
-	rm $HOME\debian.tar
-
-# Configure the new wsl micro node with the desired hostname
-	wsl -l -v	# List available wsl instances
-    	wsl -d $INSTANCE # PowerShell: Run the micro-node instance
-
-	# Generate WSL Configuration
-	read -p "Enter the desired hostname: "
-	echo "[network]" | sudo tee /etc/wsl.conf
-      echo "hostname = $REPLY" | sudo tee -a /etc/wsl.conf
-      echo "generateHosts = false" | sudo tee -a /etc/wsl.conf
-      echo "[boot]" | sudo tee -a /etc/wsl.conf
-      echo "systemd=true" | sudo tee -a /etc/wsl.conf
-
-# Change Host Name: micro-node
-        sudo sed -i "s/$(hostname)/${REPLY}/g" /etc/hosts
-
-# Shutdown micro-node (Restarting)
-	exit # Exiting to PowerShell
-      wsl --terminate $INSTANCE # PowerShell: Shutdown (restart) wsl
-
-
-
-WSL:	lvl_test_1
-	hostname: lvl1test1
-	user:mike
-	passwd:guess
-
-
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ !!!!!!!!!!!!!!!!!!!! Make sure you have it logged in to the right account and sitting at home (~) directory) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# How we get the script there????
-
-
-
 #!/bin/bash
 
 # Run latest updates and upgrades
@@ -274,17 +217,3 @@ sudo systemctl daemon-reload
 sudo systemctl enable bitcoind
 sudo systemctl enable ssh
 sudo reboot
-
-
-
-
-
-
-
-
-
-
-    Local (e.g. Window's PowerShell)
-        scp -rp -P $PORT -i $HOME/.ssh/YubiKey satoshi@$ADDRESS:~/backup $HOME/Desktop # The port is optional; default is 22
-            Example: scp -rp -i $HOME/.ssh/YubiKey satoshi@micro-node.local:~/backup $HOME/Desktop
-        # With WSL, the host drive is already mounted. It can just be copied with cp (e.g. "cp -rf ~/backup /mnt/c/Users/$USERNAME/Desktop")
