@@ -7,7 +7,8 @@ echo "hostname = $REPLY" | sudo tee -a /etc/wsl.conf
 echo "generateHosts = false" | sudo tee -a /etc/wsl.conf
 echo "[boot]" | sudo tee -a /etc/wsl.conf
 echo "systemd=true" | sudo tee -a /etc/wsl.conf
-sudo sed -i "s/$(hostname)/${REPLY}/g" /etc/hosts
+echo "[user]" | sudo tee -a /etc/wsl.conf
+echo "default=$USER" | sudo tee -a /etc/wsl.conf
 
-# Exiting to PowerShell
-exit
+# Update hostname in hosts file
+sudo sed -i "s/$(hostname)/${REPLY}/g" /etc/hosts
