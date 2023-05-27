@@ -1,7 +1,7 @@
 # WSL Micro Node
-The Windows Subsystem for Linux (WSL) lets developers run a GNU/Linux environment, including most command-line tools, utilities, and applications directly on Windows! However, the environment is not very secure and could pose risks building a network on top of it. Therefore, it is highly recommended to only implement a WSL node for limited purposes and to take additional measures to secure funds (i.e. store large amounts offline; e.g Satoshi Savings Card) and secure the connection to the network: only operate with one outbound node connection and take the security of the Windows OS seriously.<br/><br/>
+The Windows Subsystem for Linux (WSL) lets developers run a GNU/Linux environment, including most command-line tools, utilities, and applications directly on Windows! However, the environment is not very secure and could pose risks building a network on top of it. Therefore, it is highly recommended to only implement a WSL node for limited purposes and to take additional measures to secure funds (i.e. store large amounts offline; e.g Satoshi Savings Card) and secure the connection to the network: highly recommended only operate with one outbound node connection and take the security of the Windows OS seriously.<br/><br/>
 
-To make your WSL node experience more successful, make sure to turn off automatic updates (prevent windows from rebooting unknowingly). Also, disable sleep/hibernation mode. Even though there are workarounds, the most straight forward way to keep your WSL instance alive is to always leave the WSL terminal window open.<br/><br/>
+To make your WSL node experience more successful, make sure to turn off automatic updates (prevent windows from rebooting unknowingly). Also, disable sleep/hibernation mode. Even though there are workarounds, the most straightforward way to keep your WSL instance alive is to always leave the WSL terminal window open.<br/><br/>
 
 Note: If you haven't discovered the new "Windows Terminal" software readily available for download. Check it out before you get started (optional).
 
@@ -15,28 +15,27 @@ dism /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
 \# Download and install [Link wsl_update_x64](https://docs.microsoft.com/en-us/windows/wsl/install-manual#step-4---download-the-linux-kernel-update-package)<br/>
 \# Restart the Computer... Again!
 
-## (Run as administrator) PowerShell
-wsl --set-default-version 2 # Sets WSL to version 2 by default for new Linux distribution installations
-wsl --update # Make sure the latest version is being used
-wsl --unregister Debian # Let's start with a fresh install
-      
-      
-      
+## Update and Configure WSL
+\# Run PowerShell (as administrator)<br/>
+wsl --set-default-version 2<br/>
+wsl --update
+
 ## Install Debian
+wsl --unregister Debian # Let's make sure we are starting with a fresh install<br/>
 wsl --install -d Debian<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Enter Desired $USERNAME<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Enter Desired Password<br/>
 exit # Return back to the PowerShell<br/>
 wsl --terminate Debian # Shutdown the new Debian instance
 
-# Create a new micro node instance from the Debian install
+## Create a new micronode instance from the Debian install
 $INSTANCE = Read-Host -Prompt 'Enter the desired name for the wsl micro node instance'<br/>
 wsl --export Debian $HOME\debian.tar<br/>
 wsl --import $INSTANCE $HOME\$INSTANCE $HOME\debian.tar
 
-# Remove Debian (no longer needed)
+## Remove Debian (no longer needed)
 wsl --unregister Debian<br/>
-rm $HOME\debian.tar<br/>
+rm $HOME\debian.tar
 
-# Link to boot the new instance
+## Link to boot the new instance
 c:\windows\system32\wsl.exe -d $INSTANCE -u $USERNAME"
