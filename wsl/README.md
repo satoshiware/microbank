@@ -40,9 +40,6 @@ rm $HOME\debian.tar
 ## Link to boot the new instance
 c:\windows\system32\wsl.exe -d $INSTANCE -u $USERNAME
 
-## Important: Restart the instance after running each install script
-wsl --terminate $INSTANCE
-
 ## WSL Commands
 wsl -d $INSTANCE # Run desired instance<br/>
 wsl -d $INSTANCE -u $USERNAME # Run instance with desired user on startup<br/>
