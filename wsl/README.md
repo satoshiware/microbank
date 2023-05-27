@@ -38,4 +38,12 @@ wsl --unregister Debian<br/>
 rm $HOME\debian.tar
 
 ## Link to boot the new instance
-c:\windows\system32\wsl.exe -d $INSTANCE -u $USERNAME"
+c:\windows\system32\wsl.exe -d $INSTANCE -u $USERNAME
+
+## WSL Commands
+wsl -d $INSTANCE # Run desired instance
+wsl -d $INSTANCE -u $USERNAME # Run instance with desired user on startup
+wsl -t micro-node # Stop (Turn Off)<br/>
+wsl -l -v # List WSL instances and their status<br/>
+wsl --unregister $INSTANCE # Uninstall desired instance
+wsl --shutdown # Shutdown (restart) WSL and all instances
