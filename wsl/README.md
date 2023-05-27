@@ -31,7 +31,7 @@ wsl --terminate Debian # Shutdown the new Debian instance
 ## Create a new micronode instance from the Debian install
 $INSTANCE = Read-Host -Prompt 'Enter the desired name for the wsl micro node instance'<br/>
 wsl --export Debian $HOME\debian.tar<br/>
-wsl --import $INSTANCE $HOME\$INSTANCE $HOME\debian.tar
+wsl --import $INSTANCE $HOME\\$INSTANCE $HOME\debian.tar
 
 ## Remove Debian (no longer needed)
 wsl --unregister Debian<br/>
