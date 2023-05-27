@@ -9,7 +9,5 @@ echo "[boot]" | sudo tee -a /etc/wsl.conf
 echo "systemd=true" | sudo tee -a /etc/wsl.conf
 sudo sed -i "s/$(hostname)/${REPLY}/g" /etc/hosts
 
-# Shutdown micro-node (Restarting)
-exit # Exiting to PowerShell
-
-wsl --terminate $INSTANCE # PowerShell: Shutdown (restart) wsl
+# Exiting to PowerShell
+exit
