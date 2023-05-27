@@ -43,7 +43,7 @@ c:\windows\system32\wsl.exe -d $INSTANCE -u $USERNAME
 ## WSL Commands
 wsl -d $INSTANCE # Run desired instance<br/>
 wsl -d $INSTANCE -u $USERNAME # Run instance with desired user on startup<br/>
-wsl -t micro-node # Stop (Turn Off)<br/>
+wsl -t $INSTANCE # Stop (Turn Off)<br/>
 wsl -l -v # List WSL instances and their status<br/>
 wsl --unregister $INSTANCE # Uninstall desired instance<br/>
 wsl --shutdown # Shutdown (restart) WSL and all instances
