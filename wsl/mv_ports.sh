@@ -17,7 +17,8 @@ sudo ufw allow ${SSHPORT}/tcp
 sudo sed -i "s/19333/${MICROPORT}/g" /etc/systemd/system/p2pssh@.service
 
 # Add new ports to the Bitcoin (micro) configuration file
-sudo sed -i "1s/^/rpcport=${RPCPORT}\n/" /etc/bitcoin.conf
-sudo sed -i "1s/^/port=${MICROPORT}\n/" /etc/bitcoin.conf# Remind user to restart the instance
+echo "port=${MICROPORT}" | sudo tee -a /etc/bitcoin.conf
+echo "rpcport=${RPCPORT}" | sudo tee -a /etc/bitcoin.conf
 
+# Remind user to restart the instance
 clear; echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
