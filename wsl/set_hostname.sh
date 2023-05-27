@@ -18,6 +18,5 @@ read -p "Enter the default username: "
 echo "[user]" | sudo tee -a /etc/wsl.conf
 echo "default=${REPLY}" | sudo tee -a /etc/wsl.conf
 
-# User Reminder
-clear
-echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
+# Remind user to restart the instance
+clear; echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
