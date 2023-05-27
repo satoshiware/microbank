@@ -1,20 +1,28 @@
-#(Run as administrator) PowerShell
-	wsl --install
-      dism /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart # Makes sure Virtual Machines are enabled. Required for WSL
-	\# IMPORTANT! Restart the Computer.
+# WSL Micro Node
+The Windows Subsystem for Linux (WSL) lets developers run a GNU/Linux environment, including most command-line tools, utilities, and applications directly on Windows! However, the environment is not very secure and could pose risks building a network on top of it. Therefore, it is highly recommended to only implement a WSL node for limited purposes and to take additional measures to secure funds (i.e. store large amounts offline; e.g Satoshi Savings Card) and secure the connection to the network: only operate with one outbound node connection and take the security of the Windows OS seriously.<br/><br/>
 
-# Update the Kernel
-	\# Download and install the wsl_update_x64 MSI file
-	\# IMPORTANT! Restart the Computer... Again!
+To make your WSL node experience more successful, make sure to turn off automatic updates (prevent windows from rebooting unknowingly). Also, disable sleep/hibernation mode. Even though there are workarounds, the most straight forward way to keep your WSL instance alive is to always leave the WSL terminal window open.<br/><br/>
 
-# (Run as administrator) PowerShell
+Note: If you haven't discovered the new "Windows Terminal" software readily available for download. Check it out before you get started (optional).
+
+## Install WSL
+\# Run PowerShell (as administrator)<br/>
+wsl --install<br/>
+dism /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart # Make sure Virtual Machines are enabled.<br/>
+\# Restart the Computer!
+
+## Update the Kernel
+\# Download and install [Link wsl_update_x64](https://docs.microsoft.com/en-us/windows/wsl/install-manual#step-4---download-the-linux-kernel-update-package)<br/>
+\# Restart the Computer... Again!
+
+## (Run as administrator) PowerShell
 wsl --set-default-version 2 # Sets WSL to version 2 by default for new Linux distribution installations
 wsl --update # Make sure the latest version is being used
 wsl --unregister Debian # Let's start with a fresh install
       
       
       
-# Install Debian
+## Install Debian
 wsl --install -d Debian<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Enter Desired $USERNAME<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Enter Desired Password<br/>
