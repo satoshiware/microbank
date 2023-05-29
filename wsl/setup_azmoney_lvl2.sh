@@ -250,7 +250,29 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-#Create ckproxy Configuration File
+# Generating Strong Passphrase
+STRONGPASSPF=$(openssl rand -base64 24)
+STRONGPASSPF=${STRONGPASSPF//\//0} # Replace '/' characters with '0'
+STRONGPASSPF=${STRONGPASSPF//+/1} # Replace '+' characters with '1'
+STRONGPASSPF=${STRONGPASSPF//=/} # Replace '=' characters with ''
+STRONGPASSPF=${STRONGPASSPF//O/0} # Replace 'O' (o) characters with '0'
+STRONGPASSPF=${STRONGPASSPF//l/1} # Replace 'l' (L) characters with '1'
+echo $STRONGPASSPF | sudo tee /root/passphrase
+sudo chmod 400 /root/passphrase
+
+# Reload/Enable System Control for new processes
+sudo systemctl daemon-reload
+sudo systemctl enable ssh
+sudo systemctl enable bitcoind --now
+echo "waiting a few seconds for bitcoind to start"; sleep 15
+
+# Generate Wallets
+sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="watch" disable_private_keys=true descriptors=false load_on_startup=true
+sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="import" descriptors=false load_on_startup=true
+sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="mining" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
+sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
+
+# Create ckproxy Configuration File
 MININGADDRESS=$(btc -rpcwallet=mining getnewaddress "ckproxy")
 echo "Please enter your email to receive notifications from the pool"; read MININGEMAIL
 cat << EOF | sudo tee /etc/ckproxy.conf
@@ -286,28 +308,9 @@ EOF
 sudo chown root:ckproxy /etc/ckproxy.conf
 sudo chmod 440 /etc/ckproxy.conf
 
-# Generating Strong Passphrase
-STRONGPASSPF=$(openssl rand -base64 24)
-STRONGPASSPF=${STRONGPASSPF//\//0} # Replace '/' characters with '0'
-STRONGPASSPF=${STRONGPASSPF//+/1} # Replace '+' characters with '1'
-STRONGPASSPF=${STRONGPASSPF//=/} # Replace '=' characters with ''
-STRONGPASSPF=${STRONGPASSPF//O/0} # Replace 'O' (o) characters with '0'
-STRONGPASSPF=${STRONGPASSPF//l/1} # Replace 'l' (L) characters with '1'
-echo $STRONGPASSPF | sudo tee /root/passphrase
-sudo chmod 400 /root/passphrase
-
-# Reload/Enable System Control for new processes
+# Reload/Enable System Control for ckproxy
 sudo systemctl daemon-reload
-sudo systemctl enable ssh
-sudo systemctl enable bitcoind --now
 sudo systemctl enable ckproxy
-echo "waiting a few seconds for bitcoind to start"; sleep 15
-
-# Generate Wallets
-sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="watch" disable_private_keys=true descriptors=false load_on_startup=true
-sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="import" descriptors=false load_on_startup=true
-sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="mining" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
-sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
 # Create Aliases to lock and unlocks (24 Hours) wallets
 echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
