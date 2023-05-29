@@ -320,7 +320,7 @@ echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \$(sudo cat /
 echo "alias lockwallets=\"btc -rpcwallet=mining walletlock; btc -rpcwallet=bank walletlock\"" | sudo tee -a /etc/bash.bashrc
 
 # Backup Wallets
-mkdir ~/backup
+sudo mkdir -p ~/backup
 sudo install -C -m 400 -o $USER -g $USER /var/lib/bitcoin/micro/wallets/mining/wallet.dat ~/backup/mining.dat
 sudo install -C -m 400 -o $USER -g $USER /var/lib/bitcoin/micro/wallets/bank/wallet.dat ~/backup/bank.dat
 
