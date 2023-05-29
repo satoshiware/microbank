@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "Make sure to shutdown all other Bitcoin Core (micro) instances on this Windows machine."
+echo "Port collisions will interrupt this script."; read -p "Press any key to continue ..."
+
 # Run latest updates and upgrades
 sudo apt-get -y update
 sudo apt-get -y upgrade
