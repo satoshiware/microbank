@@ -5,9 +5,21 @@ sudo apt-get -y update
 sudo apt-get -y upgrade
 
 # Install Packages
-sudo apt-get -y install wget psmisc autossh ssh ufw
+sudo apt-get -y install wget psmisc autossh ssh ufw build-essential yasm autoconf automake libtool libzmq3-dev python git
 
-# Download, Verify Checksum
+# Install rpcauth Utility
+sudo wget https://github.com/satoshiware/bitcoin/ ... rpcauth.py -P /usr/share/python
+if [[ ! "$(sha256sum /usr/share/python/rpcauth.py)" == *"b0920f6d96f8c72cee49df90ee4d0bf826bbe845596ecc056c6bc0873c146d1f"* ]]; then
+        echo "Error: sha256sum for file \"/usr/share/python/rpcauth.py\" was not what was expected!"
+        exit 1
+fi
+sudo chmod +x /usr/share/python/rpcauth.py
+echo "#"\!"/bin/sh" | sudo tee /usr/share/python/rpcauth.sh
+echo "python3 /usr/share/python/rpcauth.py \$1 \$2" | sudo tee -a /usr/share/python/rpcauth.sh
+sudo ln -s /usr/share/python/rpcauth.sh /usr/bin/rpcauth
+sudo chmod 755 /usr/bin/rpcauth
+
+# Download Bitcoin Core (micro), Verify Checksum
 cd ~; wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-x86_64-linux-gnu.tar.gz
 if [[ ! "$(sha256sum ~/bitcoin-x86_64-linux-gnu.tar.gz)" == *"d868e59d59e338d5dedd25e9093c9812a764b6c6dc438871caacf8e692a9e04d"* ]]; then
         echo "Error: sha256sum for file \"bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
@@ -68,10 +80,19 @@ sudo useradd --system --shell=/sbin/nologin bitcoin
 # Wrap the Bitcoin CLI Binary with its Runtime Configuration
 echo "alias btc=\"sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf\"" | sudo tee -a /etc/bash.bashrc # Reestablish alias @ boot
 
+# Generate Strong Bitcoin RPC Password
+BTCRPCPASSWD=$(openssl rand -base64 16)
+BTCRPCPASSWD=${BTCRPCPASSWD//\//0} # Replace '/' characters with '0'
+BTCRPCPASSWD=${BTCRPCPASSWD//+/1} # Replace '+' characters with '1'
+BTCRPCPASSWD=${BTCRPCPASSWD//=/} # Replace '=' characters with ''
+echo $BTCRPCPASSWD | sudo tee /root/rpcpasswd
+BTCRPCPASSWD="" # Erase from memory
+sudo chmod 400 /root/rpcpasswd
+
 # Generate Bitcoin Configuration File with the Appropriate Permissions
 cat << EOF | sudo tee /etc/bitcoin.conf
-#server=0 # Accept JSON-RPC commands.
-#rpcauth=satoshi:e826...267$R07...070d # Username and hashed password for JSON-RPC connections
+server=1
+$(rpcauth satoshi $(sudo cat /root/rpcpasswd) | grep 'rpcauth')
 [micro]
 #### Add nodes here via ssh tunneling (e.g. addnode=localhost:19335). ####
 EOF
@@ -161,6 +182,110 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
+# Compile/Install CKProxy
+git clone https://github.com/satoshiware/ckpool
+cd ckpool
+./autogen.sh
+./configure -prefix /usr
+make clean
+make
+sudo make install
+cd ..; rm -rf ckpool
+
+# Create a ckproxy System User
+sudo useradd --system --shell=/sbin/nologin ckproxy
+
+# Create CKProxy Log Folders
+sudo mkdir -p /var/log/stratum
+sudo chown root:ckproxy -R /var/log/stratum
+sudo chmod 670 -R /var/log/stratum
+
+# Create ckproxy.service (Systemd)
+cat << EOF | sudo tee /etc/systemd/system/ckproxy.service
+[Unit]
+Description=Stratum Proxy Server
+After=network-online.target
+Wants=bitcoind.service
+
+[Service]
+ExecStart=/usr/bin/ckproxy --log-shares --killold --config /etc/ckproxy.conf
+
+Type=simple
+PIDFile=/tmp/ckproxy/main.pid
+Restart=always
+RestartSec=30
+TimeoutStopSec=30
+
+### Run as stratum:stratum ###
+User=ckproxy
+Group=ckproxy
+
+### Hardening measures ###
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Create Stratum autossh (Systemd)
+# Note: Reusing the p2pssh environment file and p2pkey authentication.
+cat << EOF | sudo tee /etc/systemd/system/stratssh@.service
+[Unit]
+Description=Stratum AutoSSH %I Tunnel Service
+Before=ckproxy.service
+After=network-online.target
+
+[Service]
+Environment="AUTOSSH_GATETIME=0"
+EnvironmentFile=/etc/default/p2pssh@%i
+ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/p2pkey -L 3334:localhost:3333 -p \${TARGET_PORT} p2p@\${TARGET}
+
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+#Create ckproxy Configuration File
+MININGADDRESS=$(btc -rpcwallet=mining getnewaddress "ckproxy")
+echo "Please enter your email to receive notifications from the pool"; read MININGEMAIL
+cat << EOF | sudo tee /etc/ckproxy.conf
+{
+"btcd" : [
+$(printf '\t'){
+$(printf '\t')"url" : "localhost:19332",
+$(printf '\t')"auth" : "satoshi",
+$(printf '\t')"pass" : "$(sudo cat /root/rpcpasswd)",
+$(printf '\t')"notify" : true
+$(printf '\t')}
+],
+"proxy" : [
+$(printf '\t'){
+$(printf '\t')"url" : "localhost:3334",
+$(printf '\t')"auth" : "${MININGADDRESS}.${MININGEMAIL}",
+$(printf '\t')"pass" : "x"
+$(printf '\t')}
+],
+"btcaddress" : "",
+"serverurl" : [
+$(printf '\t')"0.0.0.0:3333"
+],
+"mindiff" : 1,
+"startdiff" : 42,
+"maxdiff" : 0,
+"zmqblock" : "tcp://127.0.0.1:28332",
+"logdir" : "/var/log/stratum"
+}
+Comments from here on are ignored.
+EOF
+
+sudo chown root:ckproxy /etc/ckproxy.conf
+sudo chmod 440 /etc/ckproxy.conf
+
 # Generating Strong Passphrase
 STRONGPASSPF=$(openssl rand -base64 24)
 STRONGPASSPF=${STRONGPASSPF//\//0} # Replace '/' characters with '0'
@@ -175,6 +300,7 @@ sudo chmod 400 /root/passphrase
 sudo systemctl daemon-reload
 sudo systemctl enable ssh
 sudo systemctl enable bitcoind --now
+sudo systemctl enable ckproxy
 echo "waiting a few seconds for bitcoind to start"; sleep 15
 
 # Generate Wallets
