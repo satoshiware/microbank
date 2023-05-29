@@ -139,19 +139,19 @@ echo -e "\nMatch User *,"'!'"stratum,"'!'"root,"'!'"$USER" | sudo tee -a /etc/ss
 echo -e "\tAllowTCPForwarding no" | sudo tee -a /etc/ssh/sshd_config
 echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
 echo -e "\tForceCommand /usr/sbin/nologin" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\nMatch User stratum" | sudo tee -a /etc/ssh/sshd_config
+echo -e "\nMatch User p2p" | sudo tee -a /etc/ssh/sshd_config
 echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tPermitOpen localhost:3333" | sudo tee -a /etc/ssh/sshd_config
+echo -e "\tPermitOpen localhost:19333 localhost:3333" | sudo tee -a /etc/ssh/sshd_config
 
-# Setup a "no login" user called "stratum"
-sudo useradd -s /bin/false -m -d /home/stratum stratum
+# Setup a "no login" user called "p2p"
+sudo useradd -s /bin/false -m -d /home/p2p p2p
 
-# Create (stratum) .ssh folder; Set ownership and permissions
-sudo mkdir -p /home/stratum/.ssh
-sudo touch /home/stratum/.ssh/authorized_keys
-sudo chown -R stratum:stratum /home/stratum/.ssh
-sudo chmod 700 /home/stratum/.ssh
-sudo chmod 600 /home/stratum/.ssh/authorized_keys
+# Create (p2p) .ssh folder; Set ownership and permissions
+sudo mkdir -p /home/p2p/.ssh
+sudo touch /home/p2p/.ssh/authorized_keys
+sudo chown -R p2p:p2p /home/p2p/.ssh
+sudo chmod 700 /home/p2p/.ssh
+sudo chmod 600 /home/p2p/.ssh/authorized_keys
 
 # Generate public/private keys (non-encrytped)
 sudo ssh-keygen -t ed25519 -f /root/.ssh/p2pkey -N "" -C ""
