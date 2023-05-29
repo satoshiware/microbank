@@ -8,7 +8,7 @@ sudo apt-get -y upgrade
 sudo apt-get -y install wget psmisc autossh ssh ufw build-essential yasm autoconf automake libtool libzmq3-dev python git
 
 # Install rpcauth Utility
-sudo wget https://github.com/satoshiware/bitcoin/ ... rpcauth.py -P /usr/share/python
+sudo wget https://github.com/satoshiware/bitcoin/releases/download/v23001/rpcauth.py -P /usr/share/python
 if [[ ! "$(sha256sum /usr/share/python/rpcauth.py)" == *"b0920f6d96f8c72cee49df90ee4d0bf826bbe845596ecc056c6bc0873c146d1f"* ]]; then
         echo "Error: sha256sum for file \"/usr/share/python/rpcauth.py\" was not what was expected!"
         exit 1
