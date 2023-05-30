@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# Make sure we are not running as root, but that we have sudo privileges.
+if [ "$(id -u)" = "0" ]; then
+   echo "This script must NOT be run as root (or with sudo)!"
+   exit 1
+fi
+if [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
+   echo "You do not have enough sudo privileges!"
+   exit 1
+fi
+sudo pwd # Print Working Directory; have the user enable sudo access if not already.
+
 echo "Make sure to shutdown all other Bitcoin Core (micro) instances on this Windows machine."
 echo "Port collisions will interrupt this script."; read -p "Press any key to continue ..."
 
