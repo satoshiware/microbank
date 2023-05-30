@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo mkdir -p ~/backup
+mkdir -p ~/backup
 sudo chown -R $USER:$USER ~/backup
 
 echo "This file contains important information on your \"$(hostname)\" micronode." | tee ~/backup/$(hostname).info > /dev/null
