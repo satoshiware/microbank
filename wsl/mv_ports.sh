@@ -27,6 +27,7 @@ echo "rpcport=${RPCPORT}" | sudo tee -a /etc/bitcoin.conf
 # Change Stratum port in and ckproxy.conf and sshd_config
 sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckproxy.conf
 sudo sed -i "s/3333/${STRATPORT}/g" /etc/ssh/sshd_config
+sudo sed -i "s/3333/${STRATPORT}/g" /etc/default/p2pssh@stratum
 
 # Remind user to restart the instance
 clear; echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
