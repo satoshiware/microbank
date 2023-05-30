@@ -21,10 +21,3 @@ echo "" | tee -a ~/backup/$(hostname).info > /dev/null
 
 echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | tee -a ~/backup/$(hostname).info > /dev/null
 echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | tee -a ~/backup/$(hostname).info > /dev/null
-
-
-############# todo: the Micro port is gonna be different if it was not changed in the bitcoin.conf. what's the backup?
-########## havn't done stratum port yet. gotta a solution that will work on level1 and level2???
-############ the P2p service needs updated if we are gonna change ports.
-
-########### on level 1, what about doing the pass through port???? that was all theorectical 'till now. 
