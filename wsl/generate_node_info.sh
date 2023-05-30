@@ -17,7 +17,7 @@ echo "" | tee -a ~/backup/$(hostname).info > /dev/null
 
 echo "SSH Port: $(sudo cat /etc/ssh/sshd_config | grep 'Port ' | sed 's/Port *//')" | tee -a ~/backup/$(hostname).info > /dev/null
 echo "Micro Port: $(sudo cat /etc/bitcoin.conf | grep '^port=' | sed 's/port=*//')" | tee -a ~/backup/$(hostname).info > /dev/null
-echo "Stratum Port:" | tee -a ~/backup/$(hostname).info > /dev/null
+echo "Stratum Port:" | tee -a ~/backup/$(hostname).info > /dev/null ####################################################################### TODO
 echo "" | tee -a ~/backup/$(hostname).info > /dev/null
 
 echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | tee -a ~/backup/$(hostname).info > /dev/null
