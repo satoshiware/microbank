@@ -266,7 +266,7 @@ sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
 # Create ckproxy Configuration File
-MININGADDRESS=$(btc -rpcwallet=mining getnewaddress "ckproxy")
+MININGADDRESS=$(sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf -rpcwallet=mining getnewaddress "ckproxy")
 echo "Please enter your email to receive notifications from the pool"; read MININGEMAIL
 cat << EOF | sudo tee /etc/ckproxy.conf
 {
