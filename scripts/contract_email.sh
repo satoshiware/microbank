@@ -114,6 +114,6 @@ EOF
 curl --request POST \
   --url $API \
   --header 'accept: application/json' \
-  --header 'api-key: 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' \
+  --header "api-key: ${KEY}" \
   --header 'content-type: application/json' \
   --data "$(generate_post_data)"
