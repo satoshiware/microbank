@@ -25,8 +25,9 @@ sudo sed -i "s/19332/${RPCPORT}/g" /etc/ckproxy.conf
 echo "port=${MICROPORT}" | sudo tee -a /etc/bitcoin.conf
 echo "rpcport=${RPCPORT}" | sudo tee -a /etc/bitcoin.conf
 
-# Change Stratum port in and ckproxy.conf
+# Change Stratum port in and ckproxy.conf and sshd_config
 sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckproxy.conf
+sudo sed -i "s/3333/${STRATPORT}/g" /etc/ssh/sshd_config
 
 # Remind user to restart the instance
 clear; echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
