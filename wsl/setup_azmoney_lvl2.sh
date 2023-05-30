@@ -204,6 +204,7 @@ sudo chown root:ckproxy -R /var/log/stratum
 sudo chmod 670 -R /var/log/stratum
 
 # Create ckproxy.service (Systemd)
+LOCAL_STRATUM_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
 cat << EOF | sudo tee /etc/systemd/system/ckproxy.service
 [Unit]
 Description=Stratum Proxy Server
@@ -244,7 +245,7 @@ After=network-online.target
 [Service]
 Environment="AUTOSSH_GATETIME=0"
 EnvironmentFile=/etc/default/p2pssh@%i
-ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/p2pkey -L 3334:localhost:3333 -p \${TARGET_PORT} p2p@\${TARGET}
+ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/p2pkey -L ${LOCAL_STRATUM_PORT}:localhost:3333 -p \${TARGET_PORT} p2p@\${TARGET}
 
 RestartSec=5
 Restart=always
@@ -290,7 +291,7 @@ $(printf '\t')}
 ],
 "proxy" : [
 $(printf '\t'){
-$(printf '\t')"url" : "localhost:3334",
+$(printf '\t')"url" : "localhost:${LOCAL_STRATUM_PORT}",
 $(printf '\t')"auth" : "${MININGADDRESS}.${MININGEMAIL}",
 $(printf '\t')"pass" : "x"
 $(printf '\t')}
