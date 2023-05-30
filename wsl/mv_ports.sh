@@ -25,8 +25,9 @@ sudo sed -i "s/19332/${RPCPORT}/g" /etc/ckpool.conf
 echo "port=${MICROPORT}" | sudo tee -a /etc/bitcoin.conf
 echo "rpcport=${RPCPORT}" | sudo tee -a /etc/bitcoin.conf
 
-# Change Stratum port in and ckproxy.conf and sshd_config
+# Change Stratum port in and ckproxy/ckpool.conf, sshd_config, and p2pssh@stratum environment file
 sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckproxy.conf
+sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckpool.conf
 sudo sed -i "s/3333/${STRATPORT}/g" /etc/ssh/sshd_config
 sudo sed -i "s/3333/${STRATPORT}/g" /etc/default/p2pssh@stratum
 
