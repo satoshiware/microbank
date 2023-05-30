@@ -135,13 +135,6 @@ sudo chmod 600 /home/stratum/.ssh/authorized_keys
 # Generate public/private keys (non-encrytped)
 sudo ssh-keygen -t ed25519 -f /root/.ssh/p2pkey -N "" -C ""
 
-# Create .ssh folder; Set ownership and permissions
-sudo mkdir -p ~/.ssh
-sudo touch ~/.ssh/authorized_keys
-sudo chown -R $USER:$USER ~/.ssh
-sudo chmod 700 ~/.ssh
-sudo chmod 600 ~/.ssh/authorized_keys
-
 # Create known_hosts file
 sudo touch /root/.ssh/known_hosts
 
