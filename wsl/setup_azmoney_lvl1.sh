@@ -164,9 +164,9 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-# Create stratum environment file for systemctl p2pssh@ tunnel service"
-sudo cat << EOF > /etc/default/p2pssh@stratum
-NAME=
+# Create stratum environment file for systemctl p2pssh@ tunnel service
+cat << EOF | sudo tee /etc/default/p2pssh@stratum
+SSH_NAME=
 LOCAL_PORT=3333
 FORWARD_PORT=
 TARGET=
