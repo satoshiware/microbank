@@ -245,7 +245,7 @@ After=network-online.target
 [Service]
 Environment="AUTOSSH_GATETIME=0"
 EnvironmentFile=/etc/default/p2pssh@%i
-ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/p2pkey -L ${LOCAL_STRATUM_PORT}:localhost:3333 -p \${TARGET_PORT} p2p@\${TARGET}
+ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/p2pkey -L ${LOCAL_STRATUM_PORT}:localhost:\${TARGET_STRATUM_PORT} -p \${TARGET_PORT} p2p@\${TARGET}
 
 RestartSec=5
 Restart=always
