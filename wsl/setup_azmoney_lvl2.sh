@@ -185,6 +185,16 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
+# Create stratum environment file for systemctl p2pssh@ tunnel service
+LOCAL_STRATUM_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+cat << EOF | sudo tee /etc/default/p2pssh@stratum
+SSH_NAME=
+LOCAL_PORT=${LOCAL_STRATUM_PORT}
+FORWARD_PORT=
+TARGET=
+TARGET_PORT=
+EOF
+
 # Compile/Install CKProxy
 git clone https://github.com/satoshiware/ckpool
 cd ckpool
@@ -256,7 +266,6 @@ sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
 # Create ckproxy Configuration File
-LOCAL_STRATUM_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
 MININGADDRESS=$(btc -rpcwallet=mining getnewaddress "ckproxy")
 echo "Please enter your email to receive notifications from the pool"; read MININGEMAIL
 cat << EOF | sudo tee /etc/ckproxy.conf
