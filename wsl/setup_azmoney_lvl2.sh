@@ -204,7 +204,6 @@ sudo chown root:ckproxy -R /var/log/stratum
 sudo chmod 670 -R /var/log/stratum
 
 # Create ckproxy.service (Systemd)
-LOCAL_STRATUM_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
 cat << EOF | sudo tee /etc/systemd/system/ckproxy.service
 [Unit]
 Description=Stratum Proxy Server
@@ -257,6 +256,7 @@ sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
 # Create ckproxy Configuration File
+LOCAL_STRATUM_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
 MININGADDRESS=$(btc -rpcwallet=mining getnewaddress "ckproxy")
 echo "Please enter your email to receive notifications from the pool"; read MININGEMAIL
 cat << EOF | sudo tee /etc/ckproxy.conf
