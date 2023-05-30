@@ -164,6 +164,15 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
+# Create stratum environment file for systemctl p2pssh@ tunnel service"
+sudo cat << EOF > /etc/default/p2pssh@stratum
+NAME=
+LOCAL_PORT=3333
+FORWARD_PORT=
+TARGET=
+TARGET_PORT=
+EOF
+
 # Generating Strong Passphrase
 STRONGPASSPF=$(openssl rand -base64 24)
 STRONGPASSPF=${STRONGPASSPF//\//0} # Replace '/' characters with '0'
