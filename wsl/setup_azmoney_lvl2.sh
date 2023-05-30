@@ -229,7 +229,7 @@ Restart=always
 RestartSec=30
 TimeoutStopSec=30
 
-### Run as stratum:stratum ###
+### Run as ckproxy:ckproxy ###
 User=ckproxy
 Group=ckproxy
 
