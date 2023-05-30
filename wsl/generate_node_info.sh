@@ -1,6 +1,7 @@
 #!/bin/bash
 
-mkdir -p ~/backup
+sudo mkdir -p ~/backup
+sudo chown -R $USER:$USER ~/backup
 
 echo "This file contains important information on your \"$(hostname)\" micronode." | tee ~/backup/$(hostname).info > /dev/null
 echo "It can be used to establish p2p and stratum connections over ssh." | tee -a ~/backup/$(hostname).info > /dev/null
@@ -21,3 +22,5 @@ echo "" | tee -a ~/backup/$(hostname).info > /dev/null
 
 echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | tee -a ~/backup/$(hostname).info > /dev/null
 echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | tee -a ~/backup/$(hostname).info > /dev/null
+
+sudo chmod 400 ~/backup/$(hostname).info
