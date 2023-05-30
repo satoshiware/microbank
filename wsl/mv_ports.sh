@@ -19,6 +19,7 @@ sudo sed -i "s/19333/${MICROPORT}/g" /etc/ssh/sshd_config
 
 # Change RPC Bitcoin Core (micro) port in and ckproxy.conf
 sudo sed -i "s/19332/${RPCPORT}/g" /etc/ckproxy.conf
+sudo sed -i "s/19332/${RPCPORT}/g" /etc/ckpool.conf
 
 # Add new ports to the Bitcoin (micro) configuration file
 echo "port=${MICROPORT}" | sudo tee -a /etc/bitcoin.conf
