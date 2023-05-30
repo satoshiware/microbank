@@ -3,20 +3,20 @@
 echo "name, email, amount, address, txid, total, hashrate, coin(sats), coin(usd), coin(btc), total(sats), total(usd), hashrate(sats), hashrate(usd), Deposits(sats), Deposits(btc), deposits(coins), deposits(unit), phone, email"
 NAME=$1; EMAIL=$2; AMOUNT=$3; ADDRESS=$4; TXID=$5; TOTAL=$6; HASHRATE=$7; COINVALUESATS=$8; COINVALUEUSD=$9; COINVALUEBTC=${10}; COINVALUETOTALSATS=${11}; COINVALUETOTALUSD=${12}; HASHPRICESATS=${13}; HASHPRICEUSD=${14}; DEPOSITSSATS=${15}; DEPOSITSBTC=${16}; DEPOSITSCOINS=${17}; DEPOSITSUNIT=${18}; CONTACTPHONE=${19}; CONTACTEMAIL=${20}
 
-NETWORK="AZ Money"
-NETWORKPREFIX="AZ"
-DENOMINATION="SAGZ"
-DENOMINATIONNAME="Saguaros"
-HASHRATEUNIT="GH/s"
-TXIDEXPLORER="TXID:"
+NETWORK="?? ?????"
+NETWORKPREFIX="??"
+DENOMINATION="????"
+DENOMINATIONNAME="????"
+HASHRATEUNIT="?H/s"
+TXIDEXPLORER="https://microexplorer????.com/"
 
-MEETUPLINK="https://meetup.com/az-money"
+MEETUPLINK="https://meetup.com/????"
 
-API="https://api.brevo.com/v3/smtp/email"
-KEY="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"
+API="????"
+KEY="????"
 
-SENDERNAME="${NETWORK} Mining & Trading"
-SENDEREMAIL="satoshi@manamining.com"
+SENDERNAME="${NETWORK}"
+SENDEREMAIL="satoshi@????.com"
 SUBJECT="You mined $AMOUNT coins!"
 MESSAGE=$(cat << EOF
         <html><head></head><body>
@@ -81,7 +81,7 @@ MESSAGE=$(cat << EOF
                         </li><li>
                                 <b>Forum:</b> <u><i><a href=\"https://forum.satoshiware.org\">https://forum.satoshiware.org</a></i></u>
                         </li><li>
-                                <b>Meetup:</b> <u><i><a href=\"${MEETUPLINK}\">https://meetup.com/az-money</a></i></u>
+                                <b>Meetup:</b> <u><i><a href=\"${MEETUPLINK}\">${MEETUPLINK}</a></i></u>
                         </li>
                 </ul>
         </body></html>
