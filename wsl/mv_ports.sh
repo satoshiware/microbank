@@ -14,8 +14,7 @@ sudo sed -i "s/#Port 22/Port ${SSHPORT}/g" /etc/ssh/sshd_config
 sudo ufw delete allow 22/tcp
 sudo ufw allow ${SSHPORT}/tcp
 
-# Change Bitcoin Core (micro) port in p2pssh@.service and sshd_config
-sudo sed -i "s/19333/${MICROPORT}/g" /etc/systemd/system/p2pssh@.service
+# Change Bitcoin Core (micro) port in sshd_config
 sudo sed -i "s/19333/${MICROPORT}/g" /etc/ssh/sshd_config
 
 # Change RPC Bitcoin Core (micro) port in and ckproxy.conf
