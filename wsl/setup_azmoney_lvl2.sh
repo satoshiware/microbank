@@ -176,7 +176,7 @@ After=network-online.target
 [Service]
 Environment="AUTOSSH_GATETIME=0"
 EnvironmentFile=/etc/default/p2pssh@%i
-ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/p2pkey -L \${LOCAL_PORT}:localhost:19333 -p \${TARGET_PORT} p2p@\${TARGET}
+ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/p2pkey -L \${LOCAL_PORT}:localhost:\${FORWARD_PORT} -p \${TARGET_PORT} p2p@\${TARGET}
 
 RestartSec=5
 Restart=always
@@ -229,26 +229,6 @@ ProtectSystem=full
 ProtectHome=true
 NoNewPrivileges=true
 PrivateDevices=true
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Create Stratum autossh (Systemd)
-# Note: Reusing the p2pssh environment file and p2pkey authentication.
-cat << EOF | sudo tee /etc/systemd/system/stratssh@.service
-[Unit]
-Description=Stratum AutoSSH %I Tunnel Service
-Before=ckproxy.service
-After=network-online.target
-
-[Service]
-Environment="AUTOSSH_GATETIME=0"
-EnvironmentFile=/etc/default/p2pssh@%i
-ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/p2pkey -L ${LOCAL_STRATUM_PORT}:localhost:\${TARGET_STRATUM_PORT} -p \${TARGET_PORT} p2p@\${TARGET}
-
-RestartSec=5
-Restart=always
 
 [Install]
 WantedBy=multi-user.target
