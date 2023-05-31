@@ -5,11 +5,6 @@ if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
    exit 1
 fi
-if [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
-   echo "You do not have enough sudo privileges!"
-   exit 1
-fi
-sudo pwd # Print Working Directory; have the user enable sudo access if not already.
 
 echo "This file contains important information on your \"$(hostname)\" micronode." | tee ~/backup/$(hostname).info > /dev/null
 echo "It can be used to establish p2p and stratum connections over ssh." | tee -a ~/backup/$(hostname).info > /dev/null
