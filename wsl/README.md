@@ -27,15 +27,12 @@ wsl --install -d Debian<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Enter Desired Password<br/>
 exit # Return back to the PowerShell<br/>
 wsl -t Debian # Shutdown the new Debian instance
-wsl --export Debian $HOME\debian.tar<br/>
+wsl --export Debian $HOME\wsl-debian-micronode.tar<br/>
+wsl --unregister Debian<br/>
 
 ## Create a new micronode instance from the Debian install
 $INSTANCE = Read-Host -Prompt 'Enter the desired name for the wsl micro node instance'<br/>
-wsl --import $INSTANCE $HOME\\$INSTANCE $HOME\debian.tar
-
-## Remove Debian (if no longer needed)
-wsl --unregister Debian<br/>
-rm $HOME\debian.tar
+wsl --import $INSTANCE $HOME\\$INSTANCE $HOME\wsl-debian-micronode.tar
 
 ## Link to boot the new instance
 c:\windows\system32\wsl.exe -d $INSTANCE
