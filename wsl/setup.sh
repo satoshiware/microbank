@@ -4,8 +4,7 @@
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
    exit 1
-fi
-if [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
+elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    echo "You do not have enough sudo privileges!"
    exit 1
 fi
@@ -14,15 +13,16 @@ cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if no
 echo "Make sure to shutdown all other Bitcoin Core (micro) instances on this Windows machine."
 echo "Port collisions will interrupt this script."; read -p "Press enter to continue ..."
 read -p "What node level would you like installed? (1, 2, or 3): " NDLVL
+echo ${NDLVL} | sudo tee /etc/nodelevel
 
 # Run latest updates and upgrades
 sudo apt-get -y update
 sudo apt-get -y upgrade
 
 # Install Packages
-sudo apt-get -y install wget psmisc autossh ssh ufw
+sudo apt-get -y install wget psmisc autossh ssh ufw python jq
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	sudo apt-get -y install build-essential yasm autoconf automake libtool libzmq3-dev python git
+	sudo apt-get -y install build-essential yasm autoconf automake libtool libzmq3-dev git
 
 	# Install rpcauth Utility
 	sudo wget https://github.com/satoshiware/bitcoin/releases/download/v23001/rpcauth.py -P /usr/share/python
@@ -225,19 +225,12 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-if [[ ${NDLVL} = "1" || ${NDLVL} = "2" ]]; then
-	# Create stratum environment file for systemctl p2pssh@ tunnel service
-	LOCAL_STRATUM_PORT=3333
-	if [ ${NDLVL} = "2" ]; then
-		LOCAL_STRATUM_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')	
-	fi
-	cat << EOF | sudo tee /etc/default/p2pssh@stratum
-SSH_NAME=
-LOCAL_PORT=${LOCAL_STRATUM_PORT}
-FORWARD_PORT=
-TARGET=
-TARGET_PORT=
-EOF
+# Set stratum port configuration
+if [ ${NDLVL} = "1" ]; then echo "3333" | sudo tee /etc/stratumport; fi
+if [ ${NDLVL} = "2" ]; then
+	echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum1port
+	echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum2port
+	echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum3port
 fi
 
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
@@ -337,7 +330,17 @@ EOF
 	cat << EOF | sudo tee -a /etc/${STRATUMUSER}.conf
 "proxy" : [
 $(printf '\t'){
-$(printf '\t')"url" : "localhost:${LOCAL_STRATUM_PORT}",
+$(printf '\t')"url" : "localhost:$(sudo cat /etc/stratum1port)",
+$(printf '\t')"auth" : "${MININGADDRESS}.${MININGEMAIL}",
+$(printf '\t')"pass" : "x"
+$(printf '\t')},
+$(printf '\t'){
+$(printf '\t')"url" : "localhost:$(sudo cat /etc/stratum2port)",
+$(printf '\t')"auth" : "${MININGADDRESS}.${MININGEMAIL}",
+$(printf '\t')"pass" : "x"
+$(printf '\t')},
+$(printf '\t'){
+$(printf '\t')"url" : "localhost:$(sudo cat /etc/stratum3port)",
 $(printf '\t')"auth" : "${MININGADDRESS}.${MININGEMAIL}",
 $(printf '\t')"pass" : "x"
 $(printf '\t')}
@@ -360,7 +363,6 @@ $(printf '\t')"0.0.0.0:3333"
 "zmqblock" : "tcp://127.0.0.1:28332",
 "logdir" : "/var/log/stratum"
 }
-Comments from here on are ignored.
 EOF
 
 	sudo chown root:${STRATUMUSER} /etc/${STRATUMUSER}.conf
@@ -439,7 +441,7 @@ if [[ ${REPLY} = "y" || ${REPLY} = "Y" ]]; then
 	sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckproxy.conf
 	sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckpool.conf
 	sudo sed -i "s/3333/${STRATPORT}/g" /etc/ssh/sshd_config
-	sudo sed -i "s/3333/${STRATPORT}/g" /etc/default/p2pssh@stratum
+	echo "${STRATPORT}" | sudo tee /etc/stratumport;	
 fi
 
 # Generate Micronode Information
