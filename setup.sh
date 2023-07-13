@@ -3,6 +3,10 @@
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
+   echo "if you need to create a sudo user (e.g. satoshi), run the following commands:"
+   echo "   sudo adduser satoshi"
+   echo "   sudo usermod -aG sudo satoshi"
+   echo "   sudo su satoshi # Switch to the new user"
    exit 1
 elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    echo "You do not have enough sudo privileges!"
@@ -10,8 +14,27 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if not already.
 
-echo "Make sure to shutdown all other Bitcoin Core (micro) instances on this Windows machine."
-echo "Port collisions will interrupt this script."; read -p "Press enter to continue ..."
+# Select the system configuration for the remaining script to run the proper setup/installtion.
+echo ""
+PS3='What system configuration are we using? '
+options=("WSL (Debian, x86_64)" "Debian (x86_64)" "Raspbian (ARM_32)")
+select opt in "${options[@]}"
+do
+    case $opt in
+        "WSL (Debian, x86_64)") MN_SYS_CONFIG="WSL"; break;;
+        "Debian (x86_64)") MN_SYS_CONFIG="DEBIAN"; break;;
+        "Raspbian (ARM_32)") MN_SYS_CONFIG="RASPBIAN"; break;;
+        *) echo "Invalid option! Your input was \"$REPLY\""; break;;
+    esac
+done
+
+# WSL Reminder: multiple (micro) bitcoin core instances running on the same windows machine could have port collision.
+if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
+    echo ""; echo "Make sure to shutdown all other Bitcoin Core (micro) instances on this Windows machine."
+    echo "Port collisions will interrupt this script."; read -p "Press enter to continue ..."; echo ""
+fi
+
+# Select the node level
 read -p "What node level would you like installed? (1, 2, or 3): " NDLVL
 echo ${NDLVL} | sudo tee /etc/nodelevel
 
@@ -22,32 +45,45 @@ sudo apt-get -y upgrade
 # Install Packages
 sudo apt-get -y install wget psmisc autossh ssh ufw python jq
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	sudo apt-get -y install build-essential yasm autoconf automake libtool libzmq3-dev git
+    sudo apt-get -y install build-essential yasm autoconf automake libtool libzmq3-dev git
 
-	# Install rpcauth Utility
-	sudo wget https://github.com/satoshiware/bitcoin/releases/download/v23001/rpcauth.py -P /usr/share/python
-	if [[ ! "$(sha256sum /usr/share/python/rpcauth.py)" == *"b0920f6d96f8c72cee49df90ee4d0bf826bbe845596ecc056c6bc0873c146d1f"* ]]; then
-		echo "Error: sha256sum for file \"/usr/share/python/rpcauth.py\" was not what was expected!"
+    # Install rpcauth Utility
+    sudo wget https://github.com/satoshiware/bitcoin/releases/download/v23001/rpcauth.py -P /usr/share/python
+    if [[ ! "$(sha256sum /usr/share/python/rpcauth.py)" == *"b0920f6d96f8c72cee49df90ee4d0bf826bbe845596ecc056c6bc0873c146d1f"* ]]; then
+        echo "Error: sha256sum for file \"/usr/share/python/rpcauth.py\" was not what was expected!"
         exit 1
-	fi
-	sudo chmod +x /usr/share/python/rpcauth.py
-	echo "#"\!"/bin/sh" | sudo tee /usr/share/python/rpcauth.sh
-	echo "python3 /usr/share/python/rpcauth.py \$1 \$2" | sudo tee -a /usr/share/python/rpcauth.sh
-	sudo ln -s /usr/share/python/rpcauth.sh /usr/bin/rpcauth
-	sudo chmod 755 /usr/bin/rpcauth
+    fi
+    sudo chmod +x /usr/share/python/rpcauth.py
+    echo "#"\!"/bin/sh" | sudo tee /usr/share/python/rpcauth.sh
+    echo "python3 /usr/share/python/rpcauth.py \$1 \$2" | sudo tee -a /usr/share/python/rpcauth.sh
+    sudo ln -s /usr/share/python/rpcauth.sh /usr/bin/rpcauth
+    sudo chmod 755 /usr/bin/rpcauth
 fi
 
 # Download Bitcoin Core (micro), Verify Checksum
-wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-x86_64-linux-gnu.tar.gz
-if [[ ! "$(sha256sum ~/bitcoin-x86_64-linux-gnu.tar.gz)" == *"d868e59d59e338d5dedd25e9093c9812a764b6c6dc438871caacf8e692a9e04d"* ]]; then
+if [[ ${MN_SYS_CONFIG} = "RASPBIAN" ]]; then
+    wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-arm-linux-gnueabihf.tar.gz
+    if [[ ! "$(sha256sum ~/bitcoin-arm-linux-gnueabihf.tar.gz)" == *"df74eb09096a722c42e0b84ff96bc29f01380b4460729ea30cacba96ad6af7a6"* ]]; then
+        echo "Error: sha256sum for file \"bitcoin-arm-linux-gnueabihf.tar.gz\" was not what was expected!"
+        exit 1
+    fi
+
+    tar -xzf bitcoin-arm-linux-gnueabihf.tar.gz
+    rm bitcoin-arm-linux-gnueabihf.tar.gz
+
+else
+    wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-x86_64-linux-gnu.tar.gz
+    if [[ ! "$(sha256sum ~/bitcoin-x86_64-linux-gnu.tar.gz)" == *"d868e59d59e338d5dedd25e9093c9812a764b6c6dc438871caacf8e692a9e04d"* ]]; then
         echo "Error: sha256sum for file \"bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
         exit 1
+    fi
+
+    tar -xzf bitcoin-x86_64-linux-gnu.tar.gz
+    rm bitcoin-x86_64-linux-gnu.tar.gz
 fi
 
 # Install Binaries
-tar -xzf bitcoin-x86_64-linux-gnu.tar.gz
 sudo install -m 0755 -o root -g root -t /usr/bin bitcoin-install/bin/*
-rm bitcoin-x86_64-linux-gnu.tar.gz
 rm -rf bitcoin-install
 
 # Prepare Service Configuration
@@ -99,25 +135,25 @@ sudo useradd --system --shell=/sbin/nologin bitcoin
 echo "alias btc=\"sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf\"" | sudo tee -a /etc/bash.bashrc # Reestablish alias @ boot
 
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	# Generate Strong Bitcoin RPC Password
-	BTCRPCPASSWD=$(openssl rand -base64 16)
-	BTCRPCPASSWD=${BTCRPCPASSWD//\//0} # Replace '/' characters with '0'
-	BTCRPCPASSWD=${BTCRPCPASSWD//+/1} # Replace '+' characters with '1'
-	BTCRPCPASSWD=${BTCRPCPASSWD//=/} # Replace '=' characters with ''
-	echo $BTCRPCPASSWD | sudo tee /root/rpcpasswd
-	BTCRPCPASSWD="" # Erase from memory
-	sudo chmod 400 /root/rpcpasswd
+    # Generate Strong Bitcoin RPC Password
+    BTCRPCPASSWD=$(openssl rand -base64 16)
+    BTCRPCPASSWD=${BTCRPCPASSWD//\//0} # Replace '/' characters with '0'
+    BTCRPCPASSWD=${BTCRPCPASSWD//+/1} # Replace '+' characters with '1'
+    BTCRPCPASSWD=${BTCRPCPASSWD//=/} # Replace '=' characters with ''
+    echo $BTCRPCPASSWD | sudo tee /root/rpcpasswd
+    BTCRPCPASSWD="" # Erase from memory
+    sudo chmod 400 /root/rpcpasswd
 fi
 
 # Generate Bitcoin Configuration File with the Appropriate Permissions
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	cat << EOF | sudo tee /etc/bitcoin.conf
+    cat << EOF | sudo tee /etc/bitcoin.conf
 server=1
 $(rpcauth satoshi $(sudo cat /root/rpcpasswd) | grep 'rpcauth')
 [micro]
 EOF
 else
-	cat << EOF | sudo tee /etc/bitcoin.conf
+    cat << EOF | sudo tee /etc/bitcoin.conf
 [micro]
 EOF
 fi
@@ -157,47 +193,47 @@ sudo sed -i 's/X11Forwarding yes/#X11Forwarding no/g' /etc/ssh/sshd_config # Dis
 sudo sed -i 's/#AllowTcpForwarding yes/AllowTcpForwarding Local/g' /etc/ssh/sshd_config # Only allow local port forwarding
 sudo sed -i 's/#.*StrictHostKeyChecking ask/\ \ \ \ StrictHostKeyChecking yes/g' /etc/ssh/ssh_config # Enable strict host verification
 if [ ${NDLVL} = "1" ]; then
-	echo -e "\nMatch User *,"'!'"stratum,"'!'"root,"'!'"$USER" | sudo tee -a /etc/ssh/sshd_config; 
+    echo -e "\nMatch User *,"'!'"stratum,"'!'"root,"'!'"$USER" | sudo tee -a /etc/ssh/sshd_config;
 fi
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	echo -e "\nMatch User *,"'!'"p2p,"'!'"root,"'!'"$USER" | sudo tee -a /etc/ssh/sshd_config
+    echo -e "\nMatch User *,"'!'"p2p,"'!'"root,"'!'"$USER" | sudo tee -a /etc/ssh/sshd_config
 fi
 echo -e "\tAllowTCPForwarding no" | sudo tee -a /etc/ssh/sshd_config
 echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
 echo -e "\tForceCommand /usr/sbin/nologin" | sudo tee -a /etc/ssh/sshd_config
 if [ ${NDLVL} = "1" ]; then
-	echo -e "\nMatch User stratum" | sudo tee -a /etc/ssh/sshd_config
-	echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
-	echo -e "\tPermitOpen localhost:3333" | sudo tee -a /etc/ssh/sshd_config
+    echo -e "\nMatch User stratum" | sudo tee -a /etc/ssh/sshd_config
+    echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
+    echo -e "\tPermitOpen localhost:3333" | sudo tee -a /etc/ssh/sshd_config
 fi
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	echo -e "\nMatch User p2p" | sudo tee -a /etc/ssh/sshd_config
-	echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
-	echo -e "\tPermitOpen localhost:19333 localhost:3333" | sudo tee -a /etc/ssh/sshd_config
+    echo -e "\nMatch User p2p" | sudo tee -a /etc/ssh/sshd_config
+    echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
+    echo -e "\tPermitOpen localhost:19333 localhost:3333" | sudo tee -a /etc/ssh/sshd_config
 fi
 
 if [ ${NDLVL} = "1" ]; then
-	# Setup a "no login" user called "stratum"
-	sudo useradd -s /bin/false -m -d /home/stratum stratum
+    # Setup a "no login" user called "stratum"
+    sudo useradd -s /bin/false -m -d /home/stratum stratum
 
-	# Create (stratum) .ssh folder; Set ownership and permissions
-	sudo mkdir -p /home/stratum/.ssh
-	sudo touch /home/stratum/.ssh/authorized_keys
-	sudo chown -R stratum:stratum /home/stratum/.ssh
-	sudo chmod 700 /home/stratum/.ssh
-	sudo chmod 600 /home/stratum/.ssh/authorized_keys
+    # Create (stratum) .ssh folder; Set ownership and permissions
+    sudo mkdir -p /home/stratum/.ssh
+    sudo touch /home/stratum/.ssh/authorized_keys
+    sudo chown -R stratum:stratum /home/stratum/.ssh
+    sudo chmod 700 /home/stratum/.ssh
+    sudo chmod 600 /home/stratum/.ssh/authorized_keys
 fi
 
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	# Setup a "no login" user called "p2p"
-	sudo useradd -s /bin/false -m -d /home/p2p p2p
+    # Setup a "no login" user called "p2p"
+    sudo useradd -s /bin/false -m -d /home/p2p p2p
 
-	# Create (p2p) .ssh folder; Set ownership and permissions
-	sudo mkdir -p /home/p2p/.ssh
-	sudo touch /home/p2p/.ssh/authorized_keys
-	sudo chown -R p2p:p2p /home/p2p/.ssh
-	sudo chmod 700 /home/p2p/.ssh
-	sudo chmod 600 /home/p2p/.ssh/authorized_keys
+    # Create (p2p) .ssh folder; Set ownership and permissions
+    sudo mkdir -p /home/p2p/.ssh
+    sudo touch /home/p2p/.ssh/authorized_keys
+    sudo chown -R p2p:p2p /home/p2p/.ssh
+    sudo chmod 700 /home/p2p/.ssh
+    sudo chmod 600 /home/p2p/.ssh/authorized_keys
 fi
 
 # Generate public/private keys (non-encrytped)
@@ -228,38 +264,38 @@ EOF
 # Set stratum port configuration
 if [ ${NDLVL} = "1" ]; then echo "3333" | sudo tee /etc/stratumport; fi
 if [ ${NDLVL} = "2" ]; then
-	echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum1port
-	echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum2port
-	echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum3port
+    echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum1port
+    echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum2port
+    echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum3port
 fi
 
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	if [ ${NDLVL} = "2" ]; then
-		STRATUMUSER=ckproxy
-	else
-		STRATUMUSER=ckpool
-	fi
+    if [ ${NDLVL} = "2" ]; then
+        STRATUMUSER=ckproxy
+    else
+        STRATUMUSER=ckpool
+    fi
 
-	# Compile/Install CKPool/CKProxy
-	git clone https://github.com/satoshiware/ckpool
-	cd ckpool
-	./autogen.sh
-	./configure -prefix /usr
-	make clean
-	make
-	sudo make install
-	cd ..; rm -rf ckpool
+    # Compile/Install CKPool/CKProxy
+    git clone https://github.com/satoshiware/ckpool
+    cd ckpool
+    ./autogen.sh
+    ./configure -prefix /usr
+    make clean
+    make
+    sudo make install
+    cd ..; rm -rf ckpool
 
-	# Create a ${STRATUMUSER} System User
-	sudo useradd --system --shell=/sbin/nologin ${STRATUMUSER}
+    # Create a ${STRATUMUSER} System User
+    sudo useradd --system --shell=/sbin/nologin ${STRATUMUSER}
 
-	# Create ${STRATUMUSER} Log Folders
-	sudo mkdir -p /var/log/stratum
-	sudo chown root:${STRATUMUSER} -R /var/log/stratum
-	sudo chmod 670 -R /var/log/stratum
+    # Create ${STRATUMUSER} Log Folders
+    sudo mkdir -p /var/log/stratum
+    sudo chown root:${STRATUMUSER} -R /var/log/stratum
+    sudo chmod 670 -R /var/log/stratum
 
-	# Create ${STRATUMUSER}.service (Systemd)
-	cat << EOF | sudo tee /etc/systemd/system/${STRATUMUSER}.service
+    # Create ${STRATUMUSER}.service (Systemd)
+    cat << EOF | sudo tee /etc/systemd/system/${STRATUMUSER}.service
 [Unit]
 Description=Stratum ${STRATUMUSER} Server
 After=network-online.target
@@ -312,10 +348,10 @@ sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
-	# Create ${STRATUMUSER} Configuration File
-	MININGADDRESS=$(sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf -rpcwallet=mining getnewaddress "${STRATUMUSER}")
-	echo "Please enter your email to receive notifications from the ${STRATUMUSER}"; read MININGEMAIL
-	cat << EOF | sudo tee /etc/${STRATUMUSER}.conf
+    # Create ${STRATUMUSER} Configuration File
+    MININGADDRESS=$(sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf -rpcwallet=mining getnewaddress "${STRATUMUSER}")
+    echo "Please enter your email to receive notifications from the ${STRATUMUSER}"; read MININGEMAIL
+    cat << EOF | sudo tee /etc/${STRATUMUSER}.conf
 {
 "btcd" : [
 $(printf '\t'){
@@ -326,8 +362,8 @@ $(printf '\t')"notify" : true
 $(printf '\t')}
 ],
 EOF
-	if [ ${NDLVL} = "2" ]; then
-	cat << EOF | sudo tee -a /etc/${STRATUMUSER}.conf
+    if [ ${NDLVL} = "2" ]; then
+    cat << EOF | sudo tee -a /etc/${STRATUMUSER}.conf
 "proxy" : [
 $(printf '\t'){
 $(printf '\t')"url" : "localhost:$(sudo cat /etc/stratum1port)",
@@ -347,13 +383,13 @@ $(printf '\t')}
 ],
 "btcaddress" : "",
 EOF
-	else # NDLVL = 3
-	cat << EOF | sudo tee -a /etc/${STRATUMUSER}.conf
+    else # NDLVL = 3
+    cat << EOF | sudo tee -a /etc/${STRATUMUSER}.conf
 "btcaddress" : "${MININGADDRESS}",
 "btcsig" : "",
 EOF
-	fi
-	cat << EOF | sudo tee -a /etc/${STRATUMUSER}.conf
+    fi
+    cat << EOF | sudo tee -a /etc/${STRATUMUSER}.conf
 "serverurl" : [
 $(printf '\t')"0.0.0.0:3333"
 ],
@@ -365,12 +401,12 @@ $(printf '\t')"0.0.0.0:3333"
 }
 EOF
 
-	sudo chown root:${STRATUMUSER} /etc/${STRATUMUSER}.conf
-	sudo chmod 440 /etc/${STRATUMUSER}.conf
+    sudo chown root:${STRATUMUSER} /etc/${STRATUMUSER}.conf
+    sudo chmod 440 /etc/${STRATUMUSER}.conf
 
-	# Reload/Enable System Control for ${STRATUMUSER}
-	sudo systemctl daemon-reload
-	sudo systemctl enable ${STRATUMUSER}
+    # Reload/Enable System Control for ${STRATUMUSER}
+    sudo systemctl daemon-reload
+    sudo systemctl enable ${STRATUMUSER}
 fi
 
 # Create Aliases to lock and unlocks (24 Hours) wallets
@@ -409,39 +445,41 @@ if [[ ! "$(sudo cat /root/passphrase)" == "$REPLY" ]]; then
   fi
 fi
 
-# Change Default Ports
-read -p "Would you like to change the default ports? (y|n): "
-if [[ ${REPLY} = "y" || ${REPLY} = "Y" ]]; then
-	echo "This script only works once on a fresh install and cannot be undone automatically!"
-	echo "If port changes have already been changed, new changes will need to be done manually."
-	read -p "Enter new Bitcoin Core (micro) port (default = 19333): "; MICROPORT="$REPLY"
-	read -p "Enter new RPC (micro) port (default = 19332): "; RPCPORT="$REPLY"
-	read -p "Enter new Stratum port (default = 3333): "; STRATPORT="$REPLY"
-	read -p "Enter new SSH port (default = 22): "; SSHPORT="$REPLY"
+# Change Default Ports (WSL only)
+if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
+    read -p "Would you like to change the default ports? (y|n): "
+    if [[ ${REPLY} = "y" || ${REPLY} = "Y" ]]; then
+        echo "This script only works once on a fresh install and cannot be undone automatically!"
+        echo "If port changes have already been changed, new changes will need to be done manually."
+        read -p "Enter new Bitcoin Core (micro) port (default = 19333): "; MICROPORT="$REPLY"
+        read -p "Enter new RPC (micro) port (default = 19332): "; RPCPORT="$REPLY"
+        read -p "Enter new Stratum port (default = 3333): "; STRATPORT="$REPLY"
+        read -p "Enter new SSH port (default = 22): "; SSHPORT="$REPLY"
 
-	# Change SSH port in sshd config
-	sudo sed -i "s/#Port 22/Port ${SSHPORT}/g" /etc/ssh/sshd_config
+        # Change SSH port in sshd config
+        sudo sed -i "s/#Port 22/Port ${SSHPORT}/g" /etc/ssh/sshd_config
 
-	# Update firewall
-	sudo ufw delete allow 22/tcp
-	sudo ufw allow ${SSHPORT}/tcp
+        # Update firewall
+        sudo ufw delete allow 22/tcp
+        sudo ufw allow ${SSHPORT}/tcp
 
-	# Change Bitcoin Core (micro) port in sshd_config
-	sudo sed -i "s/19333/${MICROPORT}/g" /etc/ssh/sshd_config
+        # Change Bitcoin Core (micro) port in sshd_config
+        sudo sed -i "s/19333/${MICROPORT}/g" /etc/ssh/sshd_config
 
-	# Change RPC Bitcoin Core (micro) port in and ckproxy.conf
-	sudo sed -i "s/19332/${RPCPORT}/g" /etc/ckproxy.conf
-	sudo sed -i "s/19332/${RPCPORT}/g" /etc/ckpool.conf
+        # Change RPC Bitcoin Core (micro) port in and ckproxy.conf
+        sudo sed -i "s/19332/${RPCPORT}/g" /etc/ckproxy.conf
+        sudo sed -i "s/19332/${RPCPORT}/g" /etc/ckpool.conf
 
-	# Add new ports to the Bitcoin (micro) configuration file
-	echo "port=${MICROPORT}" | sudo tee -a /etc/bitcoin.conf
-	echo "rpcport=${RPCPORT}" | sudo tee -a /etc/bitcoin.conf
+        # Add new ports to the Bitcoin (micro) configuration file
+        echo "port=${MICROPORT}" | sudo tee -a /etc/bitcoin.conf
+        echo "rpcport=${RPCPORT}" | sudo tee -a /etc/bitcoin.conf
 
-	# Change Stratum port in and ckproxy/ckpool.conf, sshd_config, and p2pssh@stratum environment file
-	sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckproxy.conf
-	sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckpool.conf
-	sudo sed -i "s/3333/${STRATPORT}/g" /etc/ssh/sshd_config
-	echo "${STRATPORT}" | sudo tee /etc/stratumport;	
+        # Change Stratum port in and ckproxy/ckpool.conf, sshd_config, and p2pssh@stratum environment file
+        sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckproxy.conf
+        sudo sed -i "s/3333/${STRATPORT}/g" /etc/ckpool.conf
+        sudo sed -i "s/3333/${STRATPORT}/g" /etc/ssh/sshd_config
+        echo "${STRATPORT}" | sudo tee /etc/stratumport;
+    fi
 fi
 
 # Generate Micronode Information
@@ -457,7 +495,7 @@ echo "" | tee -a ~/backup/$(hostname).info > /dev/null
 read -p "What is the address to this micronode? "; echo "Address: $REPLY" | tee -a ~/backup/$(hostname).info > /dev/null
 echo "" | tee -a ~/backup/$(hostname).info > /dev/null
 
-if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi 
+if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
 echo "SSH Port: ${SSHPORT}" | tee -a ~/backup/$(hostname).info > /dev/null
 if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
 echo "Micro Port: ${MICROPORT}" | tee -a ~/backup/$(hostname).info > /dev/null
@@ -470,5 +508,9 @@ echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | tee -a ~/backup/$(h
 
 sudo chmod 400 ~/backup/$(hostname).info
 
-# Remind user to restart the instance
-clear; echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
+# Remind user to restart
+if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
+    clear; echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
+else
+    clear; echo "Now, just restart the machine and it's ready to go."
+fi
