@@ -346,7 +346,7 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection ############
 
 elif [[ $1 = "-f" || $1 = "--info" ]]; then # Delete a connection ############## this comment ############ should pass a parameter or show connections.
     ####################### needs work #######################################
-    echo "you made it buddy to --info"
+	cat /etc/micronode.info
 
 else
     mnconnect --help
