@@ -26,7 +26,7 @@ wsl --install -d Debian<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Enter Desired $USERNAME<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Enter Desired Password<br/>
 exit # Return back to the PowerShell<br/>
-wsl -t Debian # Shutdown the new Debian instance
+wsl -t Debian # Shutdown the new Debian instance<br/>
 wsl --export Debian $HOME\wsl-debian-micronode.tar<br/>
 wsl --unregister Debian<br/>
 
