@@ -335,6 +335,12 @@ STRONGPASSPF=${STRONGPASSPF//l/1} # Replace 'l' (L) characters with '1'
 echo $STRONGPASSPF | sudo tee /root/passphrase
 sudo chmod 400 /root/passphrase
 
+# Create and authorize a SSH-Fail-Safe Key (!WSL)
+if [[ ! ${MN_SYS_CONFIG} = "WSL" ]]; then
+  ssh-keygen -t ed25519 -C "# SSH Fail Safe" -N $(sudo cat /root/passphrase) -f ~/.ssh/ssh_key_failsafe
+  cat ~/.ssh/ssh_key_failsafe.pub | sudo tee -a ~/.ssh/authorized_keys # Add "Fail Safe Key" to list of authorized keys
+fi
+
 # Reload/Enable System Control for new processes
 sudo systemctl daemon-reload
 sudo systemctl enable ssh
@@ -413,11 +419,14 @@ fi
 echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
 echo "alias lockwallets=\"btc -rpcwallet=mining walletlock; btc -rpcwallet=bank walletlock\"" | sudo tee -a /etc/bash.bashrc
 
-# Backup Wallets
+# Backup Wallets & SSH-Fail-Safe Key (!WSL)
 sudo mkdir -p ~/backup
 sudo chown -R $USER:$USER ~/backup
 sudo install -C -m 400 -o $USER -g $USER /var/lib/bitcoin/micro/wallets/mining/wallet.dat ~/backup/mining.dat
 sudo install -C -m 400 -o $USER -g $USER /var/lib/bitcoin/micro/wallets/bank/wallet.dat ~/backup/bank.dat
+if [[ ! ${MN_SYS_CONFIG} = "WSL" ]]; then
+  sudo install -C -m 400 -o $USER -g $USER ~/.ssh/ssh_key_failsafe ~/backup
+fi
 
 # Record (by Hand) the Passphrase
 echo "The wallets are encrypted with a passphrase."
@@ -515,5 +524,5 @@ bash ~/micronode/mnconnect.sh -i
 if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
     clear; echo "Now, \"exit\" to PowerShell and restart this instance (\"wsl -t \$INSTANCE\"), move backup folder (~/backup) with wallets to some other media, and it's ready to go!"
 else
-    clear; echo "Now, just restart the machine (e.g. \"sudo reboot\"), move backup folder (~/backup) with wallets to some other media, and it's ready to go!"
+    clear; echo "Now, just restart the machine (e.g. \"sudo reboot\"), move backup folder (~/backup) with wallets & SSH-Fail-Safe Key to some other media, and it's ready to go!"
 fi
