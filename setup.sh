@@ -483,28 +483,28 @@ if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
 fi
 
 # Generate Micronode Information
-echo "This file contains important information on your \"$(hostname)\" micronode." | tee /etc/micronode.info > /dev/null
-echo "It can be used to establish p2p and stratum connections over ssh." | tee -a /etc/micronode.info > /dev/null
-echo "" | tee -a /etc/micronode.info > /dev/null
+echo "This file contains important information on your \"$(hostname)\" micronode." | sudo tee /etc/micronode.info > /dev/null
+echo "It can be used to establish p2p and stratum connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
+echo "" | sudo tee -a /etc/micronode.info > /dev/null
 
-read -p "What is your (hub) name? "; echo "Name: $REPLY" | tee -a /etc/micronode.info > /dev/null
-echo "Level: ${NDLVL}" | tee -a /etc/micronode.info > /dev/null
-echo "Time Stamp: $(date +%s)" | tee -a /etc/micronode.info > /dev/null
-echo "" | tee -a /etc/micronode.info > /dev/null
+read -p "What is your (hub) name? "; echo "Name: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
+echo "Level: ${NDLVL}" | sudo tee -a /etc/micronode.info > /dev/null
+echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info > /dev/null
+echo "" | sudo tee -a /etc/micronode.info > /dev/null
 
-read -p "What is the address to this micronode? "; echo "Address: $REPLY" | tee -a /etc/micronode.info > /dev/null
-echo "" | tee -a /etc/micronode.info > /dev/null
+read -p "What is the address to this micronode? "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
+echo "" | sudo tee -a /etc/micronode.info > /dev/null
 
 if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
-echo "SSH Port: ${SSHPORT}" | tee -a /etc/micronode.info > /dev/null
+echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info > /dev/null
 if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
-echo "Micro Port: ${MICROPORT}" | tee -a /etc/micronode.info > /dev/null
+echo "Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info > /dev/null
 if [ -z ${STRATPORT+x} ]; then STRATPORT="3333"; fi
-echo "Stratum Port: ${STRATPORT}" | tee -a /etc/micronode.info > /dev/null
-echo "" | tee -a /etc/micronode.info > /dev/null
+echo "Stratum Port: ${STRATPORT}" | sudo tee -a /etc/micronode.info > /dev/null
+echo "" | sudo tee -a /etc/micronode.info > /dev/null
 
-echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | tee -a /etc/micronode.info > /dev/null
-echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | tee -a /etc/micronode.info > /dev/null
+echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info > /dev/null
+echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info > /dev/null
 
 sudo chmod 400 /etc/micronode.info
 
@@ -513,7 +513,7 @@ bash ~/micronode/mnconnect.sh -i
 
 # Remind user to restart
 if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
-    clear; echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
+    clear; echo "Now, \"exit\" to PowerShell and restart this instance (\"wsl -t \$INSTANCE\"), move backup folder (~/backup) with wallets to some other media, and it's ready to go!"
 else
-    clear; echo "Now, just restart the machine and it's ready to go."
+    clear; echo "Now, just restart the machine (e.g. \"sudo reboot\"), move backup folder (~/backup) with wallets to some other media, and it's ready to go!"
 fi
