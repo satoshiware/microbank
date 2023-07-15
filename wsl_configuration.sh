@@ -19,4 +19,4 @@ echo "[user]" | sudo tee -a /etc/wsl.conf
 echo "default=${REPLY}" | sudo tee -a /etc/wsl.conf
 
 # Remind user to restart the instance
-clear; echo "Don't forget to exit to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
+clear; echo "Don't forget to \"exit\" to PowerShell and restart this instance: \"wsl -t \$INSTANCE\""
