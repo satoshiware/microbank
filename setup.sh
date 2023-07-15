@@ -43,7 +43,7 @@ sudo apt-get -y update
 sudo apt-get -y upgrade
 
 # Install Packages
-sudo apt-get -y install wget psmisc autossh ssh ufw python jq
+sudo apt-get -y install wget psmisc autossh ssh ufw python3 jq
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
     sudo apt-get -y install build-essential yasm autoconf automake libtool libzmq3-dev git
 
