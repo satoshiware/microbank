@@ -491,32 +491,6 @@ if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
     fi
 fi
 
-# Generate Micronode Information
-echo "This file contains important information on your \"$(hostname)\" micronode." | sudo tee /etc/micronode.info > /dev/null
-echo "It can be used to establish p2p and stratum connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
-echo "" | sudo tee -a /etc/micronode.info > /dev/null
-
-read -p "What is your (hub) name? "; echo "Name: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
-echo "Level: ${NDLVL}" | sudo tee -a /etc/micronode.info > /dev/null
-echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info > /dev/null
-echo "" | sudo tee -a /etc/micronode.info > /dev/null
-
-read -p "What is the address to this micronode? "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
-echo "" | sudo tee -a /etc/micronode.info > /dev/null
-
-if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
-echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info > /dev/null
-if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
-echo "Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info > /dev/null
-if [ -z ${STRATPORT+x} ]; then STRATPORT="3333"; fi
-echo "Stratum Port: ${STRATPORT}" | sudo tee -a /etc/micronode.info > /dev/null
-echo "" | sudo tee -a /etc/micronode.info > /dev/null
-
-echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info > /dev/null
-echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info > /dev/null
-
-sudo chmod 400 /etc/micronode.info
-
 # Install the micronode connect utility (mnconnect.sh)
 bash ~/micronode/mnconnect.sh -i
 
