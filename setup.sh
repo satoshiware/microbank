@@ -23,7 +23,7 @@ do
     case $opt in
         "WSL (Debian, x86_64)") MN_SYS_CONFIG="WSL"; break;;
         "Debian (x86_64)") MN_SYS_CONFIG="DEBIAN"; break;;
-        "Raspbian (ARM_32)") MN_SYS_CONFIG="RASPBIAN"; break;;
+        "Raspbian (ARM_64)") MN_SYS_CONFIG="RASPBIAN"; break;;
         *) echo "Invalid option! Your input was \"$REPLY\""; break;;
     esac
 done
@@ -62,14 +62,14 @@ fi
 
 # Download Bitcoin Core (micro), Verify Checksum
 if [[ ${MN_SYS_CONFIG} = "RASPBIAN" ]]; then
-    wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-arm-linux-gnueabihf.tar.gz
-    if [[ ! "$(sha256sum ~/bitcoin-arm-linux-gnueabihf.tar.gz)" == *"df74eb09096a722c42e0b84ff96bc29f01380b4460729ea30cacba96ad6af7a6"* ]]; then
-        echo "Error: sha256sum for file \"bitcoin-arm-linux-gnueabihf.tar.gz\" was not what was expected!"
+    wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-aarch64-linux-gnu.tar.gz
+    if [[ ! "$(sha256sum ~/bitcoin-aarch64-linux-gnu.tar.gz)" == *"ffadb8262438f06e5ef5706bb2158def662f92840c595077c3c794b5e33d1a11"* ]]; then
+        echo "Error: sha256sum for file \"bitcoin-aarch64-linux-gnu.tar.gz\" was not what was expected!"
         exit 1
     fi
 
-    tar -xzf bitcoin-arm-linux-gnueabihf.tar.gz
-    rm bitcoin-arm-linux-gnueabihf.tar.gz
+    tar -xzf bitcoin-aarch64-linux-gnu.tar.gz
+    rm bitcoin-aarch64-linux-gnu.tar.gz
 
 else
     wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-x86_64-linux-gnu.tar.gz
