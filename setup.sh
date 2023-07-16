@@ -17,7 +17,7 @@ cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if no
 # Select the system configuration for the remaining script to run the proper setup/installtion.
 echo ""
 PS3='What system configuration are we using? '
-options=("WSL (Debian, x86_64)" "Debian (x86_64)" "Raspbian (ARM_32)")
+options=("WSL (Debian, x86_64)" "Debian (x86_64)" "Raspbian (ARM_64)")
 select opt in "${options[@]}"
 do
     case $opt in
