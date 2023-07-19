@@ -28,6 +28,15 @@ do
     esac
 done
 
+# Create .ssh folder and authorized_keys files for the $USER under the "DEBIAN" system configuration.
+if [[ ${MN_SYS_CONFIG} = "DEBIAN" ]]; then
+    sudo mkdir -p ~/.ssh
+    sudo touch ~/.ssh/authorized_keys
+    sudo chown -R $USER:$USER ~/.ssh
+    sudo chmod 700 ~/.ssh
+    sudo chmod 600 ~/.ssh/authorized_keys
+fi
+    
 # WSL Reminder: multiple (micro) bitcoin core instances running on the same windows machine could have port collision.
 if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
     echo ""; echo "Make sure to shutdown all other Bitcoin Core (micro) instances on this Windows machine."
