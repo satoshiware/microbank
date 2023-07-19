@@ -46,6 +46,9 @@ sudo apt-get -y upgrade
 sudo apt-get -y install wget psmisc autossh ssh ufw python3 jq
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
     sudo apt-get -y install build-essential yasm autoconf automake libtool libzmq3-dev git
+    if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
+      sudo apt-get -y install pkg-config # ckpool/ckproxy will not successfully configure/compile without this package using Debian Bookworm (x12)
+    fi
 
     # Install rpcauth Utility
     sudo wget https://github.com/satoshiware/bitcoin/releases/download/v23001/rpcauth.py -P /usr/share/python
