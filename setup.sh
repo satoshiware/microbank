@@ -101,7 +101,7 @@ else
 			exit 1
 		fi
 
-		tar -xzf deseretmoney__bitcoin-x86_64-linux-gnu.tar.gz
+		tar -xzf deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
 		rm deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
 	else
 		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-x86_64-linux-gnu.tar.gz
