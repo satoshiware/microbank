@@ -25,6 +25,7 @@ sudo apt-get -y upgrade
 
 ###Install Essential Tools
 sudo apt-get -y install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl zip
+sudo apt-get -y install pkg-config # Helper tool used when compiling applications and libraries. Necessary?
 
 ###Install SQLite (Required For The Descriptor Wallet)
 sudo apt-get -y install libsqlite3-dev
