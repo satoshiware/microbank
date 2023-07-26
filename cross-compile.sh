@@ -121,6 +121,6 @@ mkdir bin
 zip -ll -X -r ./bin/${1}_bitcoin-win64.zip ./bitcoin-install #Windows x86 64-bit
 
 ###################################### Calculate Hashes ##############################################
-sha256sum ./bin/bitcoin-aarch64-linux-gnu.tar.gz > ./bin/${1}_SHA256SUMS
-sha256sum ./bin/bitcoin-win64.zip >> ./bin/${1}_SHA256SUMS
-sha256sum ./bin/bitcoin-x86_64-linux-gnu.tar.gz >> ./bin/${1}_SHA256SUMS
+sha256sum ./bin/${1}_bitcoin-aarch64-linux-gnu.tar.gz > ./bin/${1}_SHA256SUMS
+sha256sum ./bin/${1}_bitcoin-win64.zip >> ./bin/${1}_SHA256SUMS
+sha256sum ./bin/${1}_bitcoin-x86_64-linux-gnu.tar.gz >> ./bin/${1}_SHA256SUMS
