@@ -74,7 +74,7 @@ fi
 if [[ ${MN_SYS_CONFIG} = "RASPBIAN" ]]; then
 	if [[ ${1} = "deseretmoney" ]]; then
 		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz
-		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz)" == *"864e5df5171a281f5bd9cd547739a1e3741c23e04753beb7b94dd95206c01198"* ]]; then
+		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz)" == *"8b56d0b5165c9afc6b837b048f0d1c5cf16d28f27128a0e1ae0b95763c4aadaa"* ]]; then
 			echo "Error: sha256sum for file \"deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz\" was not what was expected!"
 			exit 1
 		fi
@@ -94,7 +94,7 @@ if [[ ${MN_SYS_CONFIG} = "RASPBIAN" ]]; then
 else
 	if [[ ${1} = "deseretmoney" ]]; then
 		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
-		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz)" == *"d8b7fcd8f940921fe58c0a648eaf7d7164805f44d458be226da56a25b29e7fb3"* ]]; then
+		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz)" == *"6dbf0eef48dfe215992495d6660d17b8fb84f99f6b597edd1c0eb12f6f78b5fc"* ]]; then
 			echo "Error: sha256sum for file \"deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
 			exit 1
 		fi
