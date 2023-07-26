@@ -27,6 +27,8 @@ sudo apt-get -y install libsqlite3-dev
 ###Download Bitcoin
 sudo apt-get -y install git
 git clone https://github.com/satoshiware/bitcoin ./bitcoin
+rm ~/bitcoin/src/micro.h
+mv ~/bitcoin/src/micros/micro_${1}.h ~/bitcoin/src/micro.h
 
 ###git checkout $COMMIT_HASH #Find the latest release at this link and its corresponding commit hash (7 digit code)
 
@@ -62,7 +64,7 @@ mv ./mkinstall/usr/local ./bitcoin-install
 mkdir bin
 
 ###Compress Install Files for "x86 64 Bit"
-tar -czvf ./bin/bitcoin-x86_64-linux-gnu.tar.gz ./bitcoin-install #x86 64-Bit
+tar -czvf ./bin/${1}_bitcoin-x86_64-linux-gnu.tar.gz ./bitcoin-install #x86 64-Bit
 
 ###################################### ARM 64 Bit ##############################################
 ###Prepare the Cross Compiler for "ARM 64 Bit"
@@ -89,7 +91,7 @@ mv ./mkinstall/usr/local ./bitcoin-install
 mkdir bin
 
 ###Compress Install Files for "ARM 64 Bit"
-tar -czvf ./bin/bitcoin-aarch64-linux-gnu.tar.gz ./bitcoin-install #ARM 64-Bit
+tar -czvf ./bin/${1}_bitcoin-aarch64-linux-gnu.tar.gz ./bitcoin-install #ARM 64-Bit
 
 ###################################### Windows x86 64 Bit ##############################################
 ###Prepare the Cross Compiler for "Windows x86 64 Bit"
@@ -115,9 +117,9 @@ mv ./mkinstall/usr/local ./bitcoin-install
 mkdir bin
 
 ###Compress Install Files for "Windows x86 64 Bit"
-zip -ll -X -r ./bin/bitcoin-win64.zip ./bitcoin-install #Windows x86 64-bit
+zip -ll -X -r ./bin/${1}_bitcoin-win64.zip ./bitcoin-install #Windows x86 64-bit
 
 ###################################### Calculate Hashes ##############################################
-sha256sum ./bin/bitcoin-aarch64-linux-gnu.tar.gz > ./bin/SHA256SUMS
-sha256sum ./bin/bitcoin-win64.zip >> ./bin/SHA256SUMS
-sha256sum ./bin/bitcoin-x86_64-linux-gnu.tar.gz >> ./bin/SHA256SUMS
+sha256sum ./bin/bitcoin-aarch64-linux-gnu.tar.gz > ./bin/${1}_SHA256SUMS
+sha256sum ./bin/bitcoin-win64.zip >> ./bin/${1}_SHA256SUMS
+sha256sum ./bin/bitcoin-x86_64-linux-gnu.tar.gz >> ./bin/${1}_SHA256SUMS
