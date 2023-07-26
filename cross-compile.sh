@@ -5,10 +5,15 @@
 # x86 64 bit and has been tested on Debian 11/12.
 ####################################################################################################
 
-if [ "$EUID" -ne 0 ]
-  then echo "Please run as root or with sudo privileges"
-  exit
+# Make sure we are not running as root, but that we have sudo privileges.
+if [ "$(id -u)" = "0" ]; then
+   echo "This script must NOT be run as root (or with sudo)!"
+   exit 1
+elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
+   echo "You do not have enough sudo privileges!"
+   exit 1
 fi
+cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if not already.
 
 echo "Generated binaries and related files are transfered to the \"./bitcoin/bin\" directory."
 echo "Binaries are created from the latest master branch commit @ https://github.com/satoshiware/bitcoin."
@@ -29,10 +34,6 @@ sudo apt-get -y install git
 git clone https://github.com/satoshiware/bitcoin ./bitcoin
 rm ~/bitcoin/src/micro.h
 mv ~/bitcoin/src/micros/micro_${1}.h ~/bitcoin/src/micro.h
-
-###git checkout $COMMIT_HASH #Find the latest release at this link and its corresponding commit hash (7 digit code)
-
-###Update, Add, or Overwrite microcurrency Header File: ./src/micro.h
 
 ###Install Cross Compilation Dependencies
 #Linux x86 64-bit are already installed
