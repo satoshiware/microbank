@@ -55,9 +55,7 @@ sudo apt-get -y upgrade
 sudo apt-get -y install wget psmisc autossh ssh ufw python3 jq
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
     sudo apt-get -y install build-essential yasm autoconf automake libtool libzmq3-dev git
-    if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
-      sudo apt-get -y install pkg-config # ckpool/ckproxy will not successfully configure/compile without this package using Debian Bookworm (x12)
-    fi
+    sudo apt-get -y install pkg-config # ckpool/ckproxy will not successfully configure/compile without this package using Debian Bookworm (x12)
 
     # Install rpcauth Utility
     sudo wget https://github.com/satoshiware/bitcoin/releases/download/v23001/rpcauth.py -P /usr/share/python
@@ -76,7 +74,7 @@ fi
 if [[ ${MN_SYS_CONFIG} = "RASPBIAN" ]]; then
 	if [[ ${1} = "deseretmoney" ]]; then
 		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz
-		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz)" == *"a2a5336a7a5455cefce984f7132528ba60882721d6b0cce6eb6c358efbed9566"* ]]; then
+		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz)" == *"864e5df5171a281f5bd9cd547739a1e3741c23e04753beb7b94dd95206c01198"* ]]; then
 			echo "Error: sha256sum for file \"deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz\" was not what was expected!"
 			exit 1
 		fi
@@ -96,7 +94,7 @@ if [[ ${MN_SYS_CONFIG} = "RASPBIAN" ]]; then
 else
 	if [[ ${1} = "deseretmoney" ]]; then
 		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
-		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz)" == *"6fbfef4a236d5a423f109148234d70087c1750005cc3c7827b50b13758bac3de"* ]]; then
+		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz)" == *"d8b7fcd8f940921fe58c0a648eaf7d7164805f44d458be226da56a25b29e7fb3"* ]]; then
 			echo "Error: sha256sum for file \"deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
 			exit 1
 		fi
