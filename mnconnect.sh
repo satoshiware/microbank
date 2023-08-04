@@ -20,7 +20,8 @@ fi
 if [[ $1 = "-i" || $1 = "--install" ]]; then
     echo "Installing this script (mnconnect) in /usr/local/sbin/"
     if [ ! -f /usr/local/sbin/mnconnect ]; then
-        sudo cat $0 | sudo tee /usr/local/sbin/mnconnect > /dev/null
+        sudo cat $0 | sed '/Install this script/d' | sudo tee /usr/local/sbin/mnconnect > /dev/null
+        sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/mnconnect # Make it so this code won't run again in the newly installed script.
         sudo chmod +x /usr/local/sbin/mnconnect
     else
         echo "\"mnconnect\" already exists in /usr/local/sbin!"
@@ -54,6 +55,8 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Configure inbound mining connection 
       -v, --view        See all configured connections and view status
       -d, --delete      Delete a connection
       -f, --info        Get the connection parameters for this node
+	  -g, --generate    Generate micronode information file with connection parameters for this node
+	  
 EOF
 elif [[ $1 = "-m" || $1 = "--mining" ]]; then # Configure inbound mining connection (level 1 <-- miners)
     if [ ${NDLVL} != "1" ]; then
@@ -280,14 +283,14 @@ elif [[ $1 = "-y" || $1 = "--priority" ]]; then # Sets the priorities of the str
             if [ -z "${i}" ]; then PRIFAILURE="true"; fi
         done
 
-		# Check to see if there were any failures with the user's inputs
-		if [ "${PRIFAILURE}" = "true" ]; then
-			echo ""; echo "Error! Invalid priorities. Try again."
-			
-			echo "Setting all priorities to NULL"; echo ""
+        # Check to see if there were any failures with the user's inputs
+        if [ "${PRIFAILURE}" = "true" ]; then
+            echo ""; echo "Error! Invalid priorities. Try again."
+
+            echo "Setting all priorities to NULL"; echo ""
             for i in "${PROXIES[@]}"; do sudo sed -i "s/.*LOCAL_PORT.*/LOCAL_PORT=/g" $i; done
-			exit 1
-		fi
+            exit 1
+        fi
 
         echo ""; echo "(Re)starting stratum proxy autossh systemd connection(s)"
         for i in "${PROXIES[@]}"; do sudo systemctl start $(echo "$i" | sed 's/\/etc\/default\///g'); done
@@ -344,10 +347,59 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection ############
     ####################### needs work #######################################
     echo "you made it buddy to --delete"
 
-elif [[ $1 = "-f" || $1 = "--info" ]]; then # Delete a connection ############## this comment ############ should pass a parameter or show connections.
-    ####################### needs work #######################################
-	cat /etc/micronode.info
+elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for this node
+    cat /etc/micronode.info
+
+elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information file with connection parameters for this node
+	echo "This file contains important information on your \"$(hostname)\" micronode." | sudo tee /etc/micronode.info > /dev/null
+	echo "It can be used to establish p2p and stratum connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
+	echo "" | sudo tee -a /etc/micronode.info > /dev/null
+
+	read -p "What is your (hub) name? "; echo "Name: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
+	echo "Level: ${NDLVL}" | sudo tee -a /etc/micronode.info > /dev/null
+	echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info > /dev/null
+	echo "" | sudo tee -a /etc/micronode.info > /dev/null
+
+	read -p "What is the address to this micronode? "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
+	echo "" | sudo tee -a /etc/micronode.info > /dev/null
+
+	if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
+	echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info > /dev/null
+	if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
+	echo "Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info > /dev/null
+	if [ -z ${STRATPORT+x} ]; then STRATPORT="3333"; fi
+	echo "Stratum Port: ${STRATPORT}" | sudo tee -a /etc/micronode.info > /dev/null
+	echo "" | sudo tee -a /etc/micronode.info > /dev/null
+
+	echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info > /dev/null
+	echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info > /dev/null
+
+	sudo chmod 400 /etc/micronode.info
+
+
+
+
+
+
+!!!!!!!!!!!!!!!!!!!mnconnect. be able to update /etc/micronode.info name and ip address. 
+!!!!!!!update forum or wsl/readme.md!!# With WSL, the host drive is already mounted. It can just be copied with cp (e.g. "cp -rf ~/backup /mnt/c/Users/$USERNAME/Desktop")
+
+update mnconnect to open port for local miner.
+	sudo ufw allow from 192.168.1.243 to any port 3333 # (whatever is the port)
+	!!!!!!!! Now, how can we manage this???
+remove the install option after it has been installed... maybe it just doesn't show it. I don't know. just take a peak.
+
+
+
+
+
+
+
+
+
 
 else
     mnconnect --help
 fi
+
+
