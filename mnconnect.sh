@@ -96,7 +96,7 @@ elif [[ $1 = "-s" || $1 = "--stratum" ]]; then # Make p2p and stratum outbound c
 
     # update known_hosts
     HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
-    elif [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
+    if [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
         echo "${HOSTSIG} # ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}, STRATUM" | sudo tee -a /root/.ssh/known_hosts
     else
         echo "CRITICAL ERROR: REMOTE HOST IDENTIFICATION DOES NOT MATCH GIVEN HOST KEY!!"
@@ -182,7 +182,7 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
 
     # update known_hosts
     HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
-    elif [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
+    if [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
         echo "${HOSTSIG} # ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}, P2P" | sudo tee -a /root/.ssh/known_hosts
     else
         echo "CRITICAL ERROR: REMOTE HOST IDENTIFICATION DOES NOT MATCH GIVEN HOST KEY!!"
@@ -355,34 +355,37 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
 
         # Level 1 has 1 outbound connection and multiple
 
-elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection ############## this comment ############ should pass a parameter or show connections.
+elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
+    if [[ ! ${#} = "2" ]]; then
+        echo "Enter the time stamp of the connction to delete (Example: \"mnconnect --delete 1691422785\")."
+        exit 0
+    fi
 
-    #####################todo
-#   Add input checking on the time stamp everywhere. we are going to use that to delete
-    ####################### needs work #######################################
-    echo "you made it buddy to --delete"
+    if [[ ! $2 =~ ^[0-9]+$ ]]; then
+        echo "Error! Not a valid time stamp!"
+        exit 1
+    fi
 
+#Level 2 --> Level 3
+#Level 1 --> Level 2
+#Miner --> Level 1
+# I think we need to put the internal port as well on that line
 
+# Get the internal ip address??? from where?
 #````````````````````````````````Level 2 outbound `````````````````````````````````````````````````
-#   /etc/bitcoin.conf
-#   # Mike's Level 3, 1691422785, 192.168.1.111:22
-#   addnode=localhost:40503
-#
-#   btc addnode "localhost:40503" "remove"
-#
-#   ########### How to force disconnect???????????????????
-#
+# need to delete    /etc/default/p2pssh@${TMSTAMP}-lvl3   files   <<<<<<<<<<<<<<< This is where you get the port from
+
+    sudo sed -i "/${2}/d" /etc/bitcoin.conf
+    #### get the port number
+    sudo sed -i "/${THATPORTNUMBERRRRRRRRR}/d" /etc/bitcoin.conf
+    btc addnode "localhost:${THATPORTNUMBERRRRRRRRR}" "remove"
+    ########### How to force disconnect???????????????????
+    sudo sed -i "/${2}/d" /root/.ssh/known_hosts
+
+
 #   sudo systemctl disable p2pssh@1691422785-p2p.service --now
 #   sudo systemctl disable p2pssh@1691422785-stratum.service --now
-#
-#    /root/.ssh/known_hosts
-#   ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTSRxcRkm8AEFeMJKaOEp5Y7xL1W8Pw0RgSdObQ/LwH # Mike's Level 3, 1691422785, 192.168.1.111:22, STRATUM
 
-
-
-#ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTSRxcRkm8AEFeMJKaOEp5Y7xL1W8Pw0RgSdObQ/LwH # attempt2, 1691422785, 192.168.1.111:22, STRATUM
-
-#|1|GoP0mFpycpvF5XidAKVzORNeboY=|ITSPn1U6/jwI6WE5F2KGEHLL62E= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBA40V2dKRcV/0tNiKJof+Iiojcl0gZl2rO0rGNQ/GBwdI2v7re8m+W9ggHkL6MewWVP77A5TdHWr5EN1ewDm3DE=
 
 
 
