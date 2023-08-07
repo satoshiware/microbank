@@ -55,8 +55,8 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Configure inbound mining connection 
       -v, --view        See all configured connections and view status
       -d, --delete      Delete a connection
       -f, --info        Get the connection parameters for this node
-	  -g, --generate    Generate micronode information file with connection parameters for this node
-	  
+      -g, --generate    Generate micronode information file with connection parameters for this node
+
 EOF
 elif [[ $1 = "-m" || $1 = "--mining" ]]; then # Configure inbound mining connection (level 1 <-- miners)
     if [ ${NDLVL} != "1" ]; then
@@ -95,7 +95,13 @@ elif [[ $1 = "-s" || $1 = "--stratum" ]]; then # Make p2p and stratum outbound c
     read -p "Target's Stratum Port (default = 3333): " STRATUMPORT; if [ -z $STRATUMPORT ]; then STRATUMPORT="3333"; fi
 
     # update known_hosts
-    echo "${HOSTKEY} # ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}, STRATUM" | sudo tee -a /root/.ssh/known_hosts
+    HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
+    elif [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
+        echo "${HOSTSIG} # ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}, STRATUM" | sudo tee -a /root/.ssh/known_hosts
+    else
+        echo "CRITICAL ERROR: REMOTE HOST IDENTIFICATION DOES NOT MATCH GIVEN HOST KEY!!"
+        exit 1
+    fi
 
     # create p2pssh@ stratum environment file and start its corresponding systemd service
     cat << EOF | sudo tee /etc/default/p2pssh@${TMSTAMP}-stratum
@@ -173,6 +179,15 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
 
     # update known_hosts
     echo "${HOSTKEY} # ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}, P2P" | sudo tee -a /root/.ssh/known_hosts
+
+    # update known_hosts
+    HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
+    elif [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
+        echo "${HOSTSIG} # ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}, P2P" | sudo tee -a /root/.ssh/known_hosts
+    else
+        echo "CRITICAL ERROR: REMOTE HOST IDENTIFICATION DOES NOT MATCH GIVEN HOST KEY!!"
+        exit 1
+    fi
 
     # create p2pssh@ level 3 p2p environment file and start its corresponding systemd service
     LOCALMICROPORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
@@ -347,59 +362,76 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection ############
     ####################### needs work #######################################
     echo "you made it buddy to --delete"
 
+
+#````````````````````````````````Level 2 outbound `````````````````````````````````````````````````
+#   /etc/bitcoin.conf
+#   # Mike's Level 3, 1691422785, 192.168.1.111:22
+#   addnode=localhost:40503
+#
+#   btc addnode "localhost:40503" "remove"
+#
+#   ########### How to force disconnect???????????????????
+#
+#   sudo systemctl disable p2pssh@1691422785-p2p.service --now
+#   sudo systemctl disable p2pssh@1691422785-stratum.service --now
+#
+#    /root/.ssh/known_hosts
+#   ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTSRxcRkm8AEFeMJKaOEp5Y7xL1W8Pw0RgSdObQ/LwH # Mike's Level 3, 1691422785, 192.168.1.111:22, STRATUM
+
+
+
+#ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOTSRxcRkm8AEFeMJKaOEp5Y7xL1W8Pw0RgSdObQ/LwH # attempt2, 1691422785, 192.168.1.111:22, STRATUM
+
+#|1|GoP0mFpycpvF5XidAKVzORNeboY=|ITSPn1U6/jwI6WE5F2KGEHLL62E= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBA40V2dKRcV/0tNiKJof+Iiojcl0gZl2rO0rGNQ/GBwdI2v7re8m+W9ggHkL6MewWVP77A5TdHWr5EN1ewDm3DE=
+
+
+
+#`````````````````````````````````````````````````````````````````````````````````
+
+
+
 elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for this node
-    cat /etc/micronode.info
+    if [ -f "/etc/micronode.info" ]; then
+        sudo cat /etc/micronode.info
+    else
+        echo "Connection parameters have not been generated. Rerun this script with -g (--generate) flag."
+    fi
 
 elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information file with connection parameters for this node
-	echo "This file contains important information on your \"$(hostname)\" micronode." | sudo tee /etc/micronode.info > /dev/null
-	echo "It can be used to establish p2p and stratum connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
-	echo "" | sudo tee -a /etc/micronode.info > /dev/null
+    echo "This file contains important information on your \"$(hostname)\" micronode." | sudo tee /etc/micronode.info > /dev/null
+    echo "It can be used to establish p2p and stratum connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
+    echo "" | sudo tee -a /etc/micronode.info
 
-	read -p "What is your (hub) name? "; echo "Name: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
-	echo "Level: ${NDLVL}" | sudo tee -a /etc/micronode.info > /dev/null
-	echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info > /dev/null
-	echo "" | sudo tee -a /etc/micronode.info > /dev/null
+    read -p "What is your (hub) name? "; echo "Name: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
+    echo "Level: ${NDLVL}" | sudo tee -a /etc/micronode.info
+    echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info
+    echo "" | sudo tee -a /etc/micronode.info
 
-	read -p "What is the address to this micronode? "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
-	echo "" | sudo tee -a /etc/micronode.info > /dev/null
+    read -p "What is the address to this micronode? "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info
+    echo "" | sudo tee -a /etc/micronode.info
 
-	if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
-	echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info > /dev/null
-	if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
-	echo "Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info > /dev/null
-	if [ -z ${STRATPORT+x} ]; then STRATPORT="3333"; fi
-	echo "Stratum Port: ${STRATPORT}" | sudo tee -a /etc/micronode.info > /dev/null
-	echo "" | sudo tee -a /etc/micronode.info > /dev/null
+    if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
+    echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info
+    if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
+    echo "Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info
+    if [ -z ${STRATPORT+x} ]; then STRATPORT="3333"; fi
+    echo "Stratum Port: ${STRATPORT}" | sudo tee -a /etc/micronode.info
+    echo "" | sudo tee -a /etc/micronode.info
 
-	echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info > /dev/null
-	echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info > /dev/null
+    echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info
+    echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info
 
-	sudo chmod 400 /etc/micronode.info
-
-
+    sudo chmod 400 /etc/micronode.info
 
 
+#!!!!!!!update forum or wsl/readme.md!!# With WSL, the host drive is already mounted. It can just be copied with cp (e.g. "cp -rf ~/backup /mnt/c/Users/$USERNAME/Desktop")
 
-
-!!!!!!!!!!!!!!!!!!!mnconnect. be able to update /etc/micronode.info name and ip address. 
-!!!!!!!update forum or wsl/readme.md!!# With WSL, the host drive is already mounted. It can just be copied with cp (e.g. "cp -rf ~/backup /mnt/c/Users/$USERNAME/Desktop")
-
-update mnconnect to open port for local miner.
-	sudo ufw allow from 192.168.1.243 to any port 3333 # (whatever is the port)
-	!!!!!!!! Now, how can we manage this???
-remove the install option after it has been installed... maybe it just doesn't show it. I don't know. just take a peak.
-
-
-
-
-
-
-
-
+#update mnconnect to open/close port for local miner.
+    #   sudo ufw allow from 192.168.1.243 to any port 3333 # (whatever is the port)
 
 
 else
-    mnconnect --help
+    $0 --help
 fi
 
 
