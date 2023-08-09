@@ -234,11 +234,11 @@ elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for
 
 elif [[ $1 = "-o" || $1 = "--open" ]]; then # Open firewall to the stratum port for any local ip
     echo ""; echo "Uncomplicated Firewall Rules"; sudo ufw status; echo ""
-
+	
+	STRATPORT=$(sudo cat /etc/micronode.info | grep "Stratum Port" | tr -d '[:blank:]' | cut -d ':' -f 2)
+	PNETWORK=$(echo $(hostname -I) | cut -d '.' -f 1)
     read -p "Open firewall to the stratum port (if not already) for any local ip? (y|n): "
     if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
-        PNETWORK=$(echo $(hostname -I) | cut -d '.' -f 1)
-        STRATPORT=$(sudo cat /etc/micronode.info | grep "Stratum Port" | tr -d '[:blank:]' | cut -d ':' -f 2)
         if [[ ${PNETWORK} = "192" ]]; then
             sudo ufw allow from 192.168.0.0/16 to any port ${STRATPORT}
         elif [[ ${PNETWORK} = "172" ]]; then
@@ -249,7 +249,8 @@ elif [[ $1 = "-o" || $1 = "--open" ]]; then # Open firewall to the stratum port 
     fi
 
     echo ""; echo "use \"sudo ufw delete \$LINENUMBER\" to delete a rule. \$LINENUMBER starts @ 1"; echo ""
-
+	echo "Mining Address (if port is open):"; echo "    stratum+tcp://$(hostname -I | tr -d '[:blank:]'):${STRATPORT}"; echo ""
+	
 elif [[ $1 = "-y" || $1 = "--priority" ]]; then # Sets the priorities of the stratum proxy connections for a level 2 node/hub
     if [ ${NDLVL} != "2" ]; then
         echo "This option is for node/hub level 2 only!"
