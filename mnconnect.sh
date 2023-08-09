@@ -51,11 +51,12 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Configure inbound mining connection 
       -n, --in          Configure inbound connection (Level 3 <-- 2 or 2 <-- 1)
       -p, --p2p         Make p2p inbound/outbound connections (level 3 <--> 3)
       -r, --remote      Configure inbound connection for a level 3 remote mining operation
+      -o, --open        Open firewall to the stratum port for any local ip
       -y, --priority    Sets the priorities of the stratum proxy connections for a level 2 node/hub
       -v, --view        See all configured connections and view status
       -d, --delete      Delete a connection
       -f, --info        Get the connection parameters for this node
-      -g, --generate    Generate micronode information file with connection parameters for this node
+      -g, --generate    Generate micronode information file (/etc/micronode.info) with connection parameters for this node
 
 EOF
 elif [[ $1 = "-m" || $1 = "--mining" ]]; then # Configure inbound mining connection (level 1 <-- miners)
@@ -66,9 +67,9 @@ elif [[ $1 = "-m" || $1 = "--mining" ]]; then # Configure inbound mining connect
     fi
 
     echo "Configuring to allow mining inbound connection..."
-    read -p "Connection Name: " CONNNAME
+    read -p "Brief Connection Description: " CONNNAME
     read -p "Stratum (Public) Key: " STRATKEY
-    read -p "Given Time Stamp: " TMSTAMP
+    TMSTAMP=$(date +%s)
 
     echo "${STRATKEY} # ${CONNNAME}, ${TMSTAMP}" | sudo tee -a /home/stratum/.ssh/authorized_keys
 
@@ -86,7 +87,7 @@ elif [[ $1 = "-s" || $1 = "--stratum" ]]; then # Make p2p and stratum outbound c
     fi
 
     echo "Making p2p and stratum outbound connections to a level $(if [ ${NDLVL} = "1" ]; then echo '2'; else echo '3'; fi) node/hub..."
-    read -p "Connection Name: " CONNNAME
+    read -p "Brief Connection Description: " CONNNAME
     read -p "Target's Host (Public) Key: " HOSTKEY
     read -p "Given Time Stamp: " TMSTAMP
     read -p "Target's Address: " TARGETADDRESS
@@ -94,6 +95,11 @@ elif [[ $1 = "-s" || $1 = "--stratum" ]]; then # Make p2p and stratum outbound c
     read -p "Target's Bitcoin Core (micro) Port (default = 19333): " MICROPORT; if [ -z $MICROPORT ]; then MICROPORT="19333"; fi
     read -p "Target's Stratum Port (default = 3333): " STRATUMPORT; if [ -z $STRATUMPORT ]; then STRATUMPORT="3333"; fi
 
+	if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
+		echo "Error! Not a valid time stamp!"
+		exit 1
+	fi
+	
     # update known_hosts
     HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
     if [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
@@ -147,10 +153,15 @@ elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound connection (Level 
     fi
 
     echo "Configuring to allow inbound connection from a level $(if [ ${NDLVL} = "2" ]; then echo '1'; else echo '2'; fi) node/hub..."
-    read -p "Connection Name: " CONNNAME
+    read -p "Brief Connection Description: " CONNNAME
     read -p "P2P (Public) Key: " P2PKEY
     read -p "Given Time Stamp: " TMSTAMP
 
+	if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
+		echo "Error! Not a valid time stamp!"
+		exit 1
+	fi
+	
     echo "${P2PKEY} # ${CONNNAME}, ${TMSTAMP}$(if [ "${NDLVL}" = "3" ]; then echo ', LVL2'; fi)" | sudo tee -a /home/p2p/.ssh/authorized_keys
 
 elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connections (level 3 <--> 3)
@@ -165,9 +176,14 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
     fi
 
     echo "Configuring to allow inbound connection from a level 3 node/hub..."
-    read -p "Connection Name: " CONNNAME
+    read -p "Brief Connection Description: " CONNNAME
     read -p "P2P (Public) Key: " P2PKEY
     read -p "Given Time Stamp: " TMSTAMP
+	
+	if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
+		echo "Error! Not a valid time stamp!"
+		exit 1
+	fi
 
     echo "${P2PKEY} # ${CONNNAME}, ${TMSTAMP}, P2P" | sudo tee -a /home/p2p/.ssh/authorized_keys
 
@@ -176,9 +192,6 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
     read -p "Target's Address: " TARGETADDRESS
     read -p "Target's SSH PORT (default = 22): " SSHPORT; if [ -z $SSHPORT ]; then SSHPORT="22"; fi
     read -p "Target's Bitcoin Core (micro) Port (default = 19333): " MICROPORT; if [ -z $MICROPORT ]; then MICROPORT="19333"; fi
-
-    # update known_hosts
-    echo "${HOSTKEY} # ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}, P2P" | sudo tee -a /root/.ssh/known_hosts
 
     # update known_hosts
     HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
@@ -190,7 +203,7 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
     fi
 
     # create p2pssh@ level 3 p2p environment file and start its corresponding systemd service
-    LOCALMICROPORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+    LOCALMICROPORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
     cat << EOF | sudo tee /etc/default/p2pssh@${TMSTAMP}-lvl3
 # ${CONNNAME}
 LOCAL_PORT=${LOCALMICROPORT}
@@ -213,11 +226,29 @@ elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for
     fi
 
     echo "Configuring inbound connection for a level 3 remote mining operation..."
-    read -p "Connection Name: " CONNNAME
+    read -p "Brief Connection Description: " CONNNAME
     read -p "P2P (Public) Key: " P2PKEY
-    read -p "Given Time Stamp: " TMSTAMP
+    TMSTAMP=$(date +%s)
 
     echo "${P2PKEY} # ${CONNNAME}, ${TMSTAMP}, REMOTE" | sudo tee -a /home/p2p/.ssh/authorized_keys
+
+elif [[ $1 = "-o" || $1 = "--open" ]]; then # Open firewall to the stratum port for any local ip
+    echo ""; echo "Uncomplicated Firewall Rules"; sudo ufw status; echo ""
+
+    read -p "Open firewall to the stratum port (if not already) for any local ip? (y|n): "
+    if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
+        PNETWORK=$(echo $(hostname -I) | cut -d '.' -f 1)
+        STRATPORT=$(sudo cat /etc/micronode.info | grep "Stratum Port" | tr -d '[:blank:]' | cut -d ':' -f 2)
+        if [[ ${PNETWORK} = "192" ]]; then
+            sudo ufw allow from 192.168.0.0/16 to any port ${STRATPORT}
+        elif [[ ${PNETWORK} = "172" ]]; then
+            sudo ufw allow from 172.16.0.0/12 to any port ${STRATPORT}
+        elif [[ ${PNETWORK} = "10" ]]; then
+            sudo ufw allow from 10.0.0.0/8 to any port ${STRATPORT}
+        fi
+    fi
+
+    echo ""; echo "use \"sudo ufw delete \$LINENUMBER\" to delete a rule. \$LINENUMBER starts @ 1"; echo ""
 
 elif [[ $1 = "-y" || $1 = "--priority" ]]; then # Sets the priorities of the stratum proxy connections for a level 2 node/hub
     if [ ${NDLVL} != "2" ]; then
@@ -355,76 +386,6 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
 
         # Level 1 has 1 outbound connection and multiple
 
-elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
-    if [[ ! ${#} = "2" ]]; then
-        echo "Enter the time stamp of the connction to delete (Example: \"mnconnect --delete 1691422785\")."
-        exit 0
-    fi
-
-    if [[ ! $2 =~ ^[0-9]+$ ]]; then
-        echo "Error! Not a valid time stamp!"
-        exit 1
-    fi
-
-#Level 2 --> Level 3
-#Level 1 --> Level 2
-#Miner --> Level 1
-# I think we need to put the internal port as well on that line
-
-# Get the internal ip address??? from where?
-#````````````````````````````````Level 2 outbound `````````````````````````````````````````````````
-# need to delete    /etc/default/p2pssh@${TMSTAMP}-lvl3   files   <<<<<<<<<<<<<<< This is where you get the port from
-
-    sudo sed -i "/${2}/d" /etc/bitcoin.conf
-    #### get the port number
-    sudo sed -i "/${THATPORTNUMBERRRRRRRRR}/d" /etc/bitcoin.conf
-    btc addnode "localhost:${THATPORTNUMBERRRRRRRRR}" "remove"
-    ########### How to force disconnect???????????????????
-    sudo sed -i "/${2}/d" /root/.ssh/known_hosts
-
-
-#   sudo systemctl disable p2pssh@1691422785-p2p.service --now
-#   sudo systemctl disable p2pssh@1691422785-stratum.service --now
-
-
-
-
-#`````````````````````````````````````````````````````````````````````````````````
-
-
-
-elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for this node
-    if [ -f "/etc/micronode.info" ]; then
-        sudo cat /etc/micronode.info
-    else
-        echo "Connection parameters have not been generated. Rerun this script with -g (--generate) flag."
-    fi
-
-elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information file with connection parameters for this node
-    echo "This file contains important information on your \"$(hostname)\" micronode." | sudo tee /etc/micronode.info > /dev/null
-    echo "It can be used to establish p2p and stratum connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
-    echo "" | sudo tee -a /etc/micronode.info
-
-    read -p "What is your (hub) name? "; echo "Name: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
-    echo "Level: ${NDLVL}" | sudo tee -a /etc/micronode.info
-    echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info
-    echo "" | sudo tee -a /etc/micronode.info
-
-    read -p "What is the address to this micronode? "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info
-    echo "" | sudo tee -a /etc/micronode.info
-
-    if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
-    echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info
-    if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
-    echo "Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info
-    if [ -z ${STRATPORT+x} ]; then STRATPORT="3333"; fi
-    echo "Stratum Port: ${STRATPORT}" | sudo tee -a /etc/micronode.info
-    echo "" | sudo tee -a /etc/micronode.info
-
-    echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info
-    echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info
-
-    sudo chmod 400 /etc/micronode.info
 
 
 #!!!!!!!update forum or wsl/readme.md!!# With WSL, the host drive is already mounted. It can just be copied with cp (e.g. "cp -rf ~/backup /mnt/c/Users/$USERNAME/Desktop")
@@ -433,8 +394,132 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information
     #   sudo ufw allow from 192.168.1.243 to any port 3333 # (whatever is the port)
 
 
+
+
+
+    # Search in stratum|p2p authorized_keys to match the timestamp with the . You know, we could just disconnect everyone!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+#   ss -t -a | grep ssh
+#   ipaddr="192.168.1.240"
+#   ddport="42682"
+#   sdport="42676"
+
+#   cat /var/log/auth.log | grep "Accepted publickey for.*${ipaddr}.*${ddport}" # what about the stratum user instead of p2p
+#   UfullVXA44hjjgvle9qIP3Hn5vjrnj5vTq0nT5Z2Y2M
+
+#    AAC3NzaC1lZDI1NTE5AAAAIMZ0yYY38wDVbwxjjeWY+sGQUrHkMIthSRgAOVdAA+Z4
+#    ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ0yYY38wDVbwxjjeWY+sGQUrHkMIthSRgAOVdAA+Z4
+
+
+#   cd ~  ###### try the "<<<" redirector instead
+#   mkfifo fifo
+#   echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ0yYY38wDVbwxjjeWY+sGQUrHkMIthSRgAOVdAA+Z4" > fifo &
+#   okok=$(ssh-keygen -l -f fifo)
+#   rm fifo
+
+elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
+    if [[ ! ${#} = "2" ]]; then
+        echo "Enter the time stamp of the connction to delete (Example: \"mnconnect --delete 1691422785\")."
+        exit 0
+    fi
+
+	if ! [[ $2 -gt 1690000000 ]]; then
+		echo "Error! Not a valid time stamp!"
+		exit 1
+	fi
+
+	# Delete outbound connections @Level 1, 2, and 3
+    LOCAL_PORT=$(grep -o 'LOCAL_PORT=[0-9]*' /etc/default/p2pssh@${2}*{p2p,lvl3} 2> /dev/null | cut -d '=' -f 2) # Get the "Local Port" that corresponds with the time stamp
+
+    sudo rm /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
+
+    sudo sed -i "/${2}/d" /etc/bitcoin.conf 2> /dev/null # Remove the comment line containing the time stamp
+    sudo sed -i "/${LOCAL_PORT}/d" /etc/bitcoin.conf 2> /dev/null # Remove the "addnode=" line containing the "LOCAL_PORT"
+
+    sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf addnode "localhost:${LOCAL_PORT}" "remove" 2> /dev/null # Remove the node containing the "LOCAL_PORT" connection
+    sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf disconnectnode "localhost:${LOCAL_PORT}" 2> /dev/null # Force immediate disconnect
+
+    sudo sed -i "/${2}/d" /root/.ssh/known_hosts 2> /dev/null # Remove the known host containing the time stamp
+
+    sudo systemctl disable p2pssh@${2}-p2p --now 2> /dev/null # Disable/remove systemd services related to the time stamp
+    sudo systemctl reset-failed p2pssh@${2}-p2p 2> /dev/null
+    sudo systemctl disable p2pssh@${2}-stratum --now 2> /dev/null
+    sudo systemctl reset-failed p2pssh@${2}-stratum 2> /dev/null
+    sudo systemctl disable p2pssh@${2}-lvl3 --now 2> /dev/null
+    sudo systemctl reset-failed p2pssh@${2}-lvl3 2> /dev/null
+	
+	# Delete inbound connections @Level 1, 2, and 3
+    sudo sed -i "/${2}/d" /home/p2p/.ssh/authorized_keys 2> /dev/null # Remove key with comment containing the time stamp
+	sudo sed -i "/${2}/d" /home/stratum/.ssh/authorized_keys 2> /dev/null # Remove key with comment containing the time stamp
+
+    # Force disconnect all p2p and stratum users
+    P2PSTRATUMPIDS=$(ps -u p2p 2> /dev/null | grep sshd)$(ps -u stratum 2> /dev/null | grep sshd)
+    while IFS= read -r line ; do sudo kill -9 $(echo $line | cut -d ' ' -f 1) 2> /dev/null; done <<< "$P2PSTRATUMPIDS"
+
+elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for this node
+    if [ -f "/etc/micronode.info" ]; then
+        echo ""
+        sudo cat /etc/micronode.info
+    else
+        echo "Connection parameters have not been generated. Rerun with the -g (--generate) flag."
+    fi
+
+elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information file (/etc/micronode.info) with connection parameters for this node
+    if [ -f "/etc/micronode.info" ]; then
+        echo "/etc/micronode.info file already exists"
+        exit 0
+    fi
+
+    echo "Here's important information about your micronode." | sudo tee /etc/micronode.info > /dev/null
+    echo "It can be used to establish p2p and stratum connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
+    echo "" | sudo tee -a /etc/micronode.info
+
+    echo "Hostname: $(hostname)" | sudo tee -a /etc/micronode.info
+    read -p "Brief description of this micronode: "; echo "Description: $REPLY" | sudo tee -a /etc/micronode.info > /dev/null
+    echo "" | sudo tee -a /etc/micronode.info
+
+    echo "Level: ${NDLVL}" | sudo tee -a /etc/micronode.info
+    echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info
+    echo "" | sudo tee -a /etc/micronode.info
+
+    echo "Public Network" | sudo tee -a /etc/micronode.info
+    echo "Here's a list of sites willing to display your external ip address (FYI):"
+    echo "    ifconfig.me:            $(curl -s -4 ifconfig.me)"
+    echo "    icanhazip.com:          $(curl -s -4 icanhazip.com)"
+    echo "    ipinfo.io/ip:           $(curl -s -4 ipinfo.io/ip)"
+    echo "    api.ipify.org:          $(curl -s -4 api.ipify.org)"
+    echo "    ident.me:               $(curl -s -4 ident.me)"
+    echo "    checkip.amazonaws.com:  $(curl -s -4 checkip.amazonaws.com)"
+    echo "    ipecho.net/plain:       $(curl -s -4 ipecho.net/plain)"
+    echo "    ifconfig.co:            $(curl -s -4 ifconfig.co)"
+    read -p "What is the \"Static\" IP or \"Dynamic\" DNS address to this micronode? "; echo "    Address: $REPLY" | sudo tee -a /etc/micronode.info
+    read -p "What is the external SSH port for this micronode? "; echo "    SSH Port: $REPLY" | sudo tee -a /etc/micronode.info
+    echo "" | sudo tee -a /etc/micronode.info
+
+    echo "Private Network" | sudo tee -a /etc/micronode.info
+    echo "    IP: $(hostname -I)" | sudo tee -a /etc/micronode.info
+    if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
+    echo "    SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info
+    echo "" | sudo tee -a /etc/micronode.info
+
+    echo "Ports" | sudo tee -a /etc/micronode.info
+    if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
+    echo "    Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info
+    if [ -z ${STRATPORT+x} ]; then STRATPORT="3333"; fi
+    echo "    Stratum Port: ${STRATPORT}" | sudo tee -a /etc/micronode.info
+    echo "" | sudo tee -a /etc/micronode.info
+
+    # Remove unwanted/unused host keys
+    sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
+    sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
+    sudo rm /etc/ssh/ssh_host_rsa_key* 2> /dev/null
+
+    echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info
+    echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info
+    echo "" | sudo tee -a /etc/micronode.info
+
+    sudo chmod 400 /etc/micronode.info
+
 else
     $0 --help
 fi
-
-
