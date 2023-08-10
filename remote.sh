@@ -94,3 +94,5 @@ sudo ufw --force enable # Enable Firewall @ Boot and Start it now!
 sudo ufw allow from 192.168.0.0/16 to any port 3333
 sudo ufw allow from 172.16.0.0/12 to any port 3333
 sudo ufw allow from 10.0.0.0/8 to any port 3333
+
+echo ""; echo "Mining Address:"; echo "    stratum+tcp://$(hostname -I | tr -d '[:blank:]'):3333"; echo ""
