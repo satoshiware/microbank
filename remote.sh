@@ -66,7 +66,7 @@ read -p "Target's Stratum Port (default = 3333): " STRATUMPORT; if [ -z $STRATUM
 # Update known_hosts
 HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
 if [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
-	sudo sed -i "/ssh-ed25519/d" /root/.ssh/known_hosts 2> /dev/null # Remove prexisting hosts
+    sudo sed -i "/ssh-ed25519/d" /root/.ssh/known_hosts 2> /dev/null # Remove prexisting hosts
     echo "${HOSTSIG} # LVL3 Address is ${TARGETADDRESS}:${SSHPORT}" | sudo tee -a /root/.ssh/known_hosts
 else
     echo "CRITICAL ERROR: REMOTE HOST IDENTIFICATION DOES NOT MATCH GIVEN HOST KEY!!"
