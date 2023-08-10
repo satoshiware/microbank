@@ -43,7 +43,7 @@ After=network-online.target
 [Service]
 Environment="AUTOSSH_GATETIME=0"
 EnvironmentFile=/etc/default/stratumssh@%i
-ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/stratumkey -L \${LOCAL_PORT}:localhost:\${FORWARD_PORT} -p \${TARGET_PORT} stratum@\${TARGET}
+ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/stratumkey -L 0.0.0.0:\${LOCAL_PORT}:localhost:\${FORWARD_PORT} -p \${TARGET_PORT} stratum@\${TARGET}
 
 RestartSec=5
 Restart=always
