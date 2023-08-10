@@ -73,7 +73,7 @@ else
     exit 1
 fi
 
-# Create p2pssh@ remote connection environment files and start its corresponding systemd service
+# Create p2pssh@ remote connection environment file and start its corresponding systemd service
 cat << EOF | sudo tee /etc/default/p2pssh@remote
 LOCAL_PORT=3333
 FORWARD_PORT=${STRATUMPORT}

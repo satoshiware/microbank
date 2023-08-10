@@ -36,7 +36,7 @@ if [[ ${MN_SYS_CONFIG} = "DEBIAN" ]]; then
     sudo chmod 700 ~/.ssh
     sudo chmod 600 ~/.ssh/authorized_keys
 fi
-    
+
 # WSL Reminder: multiple (micro) bitcoin core instances running on the same windows machine could have port collision.
 if [[ ${MN_SYS_CONFIG} = "WSL" ]]; then
     echo ""; echo "Make sure to shutdown all other Bitcoin Core (micro) instances on this Windows machine."
@@ -72,45 +72,45 @@ fi
 
 # Download Bitcoin Core (micro), Verify Checksum
 if [[ ${MN_SYS_CONFIG} = "RASPBIAN" ]]; then
-	if [[ ${1} = "deseretmoney" ]]; then
-		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz
-		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz)" == *"8b56d0b5165c9afc6b837b048f0d1c5cf16d28f27128a0e1ae0b95763c4aadaa"* ]]; then
-			echo "Error: sha256sum for file \"deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz\" was not what was expected!"
-			exit 1
-		fi
+    if [[ ${1} = "deseretmoney" ]]; then
+        wget https://github.com/satoshiware/bitcoin/releases/download/v23001/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz
+        if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz)" == *"8b56d0b5165c9afc6b837b048f0d1c5cf16d28f27128a0e1ae0b95763c4aadaa"* ]]; then
+            echo "Error: sha256sum for file \"deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz\" was not what was expected!"
+            exit 1
+        fi
 
-		tar -xzf deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz
-		rm deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz
-	else
-		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-aarch64-linux-gnu.tar.gz
-		if [[ ! "$(sha256sum ~/bitcoin-aarch64-linux-gnu.tar.gz)" == *"ffadb8262438f06e5ef5706bb2158def662f92840c595077c3c794b5e33d1a11"* ]]; then
-			echo "Error: sha256sum for file \"bitcoin-aarch64-linux-gnu.tar.gz\" was not what was expected!"
-			exit 1
-		fi
+        tar -xzf deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz
+        rm deseretmoney_bitcoin-aarch64-linux-gnu.tar.gz
+    else
+        wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-aarch64-linux-gnu.tar.gz
+        if [[ ! "$(sha256sum ~/bitcoin-aarch64-linux-gnu.tar.gz)" == *"ffadb8262438f06e5ef5706bb2158def662f92840c595077c3c794b5e33d1a11"* ]]; then
+            echo "Error: sha256sum for file \"bitcoin-aarch64-linux-gnu.tar.gz\" was not what was expected!"
+            exit 1
+        fi
 
-		tar -xzf bitcoin-aarch64-linux-gnu.tar.gz
-		rm bitcoin-aarch64-linux-gnu.tar.gz
-	fi
+        tar -xzf bitcoin-aarch64-linux-gnu.tar.gz
+        rm bitcoin-aarch64-linux-gnu.tar.gz
+    fi
 else
-	if [[ ${1} = "deseretmoney" ]]; then
-		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
-		if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz)" == *"6dbf0eef48dfe215992495d6660d17b8fb84f99f6b597edd1c0eb12f6f78b5fc"* ]]; then
-			echo "Error: sha256sum for file \"deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
-			exit 1
-		fi
+    if [[ ${1} = "deseretmoney" ]]; then
+        wget https://github.com/satoshiware/bitcoin/releases/download/v23001/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
+        if [[ ! "$(sha256sum ~/deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz)" == *"6dbf0eef48dfe215992495d6660d17b8fb84f99f6b597edd1c0eb12f6f78b5fc"* ]]; then
+            echo "Error: sha256sum for file \"deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
+            exit 1
+        fi
 
-		tar -xzf deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
-		rm deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
-	else
-		wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-x86_64-linux-gnu.tar.gz
-		if [[ ! "$(sha256sum ~/bitcoin-x86_64-linux-gnu.tar.gz)" == *"d868e59d59e338d5dedd25e9093c9812a764b6c6dc438871caacf8e692a9e04d"* ]]; then
-			echo "Error: sha256sum for file \"bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
-			exit 1
-		fi
+        tar -xzf deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
+        rm deseretmoney_bitcoin-x86_64-linux-gnu.tar.gz
+    else
+        wget https://github.com/satoshiware/bitcoin/releases/download/v23001/bitcoin-x86_64-linux-gnu.tar.gz
+        if [[ ! "$(sha256sum ~/bitcoin-x86_64-linux-gnu.tar.gz)" == *"d868e59d59e338d5dedd25e9093c9812a764b6c6dc438871caacf8e692a9e04d"* ]]; then
+            echo "Error: sha256sum for file \"bitcoin-x86_64-linux-gnu.tar.gz\" was not what was expected!"
+            exit 1
+        fi
 
-		tar -xzf bitcoin-x86_64-linux-gnu.tar.gz
-		rm bitcoin-x86_64-linux-gnu.tar.gz
-	fi
+        tar -xzf bitcoin-x86_64-linux-gnu.tar.gz
+        rm bitcoin-x86_64-linux-gnu.tar.gz
+    fi
 fi
 
 # Install Binaries

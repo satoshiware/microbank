@@ -95,11 +95,11 @@ elif [[ $1 = "-s" || $1 = "--stratum" ]]; then # Make p2p and stratum outbound c
     read -p "Target's Bitcoin Core (micro) Port (default = 19333): " MICROPORT; if [ -z $MICROPORT ]; then MICROPORT="19333"; fi
     read -p "Target's Stratum Port (default = 3333): " STRATUMPORT; if [ -z $STRATUMPORT ]; then STRATUMPORT="3333"; fi
 
-	if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
-		echo "Error! Not a valid time stamp!"
-		exit 1
-	fi
-	
+    if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
+        echo "Error! Not a valid time stamp!"
+        exit 1
+    fi
+
     # update known_hosts
     HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
     if [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
@@ -157,11 +157,11 @@ elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound connection (Level 
     read -p "P2P (Public) Key: " P2PKEY
     read -p "Given Time Stamp: " TMSTAMP
 
-	if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
-		echo "Error! Not a valid time stamp!"
-		exit 1
-	fi
-	
+    if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
+        echo "Error! Not a valid time stamp!"
+        exit 1
+    fi
+
     echo "${P2PKEY} # ${CONNNAME}, ${TMSTAMP}$(if [ "${NDLVL}" = "3" ]; then echo ', LVL2'; fi)" | sudo tee -a /home/p2p/.ssh/authorized_keys
 
 elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connections (level 3 <--> 3)
@@ -179,11 +179,11 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
     read -p "Brief Connection Description: " CONNNAME
     read -p "P2P (Public) Key: " P2PKEY
     read -p "Given Time Stamp: " TMSTAMP
-	
-	if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
-		echo "Error! Not a valid time stamp!"
-		exit 1
-	fi
+
+    if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
+        echo "Error! Not a valid time stamp!"
+        exit 1
+    fi
 
     echo "${P2PKEY} # ${CONNNAME}, ${TMSTAMP}, P2P" | sudo tee -a /home/p2p/.ssh/authorized_keys
 
@@ -234,9 +234,9 @@ elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for
 
 elif [[ $1 = "-o" || $1 = "--open" ]]; then # Open firewall to the stratum port for any local ip
     echo ""; echo "Uncomplicated Firewall Rules"; sudo ufw status; echo ""
-	
-	STRATPORT=$(sudo cat /etc/micronode.info | grep "Stratum Port" | tr -d '[:blank:]' | cut -d ':' -f 2)
-	PNETWORK=$(echo $(hostname -I) | cut -d '.' -f 1)
+
+    STRATPORT=$(sudo cat /etc/micronode.info | grep "Stratum Port" | tr -d '[:blank:]' | cut -d ':' -f 2)
+    PNETWORK=$(echo $(hostname -I) | cut -d '.' -f 1)
     read -p "Open firewall to the stratum port (if not already) for any local ip? (y|n): "
     if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
         if [[ ${PNETWORK} = "192" ]]; then
@@ -249,8 +249,8 @@ elif [[ $1 = "-o" || $1 = "--open" ]]; then # Open firewall to the stratum port 
     fi
 
     echo ""; echo "use \"sudo ufw delete \$LINENUMBER\" to delete a rule. \$LINENUMBER starts @ 1"; echo ""
-	echo "Mining Address (if port is open):"; echo "    stratum+tcp://$(hostname -I | tr -d '[:blank:]'):${STRATPORT}"; echo ""
-	
+    echo "Mining Address (if port is open):"; echo "    stratum+tcp://$(hostname -I | tr -d '[:blank:]'):${STRATPORT}"; echo ""
+
 elif [[ $1 = "-y" || $1 = "--priority" ]]; then # Sets the priorities of the stratum proxy connections for a level 2 node/hub
     if [ ${NDLVL} != "2" ]; then
         echo "This option is for node/hub level 2 only!"
@@ -424,12 +424,12 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
         exit 0
     fi
 
-	if ! [[ $2 -gt 1690000000 ]]; then
-		echo "Error! Not a valid time stamp!"
-		exit 1
-	fi
+    if ! [[ $2 -gt 1690000000 ]]; then
+        echo "Error! Not a valid time stamp!"
+        exit 1
+    fi
 
-	# Delete outbound connections @Level 1, 2, and 3
+    # Delete outbound connections @Level 1, 2, and 3
     LOCAL_PORT=$(grep -o 'LOCAL_PORT=[0-9]*' /etc/default/p2pssh@${2}*{p2p,lvl3} 2> /dev/null | cut -d '=' -f 2) # Get the "Local Port" that corresponds with the time stamp
 
     sudo rm /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
@@ -448,10 +448,10 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
     sudo systemctl reset-failed p2pssh@${2}-stratum 2> /dev/null
     sudo systemctl disable p2pssh@${2}-lvl3 --now 2> /dev/null
     sudo systemctl reset-failed p2pssh@${2}-lvl3 2> /dev/null
-	
-	# Delete inbound connections @Level 1, 2, and 3
+
+    # Delete inbound connections @Level 1, 2, and 3
     sudo sed -i "/${2}/d" /home/p2p/.ssh/authorized_keys 2> /dev/null # Remove key with comment containing the time stamp
-	sudo sed -i "/${2}/d" /home/stratum/.ssh/authorized_keys 2> /dev/null # Remove key with comment containing the time stamp
+    sudo sed -i "/${2}/d" /home/stratum/.ssh/authorized_keys 2> /dev/null # Remove key with comment containing the time stamp
 
     # Force disconnect all p2p and stratum users
     P2PSTRATUMPIDS=$(ps -u p2p 2> /dev/null | grep sshd)$(ps -u stratum 2> /dev/null | grep sshd)
