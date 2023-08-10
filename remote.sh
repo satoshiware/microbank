@@ -49,6 +49,10 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
+# Display this remote mining bridge information
+echo ""; echo "Hostname: $(hostname)"
+echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)"; echo ""
+
 # Get the necessary details to connect to the Level 3 node
 echo "Need to get the details in order to connect this remote mining bridge to your level 3 node..."
 read -p "Target's Host (Public) Key: " HOSTKEY
@@ -56,16 +60,17 @@ read -p "Target's Address: " TARGETADDRESS
 read -p "Target's SSH PORT (default = 22): " SSHPORT; if [ -z $SSHPORT ]; then SSHPORT="22"; fi
 read -p "Target's Stratum Port (default = 3333): " STRATUMPORT; if [ -z $STRATUMPORT ]; then STRATUMPORT="3333"; fi
 
-# update known_hosts
+# Update known_hosts
 HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
 if [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
+	sudo sed -i "/ssh-ed25519/d" /root/.ssh/known_hosts 2> /dev/null # Remove prexisting hosts
     echo "${HOSTSIG} # ${CONNNAME}, ${TARGETADDRESS}:${SSHPORT}" | sudo tee -a /root/.ssh/known_hosts
 else
     echo "CRITICAL ERROR: REMOTE HOST IDENTIFICATION DOES NOT MATCH GIVEN HOST KEY!!"
     exit 1
 fi
 
-# create p2pssh@ remote connection environment files and start its corresponding systemd service
+# Create p2pssh@ remote connection environment files and start its corresponding systemd service
 cat << EOF | sudo tee /etc/default/p2pssh@remote
 LOCAL_PORT=3333
 FORWARD_PORT=${STRATUMPORT}
@@ -77,6 +82,13 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl stop p2pssh@remote
 sudo systemctl enable p2pssh@remote --now
+
+# Install/Setup/Enable the Uncomplicated Firewall (UFW)
+sudo apt-get -y install ufw
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh # Open Default SSH Port
+sudo ufw --force enable # Enable Firewall @ Boot and Start it now!
 
 # Open firewall to the stratum port for any local ip
 sudo ufw allow from 192.168.0.0/16 to any port 3333
