@@ -27,6 +27,9 @@ sudo chmod 644 /root/.ssh/known_hosts
 sudo apt-get -y update
 sudo apt-get -y upgrade
 
+# Install needed packages
+sudo apt-get -y install ufw autossh ssh
+
 # Generate public/private keys (non-encrytped)
 sudo ssh-keygen -t ed25519 -f /root/.ssh/p2pkey -N "" -C ""
 
@@ -83,8 +86,7 @@ sudo systemctl daemon-reload
 sudo systemctl stop p2pssh@remote
 sudo systemctl enable p2pssh@remote --now
 
-# Install/Setup/Enable the Uncomplicated Firewall (UFW)
-sudo apt-get -y install ufw
+# Setup/Enable the Uncomplicated Firewall (UFW)
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow ssh # Open Default SSH Port
