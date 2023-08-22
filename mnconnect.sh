@@ -41,7 +41,7 @@ if [ ! -f /usr/local/sbin/mnconnect ]; then
 fi
 
 # See which mnconnect parameter was passed and execute accordingly
-if [[ $1 = "-h" || $1 = "--help" ]]; then # Configure inbound mining connection (level 1 <-- miners)
+if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       -i, --install     Install this script (mnconnect) in /usr/local/sbin/
