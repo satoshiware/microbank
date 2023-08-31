@@ -447,7 +447,7 @@ EOF
 fi
 
 # Create Aliases to lock and unlocks (24 Hours) wallets
-echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
+echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \\\$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \\\$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
 echo "alias lockwallets=\"btc -rpcwallet=mining walletlock; btc -rpcwallet=bank walletlock\"" | sudo tee -a /etc/bash.bashrc
 
 # Backup Wallets & SSH-Fail-Safe Key (!WSL)
