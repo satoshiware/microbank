@@ -1,5 +1,5 @@
 #!/bin/bash
-source /etc/default/payouts
+source /etc/default/payouts.env
 
 NAME=$1; EMAIL=$2; AMOUNT=$3; TOTAL=$4; HASHRATE=$5; CONTACTPHONE=$6; CONTACTEMAIL=$7; COINVALUESATS=$8; USDVALUESATS=$9; ADDRESSES=${10}; TXIDS=${11}
 
