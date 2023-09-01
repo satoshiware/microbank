@@ -68,7 +68,6 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     Options:
       -h, --help        Display this help message and exit
       -i, --install     Install this script (payouts) in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
-      -f, --fees        Sum the Total Fees for the latest difficulty epoch
       -e, --epoch       Look for next difficulty epoch and prepare the DB for next round of payouts
       -s, --send        Send the Money (a 2nd NUMBER parameter generates NUMBER of outputs; default = 1)
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; update the DB
@@ -199,26 +198,74 @@ EOF
     echo ""
     sqlite3 $SQ3DBNAME ".dump"
 
-elif [[ $1 = "-f" || $1 = "--fee" ]]; then # Sum the Total Fees for the latest difficulty epoch
+elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch and prepare the DB for next round of payouts
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
     BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
 
     if [ $($BTC getblockcount) -ge $BLOCKEPOCH ]; then
-
-        # Find total fees for the epoch period ############## How do we weed out any outlayers? #######################
-        # If any block is empty then no go on the fee.
-        TOTAL_FEES=0
+        # Find total fees for the epoch period
+        TOTAL_FEES=0; TX_COUNT=0; TOTAL_WEIGHT=0; MAXFEERATE=0
         for ((i = $(($BLOCKEPOCH - $EPOCHBLOCKS)); i < $BLOCKEPOCH; i++)); do
-            TOTAL_FEES=$(($TOTAL_FEES + $(btc getblockstats $i | jq '.totalfee')))
+            tmp=$($BTC getblockstats $i)
+            TOTAL_FEES=$(($TOTAL_FEES + $(echo $tmp | jq '.totalfee')))
+            TX_COUNT=$(($TX_COUNT + $(echo $tmp | jq '.txs') - 1))
+            TOTAL_WEIGHT=$(($TOTAL_WEIGHT + $(echo $tmp | jq '.total_weight')))
+            if [ $MAXFEERATE -lt $(echo $tmp | jq '.maxfeerate') ]; then
+                MAXFEERATE=$(echo $tmp | jq '.maxfeerate')
+            fi
+			echo "BLOCK: $i, TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE"
         done
 
-        sudo sqlite3 $SQ3DBNAME "INSERT INTO payouts (epoch_period, block_height, total_fees) VALUES ($NEXTEPOCH, $BLOCKEPOCH, $TOTAL_FEES)"
-    else
-        echo "$(date) - Find Fee: $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
-    fi
-        ##EMAIL SYSTEM
+        tmp=$($BTC getblock $($BTC getblockhash $BLOCKEPOCH))
+        BLOCKTIME=$(echo $tmp | jq '.time')
+        DIFFICULTY=$(echo $tmp | jq '.difficulty')
 
-    ############## ok, if --epoch routine now looks for he total fee to be set, what about the install routine that dependes on it?##########################################################
+        EXPONENT=$(awk -v eblcks=$BLOCKEPOCH -v interval=$HALVINGINTERVAL 'BEGIN {printf("%d\n", eblcks / interval)}')
+        SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%d\n", reward / 2 ^ expo)}')
+
+        AMOUNT=$(awk -v hashrate=$HASHESPERCONTRACT -v btime=$BLOCKINTERVAL -v subs=$SUBSIDY -v totalfee=$TOTAL_FEES -v diff=$DIFFICULTY -v eblcks=$EPOCHBLOCKS 'BEGIN {printf("%d\n", ((hashrate * btime) / (diff * 2^32)) * ((subs * eblcks) + totalfee))}')
+
+        # Get array of contract_ids (from active contracts only before this epoch).
+        tmp=$(sqlite3 $SQ3DBNAME "SELECT contract_id, quantity FROM contracts WHERE active != 0 AND time<=$BLOCKTIME")
+        eol=$'\n'; read -a query <<< ${tmp//$eol/ }
+
+        # Create individual arrays for each column
+        read -a CONTIDS <<< ${query[*]%|*}
+        read -a QTYS <<< ${query[*]#*|}
+
+        # Prepare values to INSERT into the sqlite db.
+        SQL_VALUES=""
+        for ((i=0; i<${#QTYS[@]}; i++)); do
+            OUTPUT=$(awk -v qty=${QTYS[i]} -v amnt=$AMOUNT 'BEGIN {printf("%d\n", (qty * amnt))}')
+            SQL_VALUES="$SQL_VALUES(${CONTIDS[i]}, $NEXTEPOCH, $OUTPUT),"
+        done
+        SQL_VALUES="${SQL_VALUES%?}"
+
+        # Insert into database
+        sudo sqlite3 -bail $SQ3DBNAME << EOF
+		BEGIN transaction;
+        PRAGMA foreign_keys = ON;
+        INSERT INTO payouts (epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount)
+        VALUES ($NEXTEPOCH, $BLOCKEPOCH, $SUBSIDY, $TOTAL_FEES, $BLOCKTIME, $DIFFICULTY, $AMOUNT);
+        INSERT INTO txs (contract_id, epoch_period, amount)
+        VALUES $SQL_VALUES;
+		COMMIT;
+EOF
+
+
+
+
+        # Query DB ######################################################################################################### #EMAIL SYSTEM
+        echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount FROM payouts WHERE epoch_period = $NEXTEPOCH" "SELECT * FROM txs WHERE epoch_period = $NEXTEPOCH"; echo ""
+    else
+        # Don't change text on next line! The string "next epoch" used for a conditional statement above.
+        echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
+    fi
+
+    echo "TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE"
+
+####### How much did the TOTALFEES have on the payout???? Should we divide it? when we report it? yes
+############   just compare it with the total subsidy 1440 * subisidy and represent it as a percent. 
 
 
 
@@ -244,66 +291,9 @@ elif [[ $1 = "-f" || $1 = "--fee" ]]; then # Sum the Total Fees for the latest d
 
 
 
-elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch and prepare the DB for next round of payouts
-    NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
-    BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
-
-    if [ $($BTC getblockcount) -ge $BLOCKEPOCH ]; then
-        tmp=$($BTC getblock $($BTC getblockhash $BLOCKEPOCH))
-        BLOCKTIME=$(echo $tmp | jq '.time')
-        DIFFICULTY=$(echo $tmp | jq '.difficulty')
-
-        EXPONENT=$(awk -v eblcks=$BLOCKEPOCH -v interval=$HALVINGINTERVAL 'BEGIN {printf("%d\n", eblcks / interval)}')
-        SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%d\n", reward / 2 ^ expo)}')
-
-        # Find total fees for the epoch period
-        # add up total fee epoch to epoch -1
-        # How do we weed out any outlayers?
-        TOTAL_FEES=0
-#       for ((i = $(($BLOCKEPOCH - $EPOCHBLOCKS)); i < $BLOCKEPOCH; i++)); do
-#           TOTAL_FEES=$(($TOTAL_FEES + $(btc getblockstats $i | jq '.totalfee')))
-#       done
 
 
 
-        AMOUNT=$(awk -v hashrate=$HASHESPERCONTRACT -v btime=$BLOCKINTERVAL -v subs=$SUBSIDY -v totalfee=$TOTAL_FEES -v diff=$DIFFICULTY -v eblcks=$EPOCHBLOCKS 'BEGIN {printf("%d\n", ((hashrate * btime) / (diff * 2^32)) * ((subs * eblcks) + totalfee))}')
-
-        # Get array of contract_ids (from active contracts only before this epoch).
-        tmp=$(sqlite3 $SQ3DBNAME "SELECT contract_id, quantity FROM contracts WHERE active != 0 AND time<=$BLOCKTIME")
-        eol=$'\n'; read -a query <<< ${tmp//$eol/ }
-
-        # Create individual arrays for each column
-        read -a CONTIDS <<< ${query[*]%|*}
-        read -a QTYS <<< ${query[*]#*|}
-
-        # Prepare values to INSERT into the sqlite db.
-        SQL_VALUES=""
-        for ((i=0; i<${#QTYS[@]}; i++)); do
-            OUTPUT=$(awk -v qty=${QTYS[i]} -v amnt=$AMOUNT 'BEGIN {printf("%d\n", (qty * amnt))}')
-            SQL_VALUES="$SQL_VALUES(${CONTIDS[i]}, $NEXTEPOCH, $OUTPUT),"
-        done
-        SQL_VALUES="${SQL_VALUES%?}"
-
-        # Insert into database
-        sudo sqlite3 $SQ3DBNAME << EOF
-        PRAGMA foreign_keys = ON;
-        INSERT INTO payouts (epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount)
-        VALUES ($NEXTEPOCH, $BLOCKEPOCH, $SUBSIDY, $TOTAL_FEES, $BLOCKTIME, $DIFFICULTY, $AMOUNT);
-        INSERT INTO txs (contract_id, epoch_period, amount)
-        VALUES $SQL_VALUES;
-EOF
-
-        # Query DB
-        echo ""
-        sqlite3 $SQ3DBNAME << EOF
-.mode columns
-        SELECT epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount FROM payouts WHERE epoch_period = $NEXTEPOCH;
-        SELECT * FROM txs WHERE epoch_period = $NEXTEPOCH;
-EOF
-        echo ""
-    else
-        echo "You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch." # Don't change text! It's ("next epoch") used for a conditional statement above.
-    fi
 
 elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     if [ -z "${2}" ]; then # Check for second parameter (if it does not exist)
