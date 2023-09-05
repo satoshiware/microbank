@@ -202,7 +202,7 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
     BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
 
-    if [ $($BTC getblockcount) -ge $BLOCKEPOCH ]; then
+    if [ $($BTC getblockcount) -ge $BLOCKEPOCH ]; then # See if it is time for the next payout
         # Find total fees for the epoch period
         TOTAL_FEES=0; TX_COUNT=0; TOTAL_WEIGHT=0; MAXFEERATE=0
         for ((i = $(($BLOCKEPOCH - $EPOCHBLOCKS)); i < $BLOCKEPOCH; i++)); do
@@ -215,14 +215,18 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
             fi
 			echo "BLOCK: $i, TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE"
         done
+		echo "$(date) - Fee calculation complete for next epoch (Number $NEXTEPOCH) - TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE" | sudo tee -a $LOG
 
+		# Get details (time and difficulty) of the epoch block
         tmp=$($BTC getblock $($BTC getblockhash $BLOCKEPOCH))
         BLOCKTIME=$(echo $tmp | jq '.time')
         DIFFICULTY=$(echo $tmp | jq '.difficulty')
 
+		# Calculate subsidy
         EXPONENT=$(awk -v eblcks=$BLOCKEPOCH -v interval=$HALVINGINTERVAL 'BEGIN {printf("%d\n", eblcks / interval)}')
         SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%d\n", reward / 2 ^ expo)}')
 
+		# Calculate payout amount
         AMOUNT=$(awk -v hashrate=$HASHESPERCONTRACT -v btime=$BLOCKINTERVAL -v subs=$SUBSIDY -v totalfee=$TOTAL_FEES -v diff=$DIFFICULTY -v eblcks=$EPOCHBLOCKS 'BEGIN {printf("%d\n", ((hashrate * btime) / (diff * 2^32)) * ((subs * eblcks) + totalfee))}')
 
         # Get array of contract_ids (from active contracts only before this epoch).
@@ -242,6 +246,7 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         SQL_VALUES="${SQL_VALUES%?}"
 
         # Insert into database
+		echo "$(date) - Attempting to insert next epoch (Number $NEXTEPOCH) into DB" | sudo tee -a $LOG
         sudo sqlite3 -bail $SQ3DBNAME << EOF
 		BEGIN transaction;
         PRAGMA foreign_keys = ON;
@@ -252,21 +257,43 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
 		COMMIT;
 EOF
 
-
-
-
-        # Query DB ######################################################################################################### #EMAIL SYSTEM
+        # Query DB 
         echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount FROM payouts WHERE epoch_period = $NEXTEPOCH" "SELECT * FROM txs WHERE epoch_period = $NEXTEPOCH"; echo ""
+		
+		
+		NEXTEPOCH=105
+		pout=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT 'Epoch Period: ' || epoch_period, 'Block Start: ' || block_height, 'Subsidy: ' || subsidy, 'Fees: ' || total_fees, 'Time: ' || block_time, 'Difficulty: ' || difficulty, 'Payout: ' || amount FROM payouts WHERE epoch_period = $NEXTEPOCH")
+		conqty=$(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE epoch_period = $NEXTEPOCH")
+		totalpayoutamount=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE epoch_period = $NEXTEPOCH")
+		
+		
+		# Total amount of payouts... Was it a success??? What is the total expected?
+		sqlite3 $SQ3DBNAME "SELECT contract_id, quantity FROM contracts WHERE active != 0 AND time<=$BLOCKTIME"
+		
+		
+	 
+    
+    
+    
+    
+        
+
+
+
+
+		
+		
+		# Log Results
+		echo "$(date) - Fee calculation complete for next epoch (Number $NEXTEPOCH) - TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE" | sudo tee -a $LOG
+		
+		# Send Email
     else
         # Don't change text on next line! The string "next epoch" used for a conditional statement above.
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
     fi
 
-    echo "TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE"
-
-####### How much did the TOTALFEES have on the payout???? Should we divide it? when we report it? yes
-############   just compare it with the total subsidy 1440 * subisidy and represent it as a percent. 
-
+####### How much did the TOTALFEES have on the payout???? Should we divide it? when we report it? yes ############   just compare it with the total subsidy 1440 * subisidy and represent it as a percent. 
+##### Give some information to the user here. they will be interested to know....
 
 
 # TODO LIST ##################################
