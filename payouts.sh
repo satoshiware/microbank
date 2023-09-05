@@ -29,11 +29,20 @@ EPOCHBLOCKS=                    # Number of blocks before each difficulty adjust
 HALVINGINTERVAL=                # Number of blocks in before the next halving (e.g. 262800)
 HASHESPERCONTRACT=              # Hashes per second for each contract (e.g. 10000000000)
 BLOCKINTERVAL=                  # Number of seconds (typically) between blocks (e.g. 120)
+
+ADMINISTRATOREMAIL=""           # Administrator email (e.g. your_email@somedomain.com)
 EOF
 
     echo "Assign static values to all the variables in the \"/etc/default/_payouts.env\" file"
     echo "Rename file to \"payouts.env\" (from \"_payouts.env\") when finished"
     exit 0
+fi
+
+# Make sure the send_email routine is installed
+if ! command -v send_email &> /dev/null; then
+    echo "Error! The \"send_email\" routine could not be found!" | sudo tee -a $LOG
+    echo "Download the script and execute \"./send_email.sh --install\" to install this routine."
+    read -p "Press any enter to continue ..."
 fi
 
 # Load envrionment variables and then verify
@@ -213,20 +222,20 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
             if [ $MAXFEERATE -lt $(echo $tmp | jq '.maxfeerate') ]; then
                 MAXFEERATE=$(echo $tmp | jq '.maxfeerate')
             fi
-			echo "BLOCK: $i, TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE"
+            echo "BLOCK: $i, TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE"
         done
-		echo "$(date) - Fee calculation complete for next epoch (Number $NEXTEPOCH) - TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE" | sudo tee -a $LOG
+        echo "$(date) - Fee calculation complete for next epoch (Number $NEXTEPOCH) - TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE" | sudo tee -a $LOG
 
-		# Get details (time and difficulty) of the epoch block
+        # Get details (time and difficulty) of the epoch block
         tmp=$($BTC getblock $($BTC getblockhash $BLOCKEPOCH))
         BLOCKTIME=$(echo $tmp | jq '.time')
         DIFFICULTY=$(echo $tmp | jq '.difficulty')
 
-		# Calculate subsidy
+        # Calculate subsidy
         EXPONENT=$(awk -v eblcks=$BLOCKEPOCH -v interval=$HALVINGINTERVAL 'BEGIN {printf("%d\n", eblcks / interval)}')
         SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%d\n", reward / 2 ^ expo)}')
 
-		# Calculate payout amount
+        # Calculate payout amount
         AMOUNT=$(awk -v hashrate=$HASHESPERCONTRACT -v btime=$BLOCKINTERVAL -v subs=$SUBSIDY -v totalfee=$TOTAL_FEES -v diff=$DIFFICULTY -v eblcks=$EPOCHBLOCKS 'BEGIN {printf("%d\n", ((hashrate * btime) / (diff * 2^32)) * ((subs * eblcks) + totalfee))}')
 
         # Get array of contract_ids (from active contracts only before this epoch).
@@ -246,65 +255,62 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         SQL_VALUES="${SQL_VALUES%?}"
 
         # Insert into database
-		echo "$(date) - Attempting to insert next epoch (Number $NEXTEPOCH) into DB" | sudo tee -a $LOG
+        echo "$(date) - Attempting to insert next epoch (Number $NEXTEPOCH) into DB" | sudo tee -a $LOG
         sudo sqlite3 -bail $SQ3DBNAME << EOF
-		BEGIN transaction;
+        BEGIN transaction;
         PRAGMA foreign_keys = ON;
         INSERT INTO payouts (epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount)
         VALUES ($NEXTEPOCH, $BLOCKEPOCH, $SUBSIDY, $TOTAL_FEES, $BLOCKTIME, $DIFFICULTY, $AMOUNT);
         INSERT INTO txs (contract_id, epoch_period, amount)
         VALUES $SQL_VALUES;
-		COMMIT;
+        COMMIT;
 EOF
 
-        # Query DB 
+        # Query DB
         echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount FROM payouts WHERE epoch_period = $NEXTEPOCH" "SELECT * FROM txs WHERE epoch_period = $NEXTEPOCH"; echo ""
-		
-		
-		NEXTEPOCH=105
-		pout=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT 'Epoch Period: ' || epoch_period, 'Block Start: ' || block_height, 'Subsidy: ' || subsidy, 'Fees: ' || total_fees, 'Time: ' || block_time, 'Difficulty: ' || difficulty, 'Payout: ' || amount FROM payouts WHERE epoch_period = $NEXTEPOCH")
-		conqty=$(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE epoch_period = $NEXTEPOCH")
-		totalpayoutamount=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE epoch_period = $NEXTEPOCH")
-		
-		
-		# Total amount of payouts... Was it a success??? What is the total expected?
-		sqlite3 $SQ3DBNAME "SELECT contract_id, quantity FROM contracts WHERE active != 0 AND time<=$BLOCKTIME"
-		
-		
-	 
-    
-    
-    
-    
-        
+        t_payout=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT 'Epoch Period: ' || epoch_period, 'Epoch Block: ' || block_height, 'Block Time: ' || datetime(block_time, 'unixepoch', 'localtime') as dates, 'Difficulty: ' || difficulty, 'Payout: ' || printf('%.8f', (CAST(amount AS REAL) / 100000000)), 'Subsidy: ' || printf('%.8f', (CAST(subsidy AS REAL) / 100000000)), 'Blocks: ' || (block_height - $EPOCHBLOCKS) || ' - ' || (block_height - 1), 'Total Fees: ' || printf('%.8f', (CAST(total_fees AS REAL) / 100000000)) FROM payouts WHERE epoch_period = $NEXTEPOCH")
+        payout_amount=$(sqlite3 $SQ3DBNAME "SELECT amount FROM payouts WHERE epoch_period = $NEXTEPOCH")
+        qty_contracts=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active != 0 AND time<=$BLOCKTIME")
+        qty_utxo=$(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE epoch_period = $NEXTEPOCH")
+        total_payment=$(sqlite3 $SQ3DBNAME "SELECT printf('%.8f', (CAST(SUM(amount) AS REAL) / 100000000)) FROM txs WHERE epoch_period = $NEXTEPOCH")
 
+        # Log Results
+        ENTRY="$(date) - New Epoch (Number $NEXTEPOCH)!"$'\n'
+        ENTRY="$ENTRY    Fee Results:"$'\n'
+        ENTRY="$ENTRY        TOTAL_FEES: $TOTAL_FEES"$'\n'
+        ENTRY="$ENTRY        TX_COUNT: $TX_COUNT"$'\n'
+        ENTRY="$ENTRY        TOTAL_WEIGHT: $TOTAL_WEIGHT"$'\n'
+        ENTRY="$ENTRY        MAXFEERATE: $MAXFEERATE"$'\n'
+        ENTRY="$ENTRY    DB Query (payouts table)"$'\n'
+        ENTRY="$ENTRY        $t_payout"$'\n'
+        ENTRY="$ENTRY    UTXOs QTY: $qty_utxo"$'\n'
+        ENTRY="$ENTRY    Expected Payment: $(awk -v qty=$qty_contracts -v amount=$payout_amount 'BEGIN {printf("%.8f\n", qty * amount / 100000000)}')"$'\n'
+        ENTRY="$ENTRY    Total Payment: $total_payment"$'\n'$'\n'
 
+        echo "$ENTRY" | sudo tee -a $LOG
 
+        # Send Email
+        fee_percent_diff=$(awk -v fee=$TOTAL_FEES -v payment=$total_payment 'BEGIN {printf("%.6f\n", ((fee / 100000000) / payment) * 100)}')
+        ENTRY="$ENTRY    There was a ${fee_percent_diff}% percent effect upon the total payout from the tx fees collected."$'\n'
+        ENTRY="$ENTRY        Note: If this percent ever gets significantly and repeatedly large, there may be some bad players in the network gaming the system!"$'\n'$'\n'
 
-		
-		
-		# Log Results
-		echo "$(date) - Fee calculation complete for next epoch (Number $NEXTEPOCH) - TOTAL_FEES: $TOTAL_FEES, TX_COUNT: $TX_COUNT, TOTAL_WEIGHT: $TOTAL_WEIGHT, MAXFEERATE: $MAXFEERATE" | sudo tee -a $LOG
-		
-		# Send Email
+        ENTRY="$ENTRY    Wallet (bank) Balance: $($BTC -rpcwallet=bank getbalance)"$'\n'
+
+        send_email --administrative "New Epoch Has Been Delivered!!!" "$ENTRY" ################################################# Email is not formated right!!!!!!!!!!!!!!!!!!!!!! What do we do???? Test the fees again!
+
     else
         # Don't change text on next line! The string "next epoch" used for a conditional statement above.
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
     fi
 
-####### How much did the TOTALFEES have on the payout???? Should we divide it? when we report it? yes ############   just compare it with the total subsidy 1440 * subisidy and represent it as a percent. 
-##### Give some information to the user here. they will be interested to know....
-
-
-# TODO LIST ##################################
-# The fee rate on the transaction is fixed. What can we do to make it dynamic
-# EMAIL and update LOG after routine
 
 # Send routine
+#### The fee rate on the transaction is fixed. What can we do to make it dynamic
 #### Check if there is enough money, before sending (LOG and email on error)
 #### Verify TXID, Print TXID to the LOG File (ALL PASS THROUGHS), EXIT if TXID was not good and verify balance did not change if so, bigger SECOND WORST CASE!!!!.
 #### If all went well, and there is still more txs to make then recursivly call routine. Other wise, EMAIL and LOG.
 #### Check for worst case. TXID is valid, but the DB was not updated correctly: Fill in all TXID that null with error, LOG, EMAIL
+#### EMAIL and update LOG after routine
 
 # Confirm routine. reread the newly updated database. Update LOG and EMAIL.
 
@@ -514,7 +520,7 @@ EOF
 
     # Format all the array data togethor <<<<<<<<<<<<<<<<<<<<<<<<<<< WE ARE HERE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     for i in "${!notify_data[@]}"; do
-        echo "./send_email.sh ${notify_data[$i]//|/ } $SATRATE $USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}"
+        echo "./send_email.sh --payouts ${notify_data[$i]//|/ } $SATRATE $USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}"
     done
 
 else
