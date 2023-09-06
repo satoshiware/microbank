@@ -315,56 +315,50 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         send_email --info "Not Enough Money in The Bank" "$message"
     fi
 
-    # Query db for tx_id, address, and amount - preparation to officially send out payments
+    # Query db for tx_id, address, and amount - preparation to send out first set of payments
     tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
     eol=$'\n'; read -a query <<< ${tmp//$eol/ }
+	while [ ! -z "${tmp}" ]; do
+		# Create individual arrays for each column (database insertion)
+		read -a tmp <<< $(echo ${query[*]#*|})
+		read -a ADDRESS <<< ${tmp[*]%|*}
+		read -a AMOUNT <<< ${query[*]##*|}
+		read -a TX_ID <<< ${query[*]%%|*}
 
-    # If there are no more transaction to process then just exit.
-    if [ -z "${tmp}" ]; then
-        echo "All payout transactions have been fullfilled."
-        exit 0
-    fi
+		# Prepare outputs for the transactions
+		utxos=""
+		for ((i=0; i<${#TX_ID[@]}; i++)); do
+			txo=$(awk -v amnt=${AMOUNT[i]} 'BEGIN {printf("%.8f\n", (amnt/100000000))}')
+			utxos="$utxos\"${ADDRESS[i]}\":$txo,"
+		done
+		utxos=${utxos%?}
 
-    # Create individual arrays for each column
-    read -a tmp <<< $(echo ${query[*]#*|})
-    read -a ADDRESS <<< ${tmp[*]%|*}
-    read -a AMOUNT <<< ${query[*]##*|}
-    read -a TX_ID <<< ${query[*]%%|*}
+		# Make the transaction
+		$UNLOCK
+		TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" conf_target=10 estimate_mode="economical" | jq '.txid')
+		TX=$($BTC -rpcwallet=bank gettransaction ${TXID//\"/})
 
-    # Prepare outputs for the transactions
-    utxos=""
-    for ((i=0; i<${#TX_ID[@]}; i++)); do
-        txo=$(awk -v amnt=${AMOUNT[i]} 'BEGIN {printf("%.8f\n", (amnt/100000000))}')
-        utxos="$utxos\"${ADDRESS[i]}\":$txo,"
+		# Update the DB with the TXID and vout
+		for ((i=0; i<${#TX_ID[@]}; i++)); do
+			sudo sqlite3 $SQ3DBNAME "UPDATE txs SET txid = $TXID, vout = $(echo $TX | jq .details[$i].vout) WHERE tx_id = ${TX_ID[i]};"
+		done
+
+		# Query db for tx_id, address, and amount - preparation to officially send out payments for the next iteration of this loop.
+		tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
+		eol=$'\n'; read -a query <<< ${tmp//$eol/ }
     done
-    utxos=${utxos%?}
+	
+	# Verify all TXIDS make sure no tx has the same txid and vout ........ ANYTHING WRONG, THIS IS A SERIOUS ERROR. LOG, EMAIL, AND SHUTDOWN THEY SYSTEM...................................................................................
+	# Query DB, Log, and email <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Report any TXIDs that are not right
+    echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE txid = $TXID"; echo "" ############### Yeah this is going to change
 
-    # Make the transaction
-    $UNLOCK
-    TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" fee_rate=1 | jq '.txid')
-    TX=$($BTC -rpcwallet=bank gettransaction ${TXID//\"/})
-
-    # Update the DB with the TXID and vout
-    for ((i=0; i<${#TX_ID[@]}; i++)); do
-        sudo sqlite3 $SQ3DBNAME "UPDATE txs SET txid = $TXID, vout = $(echo $TX | jq .details[$i].vout) WHERE tx_id = ${TX_ID[i]};"
-    done
-
-    # Query DB
-    echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE txid = $TXID"; echo ""
-
-    # Run this routine resursively in case there are more
-    echo "Press enter to send again!"; read VAR
-    $0 $1 $2
-
-# The fee rate on the transaction is fixed. What can we do to make it dynamic
+ ##### Watch account and make sure we do not spend too much. 
+	#### If we spend too much. Disable the system, Log, and email!
 
 
-#### Verify TXID, Print TXID to the LOG File (ALL PASS THROUGHS), EXIT if TXID was not good and verify balance did not change if so, bigger SECOND WORST CASE!!!!.
-#### If all went well, and there is still more txs to make then recursivly call routine. Other wise, EMAIL and LOG.
-#### Check for worst case. TXID is valid, but the DB was not updated correctly: Fill in all TXID that null with error, LOG, EMAIL
-#### EMAIL and update LOG after routine
 
-# Confirm routine. reread the newly updated database. Update LOG and EMAIL.
+
+
 
 
 
