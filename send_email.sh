@@ -103,7 +103,43 @@ elif [[ $1 = "-p" || $1 = "--payouts" ]]; then # Send a payout email to a core c
 EOF
     )
 
-elif [[ $1 = "-a" || $1 = "--administrative" ]]; then # Send an administrative email
+elif [[ $1 = "-e" || $1 = "--epoch" ]]; then
+    NEXTEPOCH=$2; TOTAL_FEES=$3; TX_COUNT=$4; TOTAL_WEIGHT=$5; MAXFEERATE=$6; qty_utxo=$7; expected_payment=$8; total_payment=$9; fee_percent_diff=${10}; bank_balance=${11}; t_payout=${12}
+
+    if [[ -z $NEXTEPOCH || -z $TOTAL_FEES || -z $TX_COUNT || -z $TOTAL_WEIGHT || -z $MAXFEERATE || -z $qty_utxo || -z $expected_payment || -z $total_payment || -z $fee_percent_diff || -z $bank_balance || -z $t_payout ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    NAME="satoshi"
+    EMAIL="${ADMINISTRATOREMAIL}"
+    SUBJECT="New Epoch Has Been Delivered!!!"
+    MESSAGE=$(cat << EOF
+        <b><u>$(date) - New Epoch (Number $NEXTEPOCH)</u></b><br><br>
+
+        <b>Fee Results:</b><br>
+        <ul>
+            <li><b>Total Fees:</b> $TOTAL_FEES</li>
+            <li><b>TX Count:</b> $TX_COUNT</li>
+            <li><b>Total Weight:</b> $TOTAL_WEIGHT</li>
+            <li><b>Max Fee Rate:</b> $MAXFEERATE</li>
+        </ul><br>
+
+        <b>DB Query (payouts table)</b><br>
+        $t_payout<br><br>
+
+        <b>UTXOs QTY:</b> $qty_utxo<br>
+        <b>Expected Payment:</b> $expected_payment<br>
+        <b>Total Payment:</b> $total_payment<br><br>
+
+        There was a <b>${fee_percent_diff} percent</b> effect upon the total payout from the tx fees collected.<br>
+        Note: If this percent ever gets significantly and repeatedly large, there may be some bad players in the network gaming the system.<br><br>
+
+        <b>Wallet (bank) Balance:</b> $bank_balance
+EOF
+    )
+
+elif [[ $1 = "-i" || $1 = "--info" ]]; then
     SUBJECT=$2; MESSAGE=$3
 
     if [[ -z $SUBJECT || -z $MESSAGE ]]; then
@@ -113,6 +149,7 @@ elif [[ $1 = "-a" || $1 = "--administrative" ]]; then # Send an administrative e
 
     NAME="satoshi"
     EMAIL="${ADMINISTRATOREMAIL}"
+
 fi
 
 MESSAGE=$(echo $MESSAGE | sed 's/[^A-Za-z0-9.<>(),$/"\¢#@`:&;?!-]/ /g')
