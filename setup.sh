@@ -179,12 +179,14 @@ fi
 # Generate Bitcoin Configuration File with the Appropriate Permissions
 if [[ ${NDLVL} = "2" || ${NDLVL} = "3" ]]; then
     cat << EOF | sudo tee /etc/bitcoin.conf
+fallbackfee=0.0002
 server=1
 $(rpcauth satoshi $(sudo cat /root/rpcpasswd) | grep 'rpcauth')
 [micro]
 EOF
 else
     cat << EOF | sudo tee /etc/bitcoin.conf
+fallbackfee=0.0002
 [micro]
 EOF
 fi
