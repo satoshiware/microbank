@@ -30,6 +30,8 @@ HALVINGINTERVAL=                # Number of blocks in before the next halving (e
 HASHESPERCONTRACT=              # Hashes per second for each contract (e.g. 10000000000)
 BLOCKINTERVAL=                  # Number of seconds (typically) between blocks (e.g. 120)
 
+TX_BATCH_SZ=                    # Number of outputs for each send transaction (e.g. 10)
+
 ADMINISTRATOREMAIL=""           # Administrator email (e.g. your_email@somedomain.com)
 EOF
 
@@ -63,7 +65,7 @@ LOG=/var/log/payout.log
 SQ3DBNAME=/var/lib/btcofaz.db.development # Uncomment this line to switch to the development database.
 if [[ $SQ3DBNAME == *"development"* ]]; then
     LOG=~/log.payout
-    echo ""; echo "log file is located at \"~/payout.log\""
+    echo ""; echo "log file is located at \"~/log.payout\""
     echo ""; echo "Did you make a recent copy of the production database for development mode?"
     echo "\"sudo cp /var/lib/btcofaz.db /var/lib/btcofaz.db.development\""
     echo ""; echo "Did you make backups of the production database?"
@@ -208,6 +210,9 @@ EOF
     sqlite3 $SQ3DBNAME ".dump"
 
 elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch and prepare the DB for next round of payouts
+    # echo $SQ3DBNAME
+    # sudo sqlite3 $SQ3DBNAME "DELETE FROM txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
+    # sudo sqlite3 $SQ3DBNAME "DELETE FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
     BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
 
@@ -275,73 +280,43 @@ EOF
         total_payment=$(sqlite3 $SQ3DBNAME "SELECT printf('%.8f', (CAST(SUM(amount) AS REAL) / 100000000)) FROM txs WHERE epoch_period = $NEXTEPOCH")
 
         # Log Results
+        expected_payment=$(awk -v qty=$qty_contracts -v amount=$payout_amount 'BEGIN {printf("%.8f\n", qty * amount / 100000000)}')
         ENTRY="$(date) - New Epoch (Number $NEXTEPOCH)!"$'\n'
         ENTRY="$ENTRY    Fee Results:"$'\n'
-        ENTRY="$ENTRY        TOTAL_FEES: $TOTAL_FEES"$'\n'
-        ENTRY="$ENTRY        TX_COUNT: $TX_COUNT"$'\n'
-        ENTRY="$ENTRY        TOTAL_WEIGHT: $TOTAL_WEIGHT"$'\n'
-        ENTRY="$ENTRY        MAXFEERATE: $MAXFEERATE"$'\n'
+        ENTRY="$ENTRY        Total Fees: $TOTAL_FEES"$'\n'
+        ENTRY="$ENTRY        TX Count: $TX_COUNT"$'\n'
+        ENTRY="$ENTRY        Total Weight: $TOTAL_WEIGHT"$'\n'
+        ENTRY="$ENTRY        Max Fee Rate: $MAXFEERATE"$'\n'
         ENTRY="$ENTRY    DB Query (payouts table)"$'\n'
         ENTRY="$ENTRY        $t_payout"$'\n'
         ENTRY="$ENTRY    UTXOs QTY: $qty_utxo"$'\n'
-        ENTRY="$ENTRY    Expected Payment: $(awk -v qty=$qty_contracts -v amount=$payout_amount 'BEGIN {printf("%.8f\n", qty * amount / 100000000)}')"$'\n'
-        ENTRY="$ENTRY    Total Payment: $total_payment"$'\n'$'\n'
+        ENTRY="$ENTRY    Expected Payment: $expected_payment"$'\n'
+        ENTRY="$ENTRY    Total Payment: $total_payment"
 
         echo "$ENTRY" | sudo tee -a $LOG
 
         # Send Email
         fee_percent_diff=$(awk -v fee=$TOTAL_FEES -v payment=$total_payment 'BEGIN {printf("%.6f\n", ((fee / 100000000) / payment) * 100)}')
-        ENTRY="$ENTRY    There was a ${fee_percent_diff}% percent effect upon the total payout from the tx fees collected."$'\n'
-        ENTRY="$ENTRY        Note: If this percent ever gets significantly and repeatedly large, there may be some bad players in the network gaming the system!"$'\n'$'\n'
-
-        ENTRY="$ENTRY    Wallet (bank) Balance: $($BTC -rpcwallet=bank getbalance)"$'\n'
-
-        send_email --administrative "New Epoch Has Been Delivered!!!" "$ENTRY" ################################################# Email is not formated right!!!!!!!!!!!!!!!!!!!!!! What do we do???? Test the fees again!
+        bank_balance=$($BTC -rpcwallet=bank getbalance)
+        send_email --epoch $NEXTEPOCH $TOTAL_FEES $TX_COUNT $TOTAL_WEIGHT $MAXFEERATE $qty_utxo $expected_payment $total_payment $fee_percent_diff $bank_balance "$t_payout"
 
     else
         # Don't change text on next line! The string "next epoch" used for a conditional statement above.
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
     fi
 
-
-# Send routine
-#### The fee rate on the transaction is fixed. What can we do to make it dynamic
-#### Check if there is enough money, before sending (LOG and email on error)
-#### Verify TXID, Print TXID to the LOG File (ALL PASS THROUGHS), EXIT if TXID was not good and verify balance did not change if so, bigger SECOND WORST CASE!!!!.
-#### If all went well, and there is still more txs to make then recursivly call routine. Other wise, EMAIL and LOG.
-#### Check for worst case. TXID is valid, but the DB was not updated correctly: Fill in all TXID that null with error, LOG, EMAIL
-#### EMAIL and update LOG after routine
-
-# Confirm routine. reread the newly updated database. Update LOG and EMAIL.
-
-# DEBUG/USEFULL COMMANDS ##################################
-# sudo sqlite3 $SQ3DBNAME "DELETE FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = 245 WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
-
-
-
-
-
-
-
-
-
-
 elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
-    if [ -z "${2}" ]; then # Check for second parameter (if it does not exist)
-        QTYOUTS=1
-    else
-        re='^[0-9]+$'
-        if ! [[ ${2} =~ $re ]]; then # Make sure second parameter is a number
-            echo "Error! \"${2}\" is not an integer!"
-            exit 1
-        fi
-        QTYOUTS="${2}"
+    # Find out if there is enough money in the bank to execute payments
+    total_payment=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL")
+    bank_balance=$(awk -v balance=$($BTC -rpcwallet=bank getbalance) 'BEGIN {printf("%.0f\n", balance * 100000000)}')
+    if [ $((total_payment + 100000000)) -gt $bank_balance ]; then
+        message="$(date) - Not enough money in the bank to send payouts! The bank has $bank_balance $DENOMINATION, but it needs $((total_payment + 100000000)) $DENOMINATION before any payouts will be sent."
+        echo $message | sudo tee -a $LOG
+        send_email --info "Not Enough Money in The Bank" "$message"
     fi
 
     # Query db for tx_id, address, and amount - preparation to officially send out payments
-    tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid is NULL LIMIT $QTYOUTS")
+    tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
     eol=$'\n'; read -a query <<< ${tmp//$eol/ }
 
     # If there are no more transaction to process then just exit.
@@ -380,6 +355,31 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     # Run this routine resursively in case there are more
     echo "Press enter to send again!"; read VAR
     $0 $1 $2
+
+# The fee rate on the transaction is fixed. What can we do to make it dynamic
+
+
+#### Verify TXID, Print TXID to the LOG File (ALL PASS THROUGHS), EXIT if TXID was not good and verify balance did not change if so, bigger SECOND WORST CASE!!!!.
+#### If all went well, and there is still more txs to make then recursivly call routine. Other wise, EMAIL and LOG.
+#### Check for worst case. TXID is valid, but the DB was not updated correctly: Fill in all TXID that null with error, LOG, EMAIL
+#### EMAIL and update LOG after routine
+
+# Confirm routine. reread the newly updated database. Update LOG and EMAIL.
+
+
+
+# Confirm routine. reread the newly updated database. Update LOG and EMAIL.
+# DEBUG/USEFULL COMMANDS ##################################
+# echo $SQ3DBNAME
+
+# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = 245 WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
+# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
+
+
+
+
+
+
 
 elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are confirmed in the blockchain; update the DB
     # Get all the txs that have a valid TXID without a block height
