@@ -1,7 +1,7 @@
 #!/bin/bash
 source /etc/default/payouts.env
 
-if [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
+if [[ $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     echo "Installing this script (send_email) in /usr/local/sbin/"
     if [ ! -f /usr/local/sbin/send_email ]; then
         sudo cat $0 | sudo tee /usr/local/sbin/send_email > /dev/null
@@ -16,7 +16,7 @@ if [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local
     fi
     exit 0
 
-elif [[ $1 = "-p" || $1 = "--payouts" ]]; then # Send a payout email to a core customer
+elif [[ $1 = "--payouts" ]]; then # Send a payout email to a core customer
     NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; ADDRESSES=${11}; TXIDS=${12}
 
     if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $CONTACTPHONE || -z $CONTACTEMAIL || -z $COINVALUESATS || -z $USDVALUESATS || -z $ADDRESSES || -z $TXIDS ]]; then
@@ -103,7 +103,7 @@ elif [[ $1 = "-p" || $1 = "--payouts" ]]; then # Send a payout email to a core c
 EOF
     )
 
-elif [[ $1 = "-e" || $1 = "--epoch" ]]; then
+elif [[ $1 = "--epoch" ]]; then
     NEXTEPOCH=$2; TOTAL_FEES=$3; TX_COUNT=$4; TOTAL_WEIGHT=$5; MAXFEERATE=$6; qty_utxo=$7; expected_payment=$8; total_payment=$9; fee_percent_diff=${10}; bank_balance=${11}; t_payout=${12}
 
     if [[ -z $NEXTEPOCH || -z $TOTAL_FEES || -z $TX_COUNT || -z $TOTAL_WEIGHT || -z $MAXFEERATE || -z $qty_utxo || -z $expected_payment || -z $total_payment || -z $fee_percent_diff || -z $bank_balance || -z $t_payout ]]; then
@@ -139,7 +139,7 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then
 EOF
     )
 
-elif [[ $1 = "-i" || $1 = "--info" ]]; then
+elif [[ $1 = "--info" ]]; then
     SUBJECT=$2; MESSAGE=$3
 
     if [[ -z $SUBJECT || -z $MESSAGE ]]; then
@@ -149,6 +149,31 @@ elif [[ $1 = "-i" || $1 = "--info" ]]; then
 
     NAME="satoshi"
     EMAIL="${ADMINISTRATOREMAIL}"
+
+elif [[ $1 = "--send" ]]; then
+    $bank_balance=$2; $total_payment=$3; $total_sending=$4; $post_bank_balance=$5; $t_txids=$6
+
+    if [[ -z $bank_balance || -z $total_payment || -z $total_sending || -z $post_bank_balance=$5 || -z $t_txids ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    NAME="satoshi"
+    EMAIL="${ADMINISTRATOREMAIL}"
+    SUBJECT="All Payments have been completed successfully!!!"
+    MESSAGE=$(cat << EOF
+        <b>$(date) - All Payments have been completed successfully!</b><br>
+        <ul>
+            <li><b>Bank Balance:</b> $bank_balance (Before Sending Payments)</li>
+            <li><b>Calculated Total:</b> $total_payment</li>
+            <li><b>Total Sent:</b> $total_sending</li>
+            <li><b>Bank Balance:</b> $post_bank_balance (After Sending Payments)</li>
+        </ul><br>
+
+        <b>DB Query (All Recent TXIDs)</b><br>
+        $t_txids
+EOF
+    )
 
 fi
 
