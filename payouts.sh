@@ -82,6 +82,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -e, --epoch       Look for next difficulty epoch and prepare the DB for next round of payouts
       -s, --send        Send the Money (a 2nd NUMBER parameter generates NUMBER of outputs; default = 1)
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; update the DB
+      -m, --email       Prepare all core customer notification emails for the latest epoch
       -d, --dump        Show all the contents of the database
       -a, --accounts    Show all accounts
       -l, --sales       Show all sales
@@ -312,10 +313,17 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         echo "    There was a serious error sending out payments last time." | sudo tee -a $LOG
         echo "    Hope you figured out why and was able to resolve it!" | sudo tee -a $LOG
         echo "    Remove file /etc/send_payments_error_flag for this routine to run again." | sudo tee -a $LOG
+        exit 1
+    fi
+
+    # If there are no payments to process then just exit
+    total_payment=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL")
+    if [ -z $total_payment ]; then
+        echo "$(date) - There are currently no payments to process." | sudo tee -a $LOG
+        exit 0
     fi
 
     # Find out if there is enough money in the bank to execute payments
-    total_payment=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL")
     bank_balance=$(awk -v balance=$($BTC -rpcwallet=bank getbalance) 'BEGIN {printf("%.0f\n", balance * 100000000)}')
     if [ $((total_payment + 100000000)) -gt $bank_balance ]; then
         message="$(date) - Not enough money in the bank to send payouts! The bank has $bank_balance $DENOMINATION, but it needs $((total_payment + 100000000)) $DENOMINATION before any payouts will be sent."
@@ -349,7 +357,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         $UNLOCK
         TXID="" # Clear variable to further prove TXID uniqueness.
         TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" conf_target=10 estimate_mode="economical" | jq '.txid')
-        if [[ ! $TXID =~ ^[0-9a-f]{64}$ ]]; then
+        if [[ ! ${TXID//\"/} =~ ^[0-9a-f]{64}$ ]]; then
             echo "$(date) - Serious Error!!! Invalid TXID: $TXID" | sudo tee -a $LOG
             send_email --info "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
             sudo touch /etc/send_payments_error_flag
@@ -384,12 +392,15 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     fi
 
     # Log Results
-    post_bank_balance=$(awk -v balance=$($BTC -rpcwallet=bank getbalance) 'BEGIN {printf("%.0f\n", balance * 100000000)}')
+    post_bank_balance=$($BTC -rpcwallet=bank getbalance)
+    bank_balance=$(awk -v num=$bank_balance 'BEGIN {printf("%.8f\n", num / 100000000)}')
+    total_payment=$(awk -v num=$total_payment 'BEGIN {printf("%.8f\n", num / 100000000)}')
+    total_sending=$(awk -v num=$total_sending 'BEGIN {printf("%.8f\n", num / 100000000)}')
     ENTRY="$(date) - All Payments have been completed successfully!"$'\n'
-    ENTRY="$ENTRY        Bank Balance: $bank_balance (Before Sending Payments)"$'\n'
-    ENTRY="$ENTRY        Calculated Total: $total_payment"$'\n'
-    ENTRY="$ENTRY        Total Sent: $total_sending"$'\n'
-    ENTRY="$ENTRY        Bank Balance: $post_bank_balance (After Sending Payments)"$'\n'
+    ENTRY="$ENTRY    Bank Balance: $bank_balance (Before Sending Payments)"$'\n'
+    ENTRY="$ENTRY    Calculated Total: $total_payment"$'\n'
+    ENTRY="$ENTRY    Total Sent: $total_sending"$'\n'
+    ENTRY="$ENTRY    Bank Balance: $post_bank_balance (After Sending Payments)"
     echo "$ENTRY" | sudo tee -a $LOG
 
     # Send Email
@@ -407,12 +418,14 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
     fi
 
     # See if each TXID has at least 6 confirmations; if so, update the block height in the DB.
+    confirmed=0
     for ((i=0; i<${#query[@]}; i++)); do
         tmp=$($BTC -rpcwallet=bank gettransaction ${query[i]})
 
         CONFIRMATIONS=$(echo $tmp | jq '.confirmations')
         if [ $CONFIRMATIONS -ge "6" ]; then
             sudo sqlite3 $SQ3DBNAME "UPDATE txs SET block_height = $(echo $tmp | jq '.blockheight') WHERE txid = \"${query[i]}\";"
+            confirmed=$((confirmed + 1))
 
             # Query DB
             echo "Confirmed:"; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE txid = \"${query[i]}\";"; echo ""
@@ -421,72 +434,21 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
         fi
     done
 
+    echo "$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
+    echo "    $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
 
+    message="$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations.<br><br>"
+    message="${message} $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations."
 
+    send_email --info "Confirming Transaction(s) on The Blockchain" "$message"
 
-# Confirm routine. reread the newly updated database. Update LOG and EMAIL.
-# DEBUG/USEFULL COMMANDS ##################################
-# echo $SQ3DBNAME
-
-# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = 245 WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
-
-
-
-
-
-
-elif [[  $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
-    sqlite3 $SQ3DBNAME ".dump"
-
-elif [[  $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
-
-elif [[  $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT sales.sale_id AS Sale, (accounts.first_name || ' ' || accounts.last_name) AS Name, sales.time AS Time, sales.quantity AS QTY, sales.status AS Status FROM accounts, sales WHERE accounts.account_id = sales.account_id"
-
-elif [[  $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts"
-
-elif [[  $1 = "-x" || $1 = "--txs" ]]; then # Show all the transactions associated with the latest payout
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);" # The latest transactions added to the DB
-
-elif [[  $1 = "-p" || $1 = "--payouts" ]]; then # Show all payouts thus far
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM payouts"
-
-elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each contract (identical addresses are combinded)
-    echo ""; echo ""; echo "Ordered by Account:"; echo "";
-    sqlite3 $SQ3DBNAME << EOF
-.mode columns
-    SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
-        contracts.micro_address AS Addresses,
-        CAST(SUM(txs.amount) as REAL) / 100000000 AS Totals
-    FROM accounts, contracts, txs
-    WHERE contracts.contract_id = txs.contract_id AND contracts.account_id = accounts.account_id
-    GROUP BY contracts.micro_address
-    ORDER BY accounts.account_id;
-EOF
-
-    echo ""; echo "Ordered by Contract ID:"; echo "";
-    sqlite3 $SQ3DBNAME << EOF
-.mode columns
-    SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
-        contracts.micro_address AS Addresses,
-        CAST(SUM(txs.amount) as REAL) / 100000000 AS Totals
-    FROM accounts, contracts, txs
-    WHERE contracts.contract_id = txs.contract_id AND contracts.account_id = accounts.account_id
-    GROUP BY contracts.micro_address
-    ORDER BY contracts.contract_id;
-EOF
-
-elif [[  $1 = "-m" || $1 = "--email" ]]; then # Show all payouts thus far  (a 2nd parameter will limit the NUMBER of rows displayed - in descending order)
-    # Get btc/usd exchange rates from populat exchanges
-    BTCUSD=$(curl https://api.coinbase.com/v2/prices/BTC-USD/spot | jq '.data.amount') # Coinbase BTC/USD Price
-    #BTCUSD=$(curl "https://api.kraken.com/0/public/Ticker?pair=BTCUSD" | jq '.result.XXBTZUSD.a[0]') # Kraken BTC/USD Price
-    BTCUSD=${BTCUSD//\"/}
-    USDSATS=$(awk -v btcusd=$BTCUSD 'BEGIN {printf("%.3f\n", 100000000 / btcusd)}')
-
-    read -p "What is today's price (in $ATS) for ???????????????????????? : " SATRATE
+elif [[  $1 = "-m" || $1 = "--email" ]]; then # Prepare all core customer notification emails for the latest epoch
+    # Check to see if the latest epoch has already been "notified"
+	notified=$(sqlite3 $SQ3DBNAME "SELECT notified FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts)")
+    if [ ! -z $notified ]; then
+        echo "No emails to prepare at this time!"
+        exit 0
+    fi
 
     # Generate payout data to be sent to each core customer
     tmp=$(sqlite3 $SQ3DBNAME << EOF
@@ -548,11 +510,62 @@ EOF
         txids[${tmp_txids[i]%|*}]=${txids[${tmp_txids[i]%|*}]}.${tmp_txids[i]#*|}
     done
 
-    # Format all the array data togethor <<<<<<<<<<<<<<<<<<<<<<<<<<< WE ARE HERE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    # Format all the array data togethor
     for i in "${!notify_data[@]}"; do
-        echo "./send_email.sh --payouts ${notify_data[$i]//|/ } $SATRATE $USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}"
+        echo "./send_email.sh --payouts ${notify_data[$i]//|/ } \$SATRATE \$USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
     done
 
+    # Set the notified flag
+    sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
+
+    # Log Results
+	echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)." | sudo tee -a $LOG
+	
+	# Send Email
+	send_email --info "Core Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)."
+	
+elif [[  $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
+    sqlite3 $SQ3DBNAME ".dump"
+
+elif [[  $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
+
+elif [[  $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT sales.sale_id AS Sale, (accounts.first_name || ' ' || accounts.last_name) AS Name, sales.time AS Time, sales.quantity AS QTY, sales.status AS Status FROM accounts, sales WHERE accounts.account_id = sales.account_id"
+
+elif [[  $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts"
+
+elif [[  $1 = "-x" || $1 = "--txs" ]]; then # Show all the transactions associated with the latest payout
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);" # The latest transactions added to the DB
+
+elif [[  $1 = "-p" || $1 = "--payouts" ]]; then # Show all payouts thus far
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM payouts"
+
+elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each contract (identical addresses are combinded)
+    echo ""; echo ""; echo "Ordered by Account:"; echo "";
+    sqlite3 $SQ3DBNAME << EOF
+.mode columns
+    SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
+        contracts.micro_address AS Addresses,
+        CAST(SUM(txs.amount) as REAL) / 100000000 AS Totals
+    FROM accounts, contracts, txs
+    WHERE contracts.contract_id = txs.contract_id AND contracts.account_id = accounts.account_id
+    GROUP BY contracts.micro_address
+    ORDER BY accounts.account_id;
+EOF
+
+    echo ""; echo "Ordered by Contract ID:"; echo "";
+    sqlite3 $SQ3DBNAME << EOF
+.mode columns
+    SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
+        contracts.micro_address AS Addresses,
+        CAST(SUM(txs.amount) as REAL) / 100000000 AS Totals
+    FROM accounts, contracts, txs
+    WHERE contracts.contract_id = txs.contract_id AND contracts.account_id = accounts.account_id
+    GROUP BY contracts.micro_address
+    ORDER BY contracts.contract_id;
+EOF
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
@@ -686,3 +699,68 @@ fi
 #./contract_emails_ut.sh Teresa tlpickens@gmail.com 1.47238742 ut1qnekh7k0k63mfarar60tehxzklhaezf3ptjssyz 9.89724101 10 480-262-1776 mla3360@hotmail.com 303 3845.932 22f88588c43e99137e8fa74f523e66d6cd7003eafdb6624aaf8678d5dfe797c0
 #./contract_emails_ut.sh Lance lanceatkinson@frontier.com 1.47238742 ut1qelu5sdqjpeg8vlsz7geflvpyhvx5g9d4mxult7 9.89724101 10 480-262-1776 mla3360@hotmail.com 303 3845.932 aecc74588ac93e66aa8b71ff3a8fe8bc175da8c39750c5640a6097210f91b6c7
 #./contract_emails_ut.sh Test mqpickens@yahoo.com 1.47238742 ut1qelu5sdqjpeg8vlsz7geflvpyhvx5g9d4mxult7 9.89724101 10 480-262-1776 mla3360@hotmail.com 303 3845.932 aecc74588ac93e66aa8b71ff3a8fe8bc175da8c39750c5640a6097210f91b6c7
+
+
+
+
+
+######### Set the SATRATE #########################
+#    # Get btc/usd exchange rates from populat exchanges
+#    BTCUSD=$(curl https://api.coinbase.com/v2/prices/BTC-USD/spot | jq '.data.amount') # Coinbase BTC/USD Price
+#   #BTCUSD=$(curl "https://api.kraken.com/0/public/Ticker?pair=BTCUSD" | jq '.result.XXBTZUSD.a[0]') # Kraken BTC/USD Price
+#    BTCUSD=${BTCUSD//\"/}
+#    USDSATS=$(awk -v btcusd=$BTCUSD 'BEGIN {printf("%.3f\n", 100000000 / btcusd)}')
+
+#    read -p "What is today's price (in $ATS) for ???????????????????????? : " SATRATE
+
+
+
+# DEBUG/USEFULL COMMANDS ##################################
+# echo $SQ3DBNAME
+
+# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = 245 WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
+
+#echo "Hello World2" | sudo tee -a /var/tmp/payout.emails
+
+#tail -n 1 /var/tmp/payout.emails
+#sudo sed -i '$d' /var/tmp/payout.emails
+
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Administrative Checks ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Send out emails to administrator-- Check. It kind of does that already
+# Send out emails to Level 1 Hubs. What's that look like??
+# Billing and keeping track of how much they have purchased.
+# Got to figure this one out!
+# Tellers Table and accounts
+
+
+# Tellers Account
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Access Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Add an account (USER_PHONE, PREFFERED_NAME, and MASTER_EMAIL is optional; however, USER_PHONE is highly reccommended if possible!)
+#payouts --add-user CONTACT_EMAIL USER_EMAIL USER_PHONE FIRST_NAME LAST_NAME PREFFERED_NAME MASTER_EMAIL
+
+# Disable an account (i.e. "deletes" an account, disables associated contracts, but retains its critical data)
+#payouts --disable-user USER_EMAIL
+
+# Add a sale - Note: This User is the one paying, but the resulting contracts can be assigned to anyone
+#payouts --add-sale USER_EMAIL QTY
+
+# Update sale status - The "STATUS" can set to "PAID", "NOT_PAID", "TRIAL", or "DISABLED"
+#payouts --update-sale SALE_ID STATUS
+
+# Add a contract
+#payouts --add-contract USER_EMAIL SALE_ID QTY MICRO_ADDRESS
+
+# Mark a contract as delivered
+#payouts --update-contract CONTRACT_ID
+
+# Disable a contract
+#payouts --disable-contract CONTRACT_ID
