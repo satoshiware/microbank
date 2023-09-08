@@ -306,6 +306,14 @@ EOF
     fi
 
 elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
+    # See if error flag is present
+    if [ -f /etc/send_payments_error_flag ]; then
+        echo "$(date) - The \"--send\" payout routine was halted!" | sudo tee -a $LOG
+        echo "    There was a serious error sending out payments last time." | sudo tee -a $LOG
+        echo "    Hope you figured out why and was able to resolve it!" | sudo tee -a $LOG
+        echo "    Remove file /etc/send_payments_error_flag for this routine to run again." | sudo tee -a $LOG
+    fi
+
     # Find out if there is enough money in the bank to execute payments
     total_payment=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL")
     bank_balance=$(awk -v balance=$($BTC -rpcwallet=bank getbalance) 'BEGIN {printf("%.0f\n", balance * 100000000)}')
@@ -318,62 +326,75 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     # Query db for tx_id, address, and amount - preparation to send out first set of payments
     tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
     eol=$'\n'; read -a query <<< ${tmp//$eol/ }
-	while [ ! -z "${tmp}" ]; do
-		# Create individual arrays for each column (database insertion)
-		read -a tmp <<< $(echo ${query[*]#*|})
-		read -a ADDRESS <<< ${tmp[*]%|*}
-		read -a AMOUNT <<< ${query[*]##*|}
-		read -a TX_ID <<< ${query[*]%%|*}
+    total_sending=0
+    while [ ! -z "${tmp}" ]; do
+        count=$(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") # Get the total count of utxos to be generated
 
-		# Prepare outputs for the transactions
-		utxos=""
-		for ((i=0; i<${#TX_ID[@]}; i++)); do
-			txo=$(awk -v amnt=${AMOUNT[i]} 'BEGIN {printf("%.8f\n", (amnt/100000000))}')
-			utxos="$utxos\"${ADDRESS[i]}\":$txo,"
-		done
-		utxos=${utxos%?}
+        # Create individual arrays for each column (database insertion)
+        read -a tmp <<< $(echo ${query[*]#*|})
+        read -a ADDRESS <<< ${tmp[*]%|*}
+        read -a AMOUNT <<< ${query[*]##*|}
+        read -a TX_ID <<< ${query[*]%%|*}
 
-		# Make the transaction
-		$UNLOCK
-		TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" conf_target=10 estimate_mode="economical" | jq '.txid')
-		TX=$($BTC -rpcwallet=bank gettransaction ${TXID//\"/})
+        # Prepare outputs for the transactions
+        utxos=""
+        for ((i=0; i<${#TX_ID[@]}; i++)); do
+            total_sending=$((total_sending + AMOUNT[i]))
+            txo=$(awk -v amnt=${AMOUNT[i]} 'BEGIN {printf("%.8f\n", (amnt/100000000))}')
+            utxos="$utxos\"${ADDRESS[i]}\":$txo,"
+        done
+        utxos=${utxos%?}
 
-		# Update the DB with the TXID and vout
-		for ((i=0; i<${#TX_ID[@]}; i++)); do
-			sudo sqlite3 $SQ3DBNAME "UPDATE txs SET txid = $TXID, vout = $(echo $TX | jq .details[$i].vout) WHERE tx_id = ${TX_ID[i]};"
-		done
+        # Make the transaction
+        $UNLOCK
+        TXID="" # Clear variable to further prove TXID uniqueness.
+        TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" conf_target=10 estimate_mode="economical" | jq '.txid')
+        if [[ ! $TXID =~ ^[0-9a-f]{64}$ ]]; then
+            echo "$(date) - Serious Error!!! Invalid TXID: $TXID" | sudo tee -a $LOG
+            send_email --info "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
+            sudo touch /etc/send_payments_error_flag
+            exit 1
+        fi
+        TX=$($BTC -rpcwallet=bank gettransaction ${TXID//\"/})
 
-		# Query db for tx_id, address, and amount - preparation to officially send out payments for the next iteration of this loop.
-		tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
-		eol=$'\n'; read -a query <<< ${tmp//$eol/ }
+        # Update the DB with the TXID and vout
+        for ((i=0; i<${#TX_ID[@]}; i++)); do
+            sudo sqlite3 $SQ3DBNAME "UPDATE txs SET txid = $TXID, vout = $(echo $TX | jq .details[$i].vout) WHERE tx_id = ${TX_ID[i]};"
+        done
+
+        # Make sure the "count" of utxos to be generated is going down
+        if [ $count -le $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") ]; then
+            echo "$(date) - Serious Error!!! Infinite loop while sending out payments!" | sudo tee -a $LOG
+            send_email --info "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
+            sudo touch /etc/send_payments_error_flag
+            exit 1
+        fi
+
+        # Query db for the next tx_id, address, and amount - preparation to officially send out payments for the next iteration of this loop.
+        tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
+        eol=$'\n'; read -a query <<< ${tmp//$eol/ }
     done
-	
-	# Verify all TXIDS make sure no tx has the same txid and vout ........ ANYTHING WRONG, THIS IS A SERIOUS ERROR. LOG, EMAIL, AND SHUTDOWN THEY SYSTEM...................................................................................
-	# Query DB, Log, and email <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Report any TXIDs that are not right
-    echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE txid = $TXID"; echo "" ############### Yeah this is going to change
 
- ##### Watch account and make sure we do not spend too much. 
-	#### If we spend too much. Disable the system, Log, and email!
+    # Make sure all payments have been sent!
+    if [ 0 -lt $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") ]; then
+        echo "$(date) - Serious Error!!! Unfulfilled TXs in the DB after sending payments!" | sudo tee -a $LOG
+        send_email --info "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
+        sudo touch /etc/send_payments_error_flag
+        exit 1
+    fi
 
+    # Log Results
+    post_bank_balance=$(awk -v balance=$($BTC -rpcwallet=bank getbalance) 'BEGIN {printf("%.0f\n", balance * 100000000)}')
+    ENTRY="$(date) - All Payments have been completed successfully!"$'\n'
+    ENTRY="$ENTRY        Bank Balance: $bank_balance (Before Sending Payments)"$'\n'
+    ENTRY="$ENTRY        Calculated Total: $total_payment"$'\n'
+    ENTRY="$ENTRY        Total Sent: $total_sending"$'\n'
+    ENTRY="$ENTRY        Bank Balance: $post_bank_balance (After Sending Payments)"$'\n'
+    echo "$ENTRY" | sudo tee -a $LOG
 
-
-
-
-
-
-
-# Confirm routine. reread the newly updated database. Update LOG and EMAIL.
-# DEBUG/USEFULL COMMANDS ##################################
-# echo $SQ3DBNAME
-
-# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = 245 WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
-
-
-
-
-
-
+    # Send Email
+    t_txids=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL;")
+    send_email --send $bank_balance $total_payment $total_sending $post_bank_balance "$t_txids"
 
 elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are confirmed in the blockchain; update the DB
     # Get all the txs that have a valid TXID without a block height
@@ -399,6 +420,21 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
             echo "NOT Confirmed! TXID \"${query[i]}\" has $CONFIRMATIONS confirmations (needs 6 or more)."; echo ""
         fi
     done
+
+
+
+
+# Confirm routine. reread the newly updated database. Update LOG and EMAIL.
+# DEBUG/USEFULL COMMANDS ##################################
+# echo $SQ3DBNAME
+
+# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = 245 WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
+# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
+
+
+
+
+
 
 elif [[  $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
     sqlite3 $SQ3DBNAME ".dump"
