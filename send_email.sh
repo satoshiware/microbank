@@ -151,7 +151,7 @@ elif [[ $1 = "--info" ]]; then
     EMAIL="${ADMINISTRATOREMAIL}"
 
 elif [[ $1 = "--send" ]]; then
-    $bank_balance=$2; $total_payment=$3; $total_sending=$4; $post_bank_balance=$5; $t_txids=$6
+    bank_balance=$2; total_payment=$3; total_sending=$4; post_bank_balance=$5; t_txids=$6
 
     if [[ -z $bank_balance || -z $total_payment || -z $total_sending || -z $post_bank_balance=$5 || -z $t_txids ]]; then
         echo "Error! Insufficient Parameters!"
