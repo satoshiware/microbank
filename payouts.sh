@@ -90,6 +90,13 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -x, --txs         Show all the transactions associated with the latest payout
       -p, --payouts     Show all payouts thus far
       -t, --totals      Show total amounts for each contract (identical addresses are combinded)
+      --add-user        Add a new account
+      --disable-user    Disable an account (i.e. "deletes" an account, disables associated contracts, but retains its critical data)
+      --add-sale        Add a sale
+      --update-sale     Update sale status
+      --add-contr       Add a contract
+      --update-contr    Mark a contract as delivered
+      --disable-contr   Disable a contract
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     echo "Installing this script (payouts) in /usr/local/sbin/"
@@ -566,6 +573,99 @@ EOF
     GROUP BY contracts.micro_address
     ORDER BY contracts.contract_id;
 EOF
+
+
+
+
+
+
+
+##### The Epoch routine could replace all those spaces with a <br> don't you think when it sends the email. 
+#####The send routine could spit something out each time it loops to let me know it's alive
+#####Should the confirm routine send out an email everytime. Well, I think if there are none, it doesn't send an email.
+	#### Just thinking about the time that there are transactions, but none of them have confirmed. Just think about it.
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Access Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+elif [[  $1 = "--add-user" ]]; then # Add a new account
+	CONTACT_EMAIL=$(echo "'$2'" | tr '[:upper:]' '[:lower:]'); USER_EMAIL=$(echo "'$3'" | tr '[:upper:]' '[:lower:]')
+	USER_PHONE="'$4'"; FIRST_NAME=$(echo "'$5'" | tr '[:upper:]' '[:lower:]'); LAST_NAME=$(echo "'$6'" | tr '[:upper:]' '[:lower:]')
+	PREFERRED_NAME=$(echo "'$7'" | tr '[:upper:]' '[:lower:]'); MASTER_EMAIL=$(echo "'$8'" | tr '[:upper:]' '[:lower:]')
+	
+	# Very basic input checking
+	if [[ -z $CONTACT_EMAIL || -z $USER_EMAIL || -z $USER_PHONE || -z $FIRST_NAME || -z $LAST_NAME || -z $PREFERRED_NAME || -z $MASTER_EMAIL ]]; then
+		echo "Error! Insufficient Parameters!"
+        exit 1
+	elif [[ $CONTACT_EMAIL == *"null"* || $USER_EMAIL == *"null"*  || $FIRST_NAME == *"null"* ]]; then
+		echo "Error! Contact email, user email, and first name are all required!"
+        exit 1
+	elif [[ $USER_PHONE == *"null"* && $MASTER_EMAIL == *"null"* ]]; then # Phone must be present if no "MASTER" is present
+		echo "Error! No phone!"
+        exit 1
+	fi
+	
+	# Check for correct formats
+	if [[ ! "$USER_EMAIL" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then; echo "Error! Invalid Email!"; exit 1; fi
+	if [[ ! "$FIRST_NAME" =~ ^[a-z]+$ ]]; then; echo "Error! Invalid First Name!"; exit 1; fi
+	if [[ ! "$LAST_NAME" =~ ^[a-z]+$ ]]; then; echo "Error! Invalid Last Name!"; exit 1; fi
+	if [[ ! "$PREFERRED_NAME" =~ ^[a-z]+$ ]]; then; echo "Error! Invalid Preferred Name!"; exit 1; fi
+	
+	
+	#####################Need to move this one ############ if [[ ! "$USER_PHONE" =~ ^[0-9]{3}-[0-9]{3}-[0-9]{4}$ ]]; then; echo "Error! Invalid Phone Number (Format)!"; exit 1; fi
+	
+	# Remove the single quotes from variables containing the string "null"
+	if [[ $USER_PHONE == *"null"* ]]; then; $USER_PHONE="NULL"; fi
+	if [[ $LAST_NAME == *"null"* ]]; then; $LAST_NAME="NULL"; fi
+	if [[ $PREFERRED_NAME == *"null"* ]]; then; $PREFERRED_NAME="NULL"; fi
+	if [[ $MASTER_EMAIL == *"null"* ]]; then; $MASTER_EMAIL="NULL"; else
+		MASTER=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = $MASTER_EMAIL") # Get the account_id for the MASTER_EMAIL
+		##################### CHECK IF WE HAVE A NUMBER ###################################################################################################
+	fi
+	CONTACT=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = $CONTACT_EMAIL") # Get the account_id for the CONTACT_EMAIL
+		##################### CHECK IF WE HAVE A NUMBER ###################################################################################################
+
+    
+	####Make upper case First Name, Last Name, Preferred Name
+
+
+
+	# Insert into the DB
+	sudo sqlite3 $SQ3DBNAME "INSERT INTO accounts (master, contact, first_name, last_name, preferred_name, email, phone, disabled) VALUES ($MASTER, $CONTACT, $FIRST_NAME, $ELAST_NAME, $PREFERRED_NAME, $USER_EMAIL, $USER_PHONE, 0);"
+	
+	# Query the DB
+	sudo sqlite3 $SQ3DBNAME "SELECT * FROM accounts WHERE email = $USER_EMAIL"
+
+elif [[  $1 = "--disable-user" ]]; then # Disable an account (i.e. "deletes" an account, disables associated contracts, but retains its critical data)
+	USER_EMAIL=$2
+
+# Add a sale - Note: This User is the one paying, but the resulting contracts can be assigned to anyone
+elif [[  $1 = "--add-sale" ]]; then
+	USER_EMAIL=$2
+
+# Update sale status - The "STATUS" can set to "PAID", "NOT_PAID", "TRIAL", or "DISABLED"
+elif [[  $1 = "--update-sale" ]];
+	SALE_ID STATUS=$2
+
+# Add a contract
+elif [[  $1 = "--add-contr" ]]; then
+	USER_EMAIL=$2; SALE_ID=$3; QTY=$4; MICRO_ADDRESS=$5
+
+# Mark a contract as delivered
+elif [[  $1 = "--update-contr" ]]; then
+	CONTRACT_ID=$2
+
+# Disable a contract
+elif [[  $1 = "--disable-contr" ]]; then
+	CONTRACT_ID=$2
+
+
+
+
+
+
+
+
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
@@ -757,10 +857,10 @@ fi
 #payouts --update-sale SALE_ID STATUS
 
 # Add a contract
-#payouts --add-contract USER_EMAIL SALE_ID QTY MICRO_ADDRESS
+#payouts --add-contr USER_EMAIL SALE_ID QTY MICRO_ADDRESS
 
 # Mark a contract as delivered
-#payouts --update-contract CONTRACT_ID
+#payouts --update-contr CONTRACT_ID
 
 # Disable a contract
-#payouts --disable-contract CONTRACT_ID
+#payouts --disable-contr CONTRACT_ID
