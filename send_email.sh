@@ -151,7 +151,7 @@ elif [[ $1 = "--info" ]]; then
     EMAIL="${ADMINISTRATOREMAIL}"
 
 elif [[ $1 = "--send" ]]; then
-    bank_balance=$2; total_payment=$3; total_sending=$4; post_bank_balance=$5; t_txids=$6
+    bank_balance=$2; total_payment=$3; total_sending=$4; post_bank_balance=$5; time=$6; batch_sz=$7; t_txids=$8
 
     if [[ -z $bank_balance || -z $total_payment || -z $total_sending || -z $post_bank_balance=$5 || -z $t_txids ]]; then
         echo "Error! Insufficient Parameters!"
@@ -164,7 +164,9 @@ elif [[ $1 = "--send" ]]; then
     MESSAGE=$(cat << EOF
         <b>$(date) - All Payments have been completed successfully!</b><br>
         <ul>
-            <li><b>Bank Balance:</b> $bank_balance (Before Sending Payments)</li>
+            <li><b>Execution Time:</b> $time seconds</li>
+			<li><b>Outputs Per TX:</b> $batch_sz</li>
+			<li><b>Bank Balance:</b> $bank_balance (Before Sending Payments)</li>
             <li><b>Calculated Total:</b> $total_payment</li>
             <li><b>Total Sent:</b> $total_sending</li>
             <li><b>Bank Balance:</b> $post_bank_balance (After Sending Payments)</li>
