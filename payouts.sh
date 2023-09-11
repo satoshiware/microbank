@@ -306,7 +306,7 @@ EOF
         # Send Email
         fee_percent_diff=$(awk -v fee=$TOTAL_FEES -v payment=$total_payment 'BEGIN {printf("%.6f\n", ((fee / 100000000) / payment) * 100)}')
         bank_balance=$($BTC -rpcwallet=bank getbalance)
-        send_email --epoch $NEXTEPOCH $TOTAL_FEES $TX_COUNT $TOTAL_WEIGHT $MAXFEERATE $qty_utxo $expected_payment $total_payment $fee_percent_diff $bank_balance "$t_payout"
+        send_email --epoch $NEXTEPOCH $TOTAL_FEES $TX_COUNT $TOTAL_WEIGHT $MAXFEERATE $qty_utxo $expected_payment $total_payment $fee_percent_diff $bank_balance "${t_payout//; /<br>}"
 
     else
         # Don't change text on next line! The string "next epoch" used for a conditional statement above.
@@ -342,8 +342,10 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
     eol=$'\n'; read -a query <<< ${tmp//$eol/ }
     total_sending=0
+    start_time=$(date +%s)
     while [ ! -z "${tmp}" ]; do
         count=$(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") # Get the total count of utxos to be generated
+        echo "There are $count UTXOs left to be generated and submitted. (Batch Size: $TX_BATCH_SZ UTXOs/TX)"
 
         # Create individual arrays for each column (database insertion)
         read -a tmp <<< $(echo ${query[*]#*|})
@@ -389,6 +391,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
         eol=$'\n'; read -a query <<< ${tmp//$eol/ }
     done
+    end_time=$(date +%s)
 
     # Make sure all payments have been sent!
     if [ 0 -lt $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") ]; then
@@ -404,6 +407,8 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     total_payment=$(awk -v num=$total_payment 'BEGIN {printf("%.8f\n", num / 100000000)}')
     total_sending=$(awk -v num=$total_sending 'BEGIN {printf("%.8f\n", num / 100000000)}')
     ENTRY="$(date) - All Payments have been completed successfully!"$'\n'
+    ENTRY="$ENTRY    Execution Time: $((end_time - start_time)) seconds."$'\n'
+    ENTRY="$ENTRY    Outputs Per TX: $TX_BATCH_SZ"$'\n'
     ENTRY="$ENTRY    Bank Balance: $bank_balance (Before Sending Payments)"$'\n'
     ENTRY="$ENTRY    Calculated Total: $total_payment"$'\n'
     ENTRY="$ENTRY    Total Sent: $total_sending"$'\n'
@@ -412,7 +417,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
 
     # Send Email
     t_txids=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL;")
-    send_email --send $bank_balance $total_payment $total_sending $post_bank_balance "$t_txids"
+    send_email --send $bank_balance $total_payment $total_sending $post_bank_balance $((end_time - start_time)) $TX_BATCH_SZ "$t_txids"
 
 elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are confirmed in the blockchain; update the DB
     # Get all the txs that have a valid TXID without a block height
@@ -441,17 +446,22 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
         fi
     done
 
-    echo "$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
-    echo "    $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
+    # Log and Email
+    if [ "$confirmed" = "0" ]; then # Simplify the log input (with no email) if there are no new confirmations.
+        echo "$(date) - $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
+    else
+        echo "$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
+        echo "    $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
 
-    message="$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations.<br><br>"
-    message="${message} $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations."
+        message="$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations.<br><br>"
+        message="${message} $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations."
 
-    send_email --info "Confirming Transaction(s) on The Blockchain" "$message"
+        send_email --info "Confirming Transaction(s) on The Blockchain" "$message"
+    fi
 
 elif [[  $1 = "-m" || $1 = "--email" ]]; then # Prepare all core customer notification emails for the latest epoch
     # Check to see if the latest epoch has already been "notified"
-	notified=$(sqlite3 $SQ3DBNAME "SELECT notified FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts)")
+    notified=$(sqlite3 $SQ3DBNAME "SELECT notified FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts)")
     if [ ! -z $notified ]; then
         echo "No emails to prepare at this time!"
         exit 0
@@ -526,11 +536,11 @@ EOF
     sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
 
     # Log Results
-	echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)." | sudo tee -a $LOG
-	
-	# Send Email
-	send_email --info "Core Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)."
-	
+    echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)." | sudo tee -a $LOG
+
+    # Send Email
+    send_email --info "Core Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)."
+
 elif [[  $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
     sqlite3 $SQ3DBNAME ".dump"
 
@@ -575,89 +585,113 @@ EOF
 EOF
 
 
-
-
-
-
-
-##### The Epoch routine could replace all those spaces with a <br> don't you think when it sends the email. 
-#####The send routine could spit something out each time it loops to let me know it's alive
-#####Should the confirm routine send out an email everytime. Well, I think if there are none, it doesn't send an email.
-	#### Just thinking about the time that there are transactions, but none of them have confirmed. Just think about it.
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Access Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[  $1 = "--add-user" ]]; then # Add a new account
-	CONTACT_EMAIL=$(echo "'$2'" | tr '[:upper:]' '[:lower:]'); USER_EMAIL=$(echo "'$3'" | tr '[:upper:]' '[:lower:]')
-	USER_PHONE="'$4'"; FIRST_NAME=$(echo "'$5'" | tr '[:upper:]' '[:lower:]'); LAST_NAME=$(echo "'$6'" | tr '[:upper:]' '[:lower:]')
-	PREFERRED_NAME=$(echo "'$7'" | tr '[:upper:]' '[:lower:]'); MASTER_EMAIL=$(echo "'$8'" | tr '[:upper:]' '[:lower:]')
-	
-	# Very basic input checking
-	if [[ -z $CONTACT_EMAIL || -z $USER_EMAIL || -z $USER_PHONE || -z $FIRST_NAME || -z $LAST_NAME || -z $PREFERRED_NAME || -z $MASTER_EMAIL ]]; then
-		echo "Error! Insufficient Parameters!"
+    CONTACT_EMAIL="${2,,}"; USER_EMAIL="${3,,}"; USER_PHONE="${4,,}"; FIRST_NAME="${5,,}"; LAST_NAME="${6,,}"; PREFERRED_NAME="${7,,}"; MASTER_EMAIL="${8,,}"
+
+    # Very basic input checking
+    if [[ -z $CONTACT_EMAIL || -z $USER_EMAIL || -z $USER_PHONE || -z $FIRST_NAME || -z $LAST_NAME || -z $PREFERRED_NAME || -z $MASTER_EMAIL ]]; then
+        echo "Error! Insufficient Parameters!"
         exit 1
-	elif [[ $CONTACT_EMAIL == *"null"* || $USER_EMAIL == *"null"*  || $FIRST_NAME == *"null"* ]]; then
-		echo "Error! Contact email, user email, and first name are all required!"
+    elif [[ $CONTACT_EMAIL == "null" || $USER_EMAIL == "null"  || $FIRST_NAME == "null" ]]; then
+        echo "Error! Contact email, user email, and first name are all required!"
         exit 1
-	elif [[ $USER_PHONE == *"null"* && $MASTER_EMAIL == *"null"* ]]; then # Phone must be present if no "MASTER" is present
-		echo "Error! No phone!"
+    elif [[ $USER_PHONE == "null" && $MASTER_EMAIL == "null" ]]; then # Phone must be present if no "MASTER" is present
+        echo "Error! No phone!"
         exit 1
-	fi
-	
-	# Check for correct formats
-	if [[ ! "$USER_EMAIL" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then; echo "Error! Invalid Email!"; exit 1; fi
-	if [[ ! "$FIRST_NAME" =~ ^[a-z]+$ ]]; then; echo "Error! Invalid First Name!"; exit 1; fi
-	if [[ ! "$LAST_NAME" =~ ^[a-z]+$ ]]; then; echo "Error! Invalid Last Name!"; exit 1; fi
-	if [[ ! "$PREFERRED_NAME" =~ ^[a-z]+$ ]]; then; echo "Error! Invalid Preferred Name!"; exit 1; fi
-	
-	
-	#####################Need to move this one ############ if [[ ! "$USER_PHONE" =~ ^[0-9]{3}-[0-9]{3}-[0-9]{4}$ ]]; then; echo "Error! Invalid Phone Number (Format)!"; exit 1; fi
-	
-	# Remove the single quotes from variables containing the string "null"
-	if [[ $USER_PHONE == *"null"* ]]; then; $USER_PHONE="NULL"; fi
-	if [[ $LAST_NAME == *"null"* ]]; then; $LAST_NAME="NULL"; fi
-	if [[ $PREFERRED_NAME == *"null"* ]]; then; $PREFERRED_NAME="NULL"; fi
-	if [[ $MASTER_EMAIL == *"null"* ]]; then; $MASTER_EMAIL="NULL"; else
-		MASTER=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = $MASTER_EMAIL") # Get the account_id for the MASTER_EMAIL
-		##################### CHECK IF WE HAVE A NUMBER ###################################################################################################
-	fi
-	CONTACT=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = $CONTACT_EMAIL") # Get the account_id for the CONTACT_EMAIL
-		##################### CHECK IF WE HAVE A NUMBER ###################################################################################################
+    fi
 
-    
-	####Make upper case First Name, Last Name, Preferred Name
+    # Check for correct formats
+    if [[ ! "$USER_EMAIL" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then echo "Error! Invalid Email!"; exit 1; fi
+    if [[ ! "$FIRST_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid First Name!"; exit 1; fi
+    if [[ ! "$LAST_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid Last Name!"; exit 1; fi
+    if [[ ! "$PREFERRED_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid Preferred Name!"; exit 1; fi
+    if [[ "$USER_PHONE" != "null" && ! "$USER_PHONE" =~ ^[0-9]{3}-[0-9]{3}-[0-9]{4}$ ]]; then echo "Error! Invalid Phone Number (Format)!"; exit 1; fi
 
+    # Make sure the "Master Email" is present if not null
+    if [[ $MASTER_EMAIL != "null" ]]; then
+        MASTER=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '$MASTER_EMAIL'") # Get the account_id for the MASTER_EMAIL
+        if [[ -z $MASTER ]]; then
+            echo "Error! Master email is not in the DB!"
+            exit 1
+        fi
+    else
+        MASTER="NULL"
+    fi
 
+    # Make sure the "Contact Email" is present
+    CONTACT=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '$CONTACT_EMAIL'") # Get the account_id for the CONTACT_EMAIL
+    if [[ -z $CONTACT ]]; then
+        echo "Error! Contact email is not in the DB!"
+        exit 1
+    fi
 
-	# Insert into the DB
-	sudo sqlite3 $SQ3DBNAME "INSERT INTO accounts (master, contact, first_name, last_name, preferred_name, email, phone, disabled) VALUES ($MASTER, $CONTACT, $FIRST_NAME, $ELAST_NAME, $PREFERRED_NAME, $USER_EMAIL, $USER_PHONE, 0);"
-	
-	# Query the DB
-	sudo sqlite3 $SQ3DBNAME "SELECT * FROM accounts WHERE email = $USER_EMAIL"
+    # Prepare variables that may contain the string "null" for the DB
+    if [[ $USER_PHONE == "null" ]]; then USER_PHONE="NULL"; else USER_PHONE="'$USER_PHONE'"; fi
+    if [[ $LAST_NAME == "null" ]]; then LAST_NAME="NULL"; else LAST_NAME="'${LAST_NAME^}'"; fi
+    if [[ $PREFERRED_NAME == "null" ]]; then PREFERRED_NAME="NULL"; else PREFERRED_NAME="'${PREFERRED_NAME^}'"; fi
 
-elif [[  $1 = "--disable-user" ]]; then # Disable an account (i.e. "deletes" an account, disables associated contracts, but retains its critical data)
-	USER_EMAIL=$2
+    # Insert into the DB
+    sudo sqlite3 $SQ3DBNAME "INSERT INTO accounts (master, contact, first_name, last_name, preferred_name, email, phone, disabled) VALUES ($MASTER, $CONTACT, '${FIRST_NAME^}', $LAST_NAME, $PREFERRED_NAME, '$USER_EMAIL', $USER_PHONE, 0);"
 
-# Add a sale - Note: This User is the one paying, but the resulting contracts can be assigned to anyone
-elif [[  $1 = "--add-sale" ]]; then
-	USER_EMAIL=$2
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE email = '$USER_EMAIL'"
 
-# Update sale status - The "STATUS" can set to "PAID", "NOT_PAID", "TRIAL", or "DISABLED"
-elif [[  $1 = "--update-sale" ]];
-	SALE_ID STATUS=$2
+elif [[  $1 = "--disable-user" ]]; then # Disable an account (i.e. marks an account as disabled; it also disables all of the mining contracts pointing to this account)
+    USER_EMAIL=$2
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
+    if [[ $exists == "0" ]]; then
+        echo "Error! Email does not exist in the database!"
+        exit 1
+    fi
+    account_id=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'") # Get the account_id
+
+    # Update the DB
+    sudo sqlite3 $SQ3DBNAME "UPDATE accounts SET disabled = 1 WHERE email = '${USER_EMAIL,,}'"
+    sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE account_id = $account_id"
+
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}'"
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE account_id = $account_id"
+
+elif [[  $1 = "--add-sale" ]]; then # Add a sale - Note: The User_Email is the one paying, but the resulting contracts can be assigned to anyone
+    USER_EMAIL=$2; QTY=$3
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
+    if [[ $exists == "0" ]]; then
+        echo "Error! Email does not exist in the database!"
+        exit 1
+    fi
+    if ! [[ $QTY =~ ^[0-9]+$ ]]; then
+        echo "Error! Quantity is not a number!";
+        exit 1
+    fi
+    account_id=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'") # Get the account_id
+
+    # Insert into the DB
+    sudo sqlite3 -bail $SQ3DBNAME << EOF
+        PRAGMA foreign_keys = ON;
+        INSERT INTO sales (account_id, time, quantity, status)
+        VALUES ($account_id, $(date +%s), $QTY, 0);
+EOF
+
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales WHERE account_id = $account_id"
+    echo ""; echo "Current Unix Time: $(date +%s)"
+
+elif [[  $1 = "--update-sale" ]]; then # Update sale status - The "STATUS" can set to "PAID", "NOT_PAID", "TRIAL", or "DISABLED" ####################################
+    SALE_ID=$2; STATUS=$3 ?????
 
 # Add a contract
 elif [[  $1 = "--add-contr" ]]; then
-	USER_EMAIL=$2; SALE_ID=$3; QTY=$4; MICRO_ADDRESS=$5
+    USER_EMAIL=$2; SALE_ID=$3; QTY=$4; MICRO_ADDRESS=$5
 
 # Mark a contract as delivered
 elif [[  $1 = "--update-contr" ]]; then
-	CONTRACT_ID=$2
+    CONTRACT_ID=$2
 
 # Disable a contract
 elif [[  $1 = "--disable-contr" ]]; then
-	CONTRACT_ID=$2
+    CONTRACT_ID=$2
 
 
 
@@ -731,78 +765,14 @@ fi
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #sudo sqlite3 $SQ3DBNAME "REPLACE INTO txs (tx_id, contract_id, epoch_period, txid, vout, amount, block_height, notes) VALUES (1078, 7, 87, 'b3845e7471af9db8eb04380dd5a811b4f2d1fbd6b5950834eff47c0ae66c1402', 1, 1423510430, 126174, NULL);"
 #sudo sqlite3 $SQ3DBNAME "REPLACE INTO txs (tx_id, contract_id, epoch_period, txid, vout, amount, block_height, notes) VALUES (85, 7, 43, '635bc164350ff39afa8bf92a02b8242691f9393db5bb0f5f702a0057cd833134', 0, 1459059010, 62327, NULL);"
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ QUERY ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#sqlite3 $SQ3DBNAME ".dump" # Show all the contents of the database
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#sqlite3 $SQ3DBNAME << EOF # Show all payout information
-#.mode columns
-#SELECT * FROM payouts
-#EOF
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#EPOCHTIME=10000000000 # Show all "active" contract information (w\ timestamp before or equal to the desired payout epoch)
-#sqlite3 $SQ3DBNAME << EOF
-#.mode columns
-#SELECT * FROM contracts WHERE active=1 AND time<=$EPOCHTIME
-#EOF
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#sqlite3 $SQ3DBNAME "SELECT * FROM txs WHERE amount = (SELECT MAX(amount) FROM txs);" # Get the TX with the biggest amount
-#sqlite3 $SQ3DBNAME "SELECT * FROM txs WHERE amount = (SELECT MIN(amount) FROM txs);" # Get the TX with the smallest amount
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-#
-#sqlite3 $SQ3DBNAME .mode columns
-#sqlite3 $SQ3DBNAME "SELECT * FROM accounts" # View all accounts
-#sqlite3 $SQ3DBNAME "SELECT account_id, association, master, contact, first_name, last_name, preferred_name, email, email_frequency, phone, phone_frequency, disable, address, notes FROM accounts"
-#
-#
-#
-#SELECT DISTINCT column_list
-#FROM table_list
-#  JOIN table ON join_condition
-#WHERE row_filter
-#ORDER BY column
-#LIMIT count OFFSET offset
-#GROUP BY column
-#HAVING group_filter;
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
 #INSERT INTO accounts (email)
 #VALUES("user@email.com");
 #
 #DELETE FROM accounts /* Delete a row */
 #WHERE account_id = 8;
-
-
-#echo "txids" > ~/report.txt
-#btc -rpcwallet=bank -named send outputs='{"ut1qnsfzalxfn2d3ml648mnuk6z2w45vjuxg8fk00r": 1.47238742}' fee_rate=1 >> ~/report.txt
-#btc -rpcwallet=bank -named send outputs='{"ut1qa0ccju4pej9lvk26gthyulqjgkmd8rjdffq4vc": 1.47238742}' fee_rate=1 >> ~/report.txt
-#btc -rpcwallet=bank -named send outputs='{"ut1qnekh7k0k63mfarar60tehxzklhaezf3ptjssyz": 1.47238742}' fee_rate=1 >> ~/report.txt
-#btc -rpcwallet=bank -named send outputs='{"ut1qelu5sdqjpeg8vlsz7geflvpyhvx5g9d4mxult7": 1.47238742}' fee_rate=1 >> ~/report.txt
-#
-#echo "executed txids" > ~/report.txt
-#btc -rpcwallet=bank gettransaction 68fcb4f2cf4eeab616b1f22204624e6f7bdc9bbefa8f29cf53b871a3c4a9cfd2 >> ~/report.txt
-#btc -rpcwallet=bank gettransaction 9d1b90543e0a90cda2e3ec4b0167aba394f284c0549bcc2dbbaa6181d133e429 >> ~/report.txt
-#btc -rpcwallet=bank gettransaction 22f88588c43e99137e8fa74f523e66d6cd7003eafdb6624aaf8678d5dfe797c0 >> ~/report.txt
-#btc -rpcwallet=bank gettransaction aecc74588ac93e66aa8b71ff3a8fe8bc175da8c39750c5640a6097210f91b6c7 >> ~/report.txt
-#
-#
-#./contract_emails_ut.sh Matt mpickens3d@gmail.com 1.47238742 ut1qnsfzalxfn2d3ml648mnuk6z2w45vjuxg8fk00r 9.89724101 10 480-262-1776 mla3360@hotmail.com 303 3845.932 68fcb4f2cf4eeab616b1f22204624e6f7bdc9bbefa8f29cf53b871a3c4a9cfd2
-#./contract_emails_ut.sh Aisake aisake@gritset.com 1.47238742 ut1qa0ccju4pej9lvk26gthyulqjgkmd8rjdffq4vc 9.89724101 10 480-262-1776 mla3360@hotmail.com 303 3845.932 9d1b90543e0a90cda2e3ec4b0167aba394f284c0549bcc2dbbaa6181d133e429
-#./contract_emails_ut.sh Teresa tlpickens@gmail.com 1.47238742 ut1qnekh7k0k63mfarar60tehxzklhaezf3ptjssyz 9.89724101 10 480-262-1776 mla3360@hotmail.com 303 3845.932 22f88588c43e99137e8fa74f523e66d6cd7003eafdb6624aaf8678d5dfe797c0
-#./contract_emails_ut.sh Lance lanceatkinson@frontier.com 1.47238742 ut1qelu5sdqjpeg8vlsz7geflvpyhvx5g9d4mxult7 9.89724101 10 480-262-1776 mla3360@hotmail.com 303 3845.932 aecc74588ac93e66aa8b71ff3a8fe8bc175da8c39750c5640a6097210f91b6c7
-#./contract_emails_ut.sh Test mqpickens@yahoo.com 1.47238742 ut1qelu5sdqjpeg8vlsz7geflvpyhvx5g9d4mxult7 9.89724101 10 480-262-1776 mla3360@hotmail.com 303 3845.932 aecc74588ac93e66aa8b71ff3a8fe8bc175da8c39750c5640a6097210f91b6c7
-
-
-
-
 
 ######### Set the SATRATE #########################
 #    # Get btc/usd exchange rates from populat exchanges
@@ -826,19 +796,12 @@ fi
 #sudo sed -i '$d' /var/tmp/payout.emails
 
 
-
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Administrative Checks ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #Send out emails to administrator-- Check. It kind of does that already
 # Send out emails to Level 1 Hubs. What's that look like??
 # Billing and keeping track of how much they have purchased.
 # Got to figure this one out!
 # Tellers Table and accounts
-
-
-# Tellers Account
 
 
 
