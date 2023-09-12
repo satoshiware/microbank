@@ -448,7 +448,7 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
 
     # Log and Email
     if [ "$confirmed" = "0" ]; then # Simplify the log input (with no email) if there are no new confirmations.
-        echo "$(date) - $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
+        echo "$(date) - ${#query[@]} transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
     else
         echo "$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
         echo "    $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations." | sudo tee -a $LOG
@@ -639,6 +639,7 @@ elif [[  $1 = "--add-user" ]]; then # Add a new account
 
 elif [[  $1 = "--disable-user" ]]; then # Disable an account (i.e. marks an account as disabled; it also disables all of the mining contracts pointing to this account)
     USER_EMAIL=$2
+
     exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
     if [[ $exists == "0" ]]; then
         echo "Error! Email does not exist in the database!"
@@ -656,6 +657,7 @@ elif [[  $1 = "--disable-user" ]]; then # Disable an account (i.e. marks an acco
 
 elif [[  $1 = "--add-sale" ]]; then # Add a sale - Note: The User_Email is the one paying, but the resulting contracts can be assigned to anyone
     USER_EMAIL=$2; QTY=$3
+
     exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
     if [[ $exists == "0" ]]; then
         echo "Error! Email does not exist in the database!"
@@ -668,7 +670,7 @@ elif [[  $1 = "--add-sale" ]]; then # Add a sale - Note: The User_Email is the o
     account_id=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'") # Get the account_id
 
     # Insert into the DB
-    sudo sqlite3 -bail $SQ3DBNAME << EOF
+    sudo sqlite3 $SQ3DBNAME << EOF
         PRAGMA foreign_keys = ON;
         INSERT INTO sales (account_id, time, quantity, status)
         VALUES ($account_id, $(date +%s), $QTY, 0);
@@ -678,27 +680,112 @@ EOF
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales WHERE account_id = $account_id"
     echo ""; echo "Current Unix Time: $(date +%s)"
 
-elif [[  $1 = "--update-sale" ]]; then # Update sale status - The "STATUS" can set to "PAID", "NOT_PAID", "TRIAL", or "DISABLED" ####################################
-    SALE_ID=$2; STATUS=$3 ?????
+elif [[  $1 = "--update-sale" ]]; then # Update sale status
+    USER_EMAIL=$2; SALE_ID=$3; STATUS=$4
 
-# Add a contract
-elif [[  $1 = "--add-contr" ]]; then
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM sales WHERE account_id = (SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}') AND sale_id = $SALE_ID)")
+    if [[ $exists == "0" ]]; then
+        echo "Error! \"User Email\" with provided \"Sale ID\" does not exist in the database!"
+        exit 1
+    fi
+
+    if ! [[ $STATUS =~ ^[0-9]+$ ]]; then
+        echo "Error! Status code is not a number!";
+        exit 1
+    elif [[ $STATUS == "0" ]]; then echo "Update to \"Not Paid\""
+    elif [[ $STATUS == "1" ]]; then echo "Update to \"Paid\""
+    elif [[ $STATUS == "2" ]]; then echo "Update to \"Trial Run\""
+    elif [[ $STATUS == "3" ]]; then echo "Update to \"Disabled\""; else
+        echo "Error! Invalid status code!";
+        exit 1
+    fi
+
+    # Update the DB
+    sudo sqlite3 $SQ3DBNAME "UPDATE sales SET status = $STATUS WHERE sale_id = $SALE_ID"
+    if [[ $STATUS == "3" ]]; then
+        sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE sale_id = $SALE_ID"
+    fi
+
+    # Query the DB
+    echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales WHERE sale_id = $SALE_ID"; echo ""
+    if [[ $STATUS == "3" ]]; then
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE sale_id = $SALE_ID"; echo ""
+    fi
+
+elif [[  $1 = "--add-contr" ]]; then # Add a contract
     USER_EMAIL=$2; SALE_ID=$3; QTY=$4; MICRO_ADDRESS=$5
 
-# Mark a contract as delivered
-elif [[  $1 = "--update-contr" ]]; then
-    CONTRACT_ID=$2
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM sales WHERE sale_id = $SALE_ID)")
+    if [[ $exists == "0" ]]; then
+        echo "Error! \"Sale ID\" does not exist in the database!"
+        exit 1
+    fi
 
-# Disable a contract
-elif [[  $1 = "--disable-contr" ]]; then
-    CONTRACT_ID=$2
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
+    if [[ $exists == "0" ]]; then
+        echo "Error! \"User Email\" does not exist in the database!"
+        exit 1
+    fi
 
+    if ! [[ $QTY =~ ^[0-9]+$ ]]; then
+        echo "Error! Quantity provided is not a number!"
+        exit 1
+    elif [[ $QTY == "0" ]]; then
+        echo "Error! Quantity provided is zero!"
+        exit 1
+    fi
+    total=$(sqlite3 $SQ3DBNAME "SELECT quantity FROM sales WHERE sale_id = $SALE_ID")
+    assigned=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE sale_id = $SALE_ID")
+    if [[ ! $QTY -le $((total - assigned)) ]]; then
+        echo "Error! The \"Sale ID\" provided cannot accommodate more than $((total - assigned)) \"shares\"!"
+        exit 1
+    fi
 
+    if ! [[ $($BTC validateaddress ${MICRO_ADDRESS,,} | jq '.isvalid') == "true" ]]; then
+        echo "Error! Address provided is not correct or Bitcoin Core (microcurrency mode) is down!"
+        exit 1
+    fi
 
+    # Insert into the DB
+    ACCOUNT_ID=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'")
+    sudo sqlite3 $SQ3DBNAME << EOF
+        PRAGMA foreign_keys = ON;
+        INSERT INTO contracts (account_id, sale_id, quantity, time, active, delivered, micro_address)
+        VALUES ($ACCOUNT_ID, $SALE_ID, $QTY, $(date +%s), 1, 0, '${MICRO_ADDRESS,,}');
+EOF
 
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE account_id = $ACCOUNT_ID"
 
+elif [[  $1 = "--deliver-contr" ]]; then # Mark a contract as delivered
+    MICRO_ADDRESS=$2
 
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}')")
+    if [[ $exists == "0" ]]; then
+        echo "Error! The \"Microcurrency Address\" provided does not exist in the database!"
+        exit 1
+    fi
 
+    # Update the DB
+    sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET delivered = 1 WHERE micro_address = '${MICRO_ADDRESS,,}'"
+
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}'"
+
+elif [[  $1 = "--disable-contr" ]]; then # Disable a contract
+    MICRO_ADDRESS=$2
+
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}')")
+    if [[ $exists == "0" ]]; then
+        echo "Error! The \"Microcurrency Address\" provided does not exist in the database!"
+        exit 1
+    fi
+
+    # Update the DB
+    sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE micro_address = '${MICRO_ADDRESS,,}'"
+
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}'"
 
 else
     echo "Method not found"
@@ -706,40 +793,13 @@ else
 fi
 
 
-
-
-#exchange rate = MATH.CIELING(100000000 / USD_PRICE), 2 decimal places)
-#TZ=America/Phoenix date -d "$(date)" +%s
 #TZ=America/Phoenix date -d @$UNIXTIMECODE
-#date --date="30 hours ago" +%s
-#date +%s
-#
-#
-#/* Once an account has received a payout, it cannot be deleted and the account_id cannot be modified.
-#If an account can be and is deleted, make sure all associated sales and contracts are also deleted.
-#If an account is marked disabled, all of its associated sales must also be marked disabled.
-#After the next payout, disabling cannot be reversed. */
-#
-#/* Make sure no tx happens that depends on a specific period before its reported epoch block time.
-#Insert first row @ 0 manually 'cuz indexing starts at 1, but we need the period to start with 0
-#Halvings occur in the middle of epoch periods; therefore, the subsidy for that epoch period that contains the halving will be an average.
 #First halving occurs in epoch period 183 with an average of 11.25 coins/block - You should verify the math */
-#
-#/* Once a sale has received a payout, it cannot be deleted and some columns cannot be modified (sale_id, account_id, and quantity)
-#If a sale can be and is deleted, make sure all associated contracts (and other contracts spawned from these contracts) are also deleted.
-#If a sale is marked disabled, all of its associated contracts (and other contracts spawned from these contracts) must be marked inactive.
-#After the next payout, disabling cannot be reversed. */
-#
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
+
 #PRAGMA foreign_keys; /* See if it is turned on (1 for on) */
 #PRAGMA foreign_keys = ON; /* Turn it on */
 #.tables /* List all the tables in the database */
 #DROP TABLE $TABLE; /* Deletes a table */
-#
-#INSERT INTO sales (account_id, date, quantity, unit_price)
-#VALUES(5, 05022023, 500, 10000);
-#
 #DELETE FROM sales /* Delete a row */
 #WHERE order_id = 2;
 #
@@ -747,34 +807,16 @@ fi
 #sudo sqlite3 $SQ3DBNAME "INSERT INTO accounts (first_name, last_name, preferred_name, email) VALUES ($NAME, $EMAIL);" # Add new account
 #
 #sudo sqlite3 $SQ3DBNAME "INSERT INTO accounts (first_name, email) VALUES ($NAME, $EMAIL);" # Add new account
-#
-#
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ REMOVE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #sudo sqlite3 $SQ3DBNAME "DELETE FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);" # Remove last epoch_period from payouts
 #sudo sqlite3 $SQ3DBNAME "DELETE FROM txs WHERE tx_id = (SELECT MAX(tx_id) FROM txs);" # Remove last tx from txs table
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ REPLACE/UPDATE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#sudo sqlite3 $SQ3DBNAME "REPLACE INTO txs (tx_id, contract_id, epoch_period, txid, vout, amount, block_height, notes) VALUES (1078, 7, 87, 'b3845e7471af9db8eb04380dd5a811b4f2d1fbd6b5950834eff47c0ae66c1402', 1, 1423510430, 126174, NULL);"
-#sudo sqlite3 $SQ3DBNAME "REPLACE INTO txs (tx_id, contract_id, epoch_period, txid, vout, amount, block_height, notes) VALUES (85, 7, 43, '635bc164350ff39afa8bf92a02b8242691f9393db5bb0f5f702a0057cd833134', 0, 1459059010, 62327, NULL);"
 
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ QUERY ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#INSERT INTO accounts (email)
-#VALUES("user@email.com");
-#
-#DELETE FROM accounts /* Delete a row */
-#WHERE account_id = 8;
-
-######### Set the SATRATE #########################
+##################################
+#SQ3DBNAME=/var/lib/btcofaz.db
+#LOG=/var/log/payout.log
+# echo $SQ3DBNAME
 #    # Get btc/usd exchange rates from populat exchanges
 #    BTCUSD=$(curl https://api.coinbase.com/v2/prices/BTC-USD/spot | jq '.data.amount') # Coinbase BTC/USD Price
 #   #BTCUSD=$(curl "https://api.kraken.com/0/public/Ticker?pair=BTCUSD" | jq '.result.XXBTZUSD.a[0]') # Kraken BTC/USD Price
@@ -782,16 +824,7 @@ fi
 #    USDSATS=$(awk -v btcusd=$BTCUSD 'BEGIN {printf("%.3f\n", 100000000 / btcusd)}')
 
 #    read -p "What is today's price (in $ATS) for ???????????????????????? : " SATRATE
-
-
-
-# DEBUG/USEFULL COMMANDS ##################################
-# echo $SQ3DBNAME
-
 # sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = 245 WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-
-#echo "Hello World2" | sudo tee -a /var/tmp/payout.emails
-
 #tail -n 1 /var/tmp/payout.emails
 #sudo sed -i '$d' /var/tmp/payout.emails
 
