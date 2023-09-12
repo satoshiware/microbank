@@ -678,11 +678,14 @@ EOF
 
     # Query the DB
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales WHERE account_id = $account_id"
+    SALE_ID=$(sqlite3 $SQ3DBNAME "SELECT sale_id FROM sales WHERE account_id = $account_id ORDER BY sale_id DESC LIMIT 1")
     echo ""; echo "Current Unix Time: $(date +%s)"
+    echo "Your new \"Sale ID\": $SALE_ID"; echo ""
 
 elif [[  $1 = "--update-sale" ]]; then # Update sale status
     USER_EMAIL=$2; SALE_ID=$3; STATUS=$4
 
+    if ! [[ $SALE_ID =~ ^[0-9]+$ ]]; then echo "Error! \"Sale ID\" is not a number!"; exit 1; fi
     exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM sales WHERE account_id = (SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}') AND sale_id = $SALE_ID)")
     if [[ $exists == "0" ]]; then
         echo "Error! \"User Email\" with provided \"Sale ID\" does not exist in the database!"
@@ -715,6 +718,7 @@ elif [[  $1 = "--update-sale" ]]; then # Update sale status
 elif [[  $1 = "--add-contr" ]]; then # Add a contract
     USER_EMAIL=$2; SALE_ID=$3; QTY=$4; MICRO_ADDRESS=$5
 
+    if ! [[ $SALE_ID =~ ^[0-9]+$ ]]; then echo "Error! \"Sale ID\" is not a number!"; exit 1; fi
     exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM sales WHERE sale_id = $SALE_ID)")
     if [[ $exists == "0" ]]; then
         echo "Error! \"Sale ID\" does not exist in the database!"
@@ -754,6 +758,12 @@ elif [[  $1 = "--add-contr" ]]; then # Add a contract
         VALUES ($ACCOUNT_ID, $SALE_ID, $QTY, $(date +%s), 1, 0, '${MICRO_ADDRESS,,}');
 EOF
 
+    # If there is a preexisting contract with the same address that is marked "delivered" then mark this delivered!
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}' AND delivered = 1)")
+    if [[ $exists == "1" ]]; then
+        $0 --deliver-contr $MICRO_ADDRESS > /dev/null
+    fi
+
     # Query the DB
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE account_id = $ACCOUNT_ID"
 
@@ -773,7 +783,9 @@ elif [[  $1 = "--deliver-contr" ]]; then # Mark a contract as delivered
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}'"
 
 elif [[  $1 = "--disable-contr" ]]; then # Disable a contract
-    MICRO_ADDRESS=$2
+    MICRO_ADDRESS=$2; CONTRACT_ID=$3
+
+    if ! [[ $CONTRACT_ID =~ ^[0-9]+$ ]]; then echo "Error! \"Contract ID\" is not a number!"; exit 1; fi
 
     exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}')")
     if [[ $exists == "0" ]]; then
@@ -782,7 +794,11 @@ elif [[  $1 = "--disable-contr" ]]; then # Disable a contract
     fi
 
     # Update the DB
-    sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE micro_address = '${MICRO_ADDRESS,,}'"
+    if [[ $CONTRACT_ID == "0" ]]; then
+        sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE micro_address = '${MICRO_ADDRESS,,}'"
+    else
+        sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE micro_address = '${MICRO_ADDRESS,,}' AND contract_id = $CONTRACT_ID"
+    fi
 
     # Query the DB
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}'"
