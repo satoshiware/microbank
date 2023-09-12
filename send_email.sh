@@ -165,8 +165,8 @@ elif [[ $1 = "--send" ]]; then
         <b>$(date) - All Payments have been completed successfully!</b><br>
         <ul>
             <li><b>Execution Time:</b> $time seconds</li>
-			<li><b>Outputs Per TX:</b> $batch_sz</li>
-			<li><b>Bank Balance:</b> $bank_balance (Before Sending Payments)</li>
+            <li><b>Outputs Per TX:</b> $batch_sz</li>
+            <li><b>Bank Balance:</b> $bank_balance (Before Sending Payments)</li>
             <li><b>Calculated Total:</b> $total_payment</li>
             <li><b>Total Sent:</b> $total_sending</li>
             <li><b>Bank Balance:</b> $post_bank_balance (After Sending Payments)</li>
