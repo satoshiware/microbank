@@ -583,9 +583,10 @@ elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each con
     echo ""
     sqlite3 $SQ3DBNAME << EOF
 .mode columns
-    SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
-        contracts.micro_address AS Addresses,
-        CAST(SUM(txs.amount) as REAL) / 100000000 AS Totals
+    SELECT 
+		accounts.first_name || COALESCE(' (' || accounts.preferred_name || ') ', ' ') || COALESCE(accounts.last_name, '') AS Name,
+        contracts.micro_address AS Address,
+        CAST(SUM(txs.amount) as REAL) / 100000000 AS Total
     FROM accounts, contracts, txs
     WHERE contracts.contract_id = txs.contract_id AND contracts.account_id = accounts.account_id
     GROUP BY contracts.micro_address
@@ -747,7 +748,7 @@ elif [[  $1 = "--add-contr" ]]; then # Add a contract
         exit 1
     fi
     total=$(sqlite3 $SQ3DBNAME "SELECT quantity FROM sales WHERE sale_id = $SALE_ID")
-    assigned=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE sale_id = $SALE_ID")
+    assigned=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE sale_id = $SALE_ID" AND active = 1)
     if [[ ! $QTY -le $((total - assigned)) ]]; then
         echo "Error! The \"Sale ID\" provided cannot accommodate more than $((total - assigned)) \"shares\"!"
         exit 1
@@ -873,45 +874,74 @@ fi
 ###
 # See all accounts that are associated with contact
 
+
+exit
 CONTACT_EMAIL="trade@tradeittech.com"
+CONTACT_EMAIL="mqpickens@yahoo.com"
+CONTACT_EMAIL="mla3360@hotmail.com"
 SQ3DBNAME=/var/lib/btcofaz.db
 LOG=/var/log/payout.log
-
-
-
 
 	
 	echo ""; echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Accounts ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     sqlite3 $SQ3DBNAME << EOF
 .mode columns
 	SELECT
-		(SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts _accounts WHERE account_id = accounts.master) AS THEMASTERRRRR,
+		(SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts _accounts WHERE account_id = accounts.master) AS Master,
 		first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') AS Name,
 		email AS Email,
 		phone AS Phone
 	FROM accounts
 	WHERE contact = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') AND disabled = 0
 EOF
-###################################### Check if there are any then skip ######################################################
-	echo ""; echo "~~~~~~~~~~~~~~~~~~~~~ Disabled Accounts ~~~~~~~~~~~~~~~~~~~~~"
-    sqlite3 $SQ3DBNAME << EOF
+
+	sqlite3 $SQ3DBNAME << EOF
 .mode columns
-	SELECT
-		first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') AS Name,
-		email AS Email,
-		phone AS Phone
-	FROM accounts
-	WHERE contact = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') AND disabled = 1
+		SELECT
+			(SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = contracts.account_id) AS Name,
+			contracts.sale_id,  /* Show Sale_id with respective Owner */
+			contracts.quantity, /* Show quantity over total of the sale */
+			contracts.time, /* Time of contract in arizona time readable */
+			contracts.micro_address /* associated address - not combined */ /*but maybe indicate if it is in use again maybe */
+		FROM contracts
+		WHERE active = 1 AND (SELECT contact FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')
 EOF
-	echo ""
 
 
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT sales.sale_id AS Sale, (accounts.first_name || ' ' || accounts.last_name) AS Name, sales.time AS Time, sales.quantity AS Quantity, sales.status AS Status FROM accounts, sales WHERE accounts.account_id = sales.account_id"
 
+
+######################################## notes ############################################
+(SELECT contact FROM accounts WHERE account_id = contracts.account_id) = 
+
+	sqlite3 $SQ3DBNAME << EOF
+.mode columns
+		SELECT
+			sales.sale_id AS 'Sale ID',
+			(accounts.first_name || ' ' || accounts.last_name) AS Name,
+			sales.time AS Time,
+			sales.quantity AS Quantity,
+			sales.status AS Status 
+		FROM accounts, sales
+		WHERE accounts.account_id = sales.account_id
+EOF
+
+
+
+
+          
+         
+        active INTEGER, /* Deprecated = 0; Active = 1 or NULL; Opened = 2 */
+        delivered INTEGER, /* NO = 0 or NULL; YES = 1 */
+        micro_address TEXT NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE,
+        FOREIGN KEY (sale_id) REFERENCES sales (sale_id) ON DELETE CASCADE)
+		
+		
+		
+		
+#So, what do we want to see here???? All the contracts with the associated sales.
 ###### Show disable accounts afterwards ###########
 
-
-###################################### Need to fix the name in the -totals routing ######################################################
 
 
 elif [[  $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
