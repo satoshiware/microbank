@@ -80,9 +80,11 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -h, --help        Display this help message and exit
       -i, --install     Install this script (payouts) in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
       -e, --epoch       Look for next difficulty epoch and prepare the DB for next round of payouts
-      -s, --send        Send the Money (a 2nd NUMBER parameter generates NUMBER of outputs; default = 1)
-      -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; update the DB
+      -s, --send        Send the Money
+      -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
       -m, --email       Prepare all core customer notification emails for the latest epoch
+
+----- Generic Database Queries ----------------------------------------------------------------------------------------------
       -d, --dump        Show all the contents of the database
       -a, --accounts    Show all accounts
       -l, --sales       Show all sales
@@ -90,13 +92,27 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -x, --txs         Show all the transactions associated with the latest payout
       -p, --payouts     Show all payouts thus far
       -t, --totals      Show total amounts for each contract (identical addresses are combinded)
+
+----- Admin/Root Interface --------------------------------------------------------------------------------------------------
       --add-user        Add a new account
-      --disable-user    Disable an account (i.e. "deletes" an account, disables associated contracts, but retains its critical data)
+			Parameters: CONTACT_EMAIL  USER_EMAIL  USER_PHONE**  FIRST_NAME  LAST_NAME*  PREFERRED_NAME*  MASTER_EMAIL*
+				Note*: LAST_NAME, PREFERRED_NAME, and MASTER_EMAIL are options
+				Note**: USER_PHONE is optional if MASTER_EMAIL was provided
+      --disable-user    Disable an account (also disables associated contracts, but not the sales)
+			Parameters: USER_EMAIL
       --add-sale        Add a sale
+			Parameters: USER_EMAIL  QTY
+				Note: The USER_EMAIL is the one paying, but the resulting contracts can be assigned to anyone (i.e. Sales don't have to match Contracts).
       --update-sale     Update sale status
+	  		Parameters: USER_EMAIL  SALE_ID  STATUS
+				Note: STATUS  =  0 (Not Paid),  1 (Paid),  2 (Trial Run),  3 (Disabled)
       --add-contr       Add a contract
-      --update-contr    Mark a contract as delivered
+	  		Parameters: USER_EMAIL  SALE_ID  QTY  MICRO_ADDRESS
+      --update-contr    Mark every contract with this address as delivered
+	  		Parameters: MICRO_ADDRESS
       --disable-contr   Disable a contract
+	  		Parameters: MICRO_ADDRESS  CONTRACT_ID
+				Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     echo "Installing this script (payouts) in /usr/local/sbin/"
@@ -541,6 +557,7 @@ EOF
     # Send Email
     send_email --info "Core Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)."
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Generic Database Queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[  $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
     sqlite3 $SQ3DBNAME ".dump"
 
@@ -548,7 +565,10 @@ elif [[  $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
 
 elif [[  $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT sales.sale_id AS Sale, (accounts.first_name || ' ' || accounts.last_name) AS Name, sales.time AS Time, sales.quantity AS QTY, sales.status AS Status FROM accounts, sales WHERE accounts.account_id = sales.account_id"
+	sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
+	echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
+	echo ""; echo "Note: The contract owners and contract buyers don't have to match."
+	echo "Example: Someone may buy extra contracts for a friend."; echo ""
 
 elif [[  $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts"
@@ -560,7 +580,7 @@ elif [[  $1 = "-p" || $1 = "--payouts" ]]; then # Show all payouts thus far
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM payouts"
 
 elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each contract (identical addresses are combinded)
-    echo ""; echo ""; echo "Ordered by Account:"; echo "";
+    echo ""
     sqlite3 $SQ3DBNAME << EOF
 .mode columns
     SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
@@ -571,21 +591,9 @@ elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each con
     GROUP BY contracts.micro_address
     ORDER BY accounts.account_id;
 EOF
+	echo ""
 
-    echo ""; echo "Ordered by Contract ID:"; echo "";
-    sqlite3 $SQ3DBNAME << EOF
-.mode columns
-    SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
-        contracts.micro_address AS Addresses,
-        CAST(SUM(txs.amount) as REAL) / 100000000 AS Totals
-    FROM accounts, contracts, txs
-    WHERE contracts.contract_id = txs.contract_id AND contracts.account_id = accounts.account_id
-    GROUP BY contracts.micro_address
-    ORDER BY contracts.contract_id;
-EOF
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Access Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[  $1 = "--add-user" ]]; then # Add a new account
     CONTACT_EMAIL="${2,,}"; USER_EMAIL="${3,,}"; USER_PHONE="${4,,}"; FIRST_NAME="${5,,}"; LAST_NAME="${6,,}"; PREFERRED_NAME="${7,,}"; MASTER_EMAIL="${8,,}"
 
@@ -786,11 +794,18 @@ elif [[  $1 = "--disable-contr" ]]; then # Disable a contract
     MICRO_ADDRESS=$2; CONTRACT_ID=$3
 
     if ! [[ $CONTRACT_ID =~ ^[0-9]+$ ]]; then echo "Error! \"Contract ID\" is not a number!"; exit 1; fi
-
-    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}')")
-    if [[ $exists == "0" ]]; then
-        echo "Error! The \"Microcurrency Address\" provided does not exist in the database!"
-        exit 1
+    if [[ $CONTRACT_ID == "0" ]]; then
+        exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}')")
+        if [[ $exists == "0" ]]; then
+            echo "Error! The \"Microcurrency Address\" provided does not exist in the database!"
+            exit 1
+        fi
+    else
+        exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}' AND contract_id = $CONTRACT_ID)")
+        if [[ $exists == "0" ]]; then
+            echo "Error! \"Microcurrency Address\" with provided \"Contract ID\" does not exist in the database!"
+            exit 1
+        fi
     fi
 
     # Update the DB
@@ -844,35 +859,94 @@ fi
 #tail -n 1 /var/tmp/payout.emails
 #sudo sed -i '$d' /var/tmp/payout.emails
 
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Administrative Checks ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#Send out emails to administrator-- Check. It kind of does that already
 # Send out emails to Level 1 Hubs. What's that look like??
 # Billing and keeping track of how much they have purchased.
-# Got to figure this one out!
 # Tellers Table and accounts
 
+##################### What's the next thing most critical #######################################
+#2) Send out adminstrative email to level 1 nodes.
+#1) Make it easier to sendout those emails.
+#3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
+
+
+###
+# See all accounts that are associated with contact
+
+CONTACT_EMAIL="trade@tradeittech.com"
+SQ3DBNAME=/var/lib/btcofaz.db
+LOG=/var/log/payout.log
 
 
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Access Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Add an account (USER_PHONE, PREFFERED_NAME, and MASTER_EMAIL is optional; however, USER_PHONE is highly reccommended if possible!)
-#payouts --add-user CONTACT_EMAIL USER_EMAIL USER_PHONE FIRST_NAME LAST_NAME PREFFERED_NAME MASTER_EMAIL
 
-# Disable an account (i.e. "deletes" an account, disables associated contracts, but retains its critical data)
-#payouts --disable-user USER_EMAIL
+	
+	echo ""; echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Accounts ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    sqlite3 $SQ3DBNAME << EOF
+.mode columns
+	SELECT
+		(SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts _accounts WHERE account_id = accounts.master) AS THEMASTERRRRR,
+		first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') AS Name,
+		email AS Email,
+		phone AS Phone
+	FROM accounts
+	WHERE contact = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') AND disabled = 0
+EOF
+###################################### Check if there are any then skip ######################################################
+	echo ""; echo "~~~~~~~~~~~~~~~~~~~~~ Disabled Accounts ~~~~~~~~~~~~~~~~~~~~~"
+    sqlite3 $SQ3DBNAME << EOF
+.mode columns
+	SELECT
+		first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') AS Name,
+		email AS Email,
+		phone AS Phone
+	FROM accounts
+	WHERE contact = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') AND disabled = 1
+EOF
+	echo ""
 
-# Add a sale - Note: This User is the one paying, but the resulting contracts can be assigned to anyone
-#payouts --add-sale USER_EMAIL QTY
 
-# Update sale status - The "STATUS" can set to "PAID", "NOT_PAID", "TRIAL", or "DISABLED"
-#payouts --update-sale SALE_ID STATUS
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT sales.sale_id AS Sale, (accounts.first_name || ' ' || accounts.last_name) AS Name, sales.time AS Time, sales.quantity AS Quantity, sales.status AS Status FROM accounts, sales WHERE accounts.account_id = sales.account_id"
 
-# Add a contract
-#payouts --add-contr USER_EMAIL SALE_ID QTY MICRO_ADDRESS
+###### Show disable accounts afterwards ###########
 
-# Mark a contract as delivered
-#payouts --update-contr CONTRACT_ID
 
-# Disable a contract
-#payouts --disable-contr CONTRACT_ID
+###################################### Need to fix the name in the -totals routing ######################################################
+
+
+elif [[  $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
+	sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
+	echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
+	echo ""; echo "Note: The contract owners and contract buyers don't have to match."
+	echo "Example: Someone may buy extra contracts for a friend."; echo ""
+
+elif [[  $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts"
+
+elif [[  $1 = "-x" || $1 = "--txs" ]]; then # Show all the transactions associated with the latest payout
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);" # The latest transactions added to the DB
+
+elif [[  $1 = "-p" || $1 = "--payouts" ]]; then # Show all payouts thus far
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM payouts"
+
+elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each contract (identical addresses are combinded)
+    echo ""
+    sqlite3 $SQ3DBNAME << EOF
+.mode columns
+    SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
+        contracts.micro_address AS Addresses,
+        CAST(SUM(txs.amount) as REAL) / 100000000 AS Totals
+    FROM accounts, contracts, txs
+    WHERE contracts.contract_id = txs.contract_id AND contracts.account_id = accounts.account_id
+    GROUP BY contracts.micro_address
+    ORDER BY accounts.account_id;
+EOF
+	echo ""
+	
+	
+
+
+
+
+
+
