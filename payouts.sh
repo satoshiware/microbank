@@ -82,7 +82,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -e, --epoch       Look for next difficulty epoch and prepare the DB for next round of payouts
       -s, --send        Send the Money
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
-      -m, --email       Prepare all core customer notification emails for the latest epoch
+      -m, --email-prep  Prepare all core customer notification emails for the latest epoch
 
 ----- Generic Database Queries ----------------------------------------------------------------------------------------------
       -d, --dump        Show all the contents of the database
@@ -113,6 +113,11 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       --disable-contr   Disable a contract
             Parameters: MICRO_ADDRESS  CONTRACT_ID
                 Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
+
+----- Email -----------------------------------------------------------------------------------------------------------------
+      --send-teller-summary     Send summary to a Teller (Level 1) Hub/Node
+            Parameters: EMAIL
+
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     echo "Installing this script (payouts) in /usr/local/sbin/"
@@ -322,7 +327,32 @@ EOF
         # Send Email
         fee_percent_diff=$(awk -v fee=$TOTAL_FEES -v payment=$total_payment 'BEGIN {printf("%.6f\n", ((fee / 100000000) / payment) * 100)}')
         bank_balance=$($BTC -rpcwallet=bank getbalance)
-        send_email --epoch $NEXTEPOCH $TOTAL_FEES $TX_COUNT $TOTAL_WEIGHT $MAXFEERATE $qty_utxo $expected_payment $total_payment $fee_percent_diff $bank_balance "${t_payout//; /<br>}"
+        t_payout="${t_payout//; /<br>}"
+        MESSAGE=$(cat << EOF
+            <b><u>$(date) - New Epoch (Number $NEXTEPOCH)</u></b><br><br>
+
+            <b>Fee Results:</b><br>
+            <ul>
+                <li><b>Total Fees:</b> $TOTAL_FEES</li>
+                <li><b>TX Count:</b> $TX_COUNT</li>
+                <li><b>Total Weight:</b> $TOTAL_WEIGHT</li>
+                <li><b>Max Fee Rate:</b> $MAXFEERATE</li>
+            </ul><br>
+
+            <b>DB Query (payouts table)</b><br>
+            $t_payout<br><br>
+
+            <b>UTXOs QTY:</b> $qty_utxo<br>
+            <b>Expected Payment:</b> $expected_payment<br>
+            <b>Total Payment:</b> $total_payment<br><br>
+
+            There was a <b>${fee_percent_diff} percent</b> effect upon the total payout from the tx fees collected.<br>
+            Note: If this percent ever gets significantly and repeatedly large, there may be some bad players in the network gaming the system.<br><br>
+
+            <b>Wallet (bank) Balance:</b> $bank_balance
+EOF
+        )
+        send_email "Satoshi" "${ADMINISTRATOREMAIL}" "New Epoch Has Been Delivered" "$MESSAGE"
 
     else
         # Don't change text on next line! The string "next epoch" used for a conditional statement above.
@@ -351,7 +381,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     if [ $((total_payment + 100000000)) -gt $bank_balance ]; then
         message="$(date) - Not enough money in the bank to send payouts! The bank has $bank_balance $DENOMINATION, but it needs $((total_payment + 100000000)) $DENOMINATION before any payouts will be sent."
         echo $message | sudo tee -a $LOG
-        send_email --info "Not Enough Money in The Bank" "$message"
+        send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Not Enough Money in The Bank" "$message"
     fi
 
     # Query db for tx_id, address, and amount - preparation to send out first set of payments
@@ -384,7 +414,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" conf_target=10 estimate_mode="economical" | jq '.txid')
         if [[ ! ${TXID//\"/} =~ ^[0-9a-f]{64}$ ]]; then
             echo "$(date) - Serious Error!!! Invalid TXID: $TXID" | sudo tee -a $LOG
-            send_email --info "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
+            send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
             sudo touch /etc/send_payments_error_flag
             exit 1
         fi
@@ -398,7 +428,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         # Make sure the "count" of utxos to be generated is going down
         if [ $count -le $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") ]; then
             echo "$(date) - Serious Error!!! Infinite loop while sending out payments!" | sudo tee -a $LOG
-            send_email --info "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
+            send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
             sudo touch /etc/send_payments_error_flag
             exit 1
         fi
@@ -412,7 +442,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     # Make sure all payments have been sent!
     if [ 0 -lt $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") ]; then
         echo "$(date) - Serious Error!!! Unfulfilled TXs in the DB after sending payments!" | sudo tee -a $LOG
-        send_email --info "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
+        send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
         sudo touch /etc/send_payments_error_flag
         exit 1
     fi
@@ -428,12 +458,28 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     ENTRY="$ENTRY    Bank Balance: $bank_balance (Before Sending Payments)"$'\n'
     ENTRY="$ENTRY    Calculated Total: $total_payment"$'\n'
     ENTRY="$ENTRY    Total Sent: $total_sending"$'\n'
-    ENTRY="$ENTRY    Bank Balance: $post_bank_balance (After Sending Payments)"
+    ENTRY="$ENTRY    Bank Balance: $post_bank_balance (After Sending Payments + TX Fees)"
     echo "$ENTRY" | sudo tee -a $LOG
 
     # Send Email
     t_txids=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL;")
-    send_email --send $bank_balance $total_payment $total_sending $post_bank_balance $((end_time - start_time)) $TX_BATCH_SZ "$t_txids"
+    time=$((end_time - start_time))
+    MESSAGE=$(cat << EOF
+        <b>$(date) - All Payments have been completed successfully</b><br>
+        <ul>
+            <li><b>Execution Time:</b> $time seconds</li>
+            <li><b>Outputs Per TX:</b> $TX_BATCH_SZ</li>
+            <li><b>Bank Balance:</b> $bank_balance (Before Sending Payments)</li>
+            <li><b>Calculated Total:</b> $total_payment</li>
+            <li><b>Total Sent:</b> $total_sending</li>
+            <li><b>Bank Balance:</b> $post_bank_balance (After Sending Payments + TX Fees)</li>
+        </ul><br>
+
+        <b>DB Query (All Recent TXIDs)</b><br>
+        $t_txids
+EOF
+    )
+    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "All Payments have been completed successfully" "$MESSAGE"
 
 elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are confirmed in the blockchain; update the DB
     # Get all the txs that have a valid TXID without a block height
@@ -472,10 +518,10 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
         message="$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations.<br><br>"
         message="${message} $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations."
 
-        send_email --info "Confirming Transaction(s) on The Blockchain" "$message"
+        send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Confirming Transaction(s) on The Blockchain" "$message"
     fi
 
-elif [[  $1 = "-m" || $1 = "--email" ]]; then # Prepare all core customer notification emails for the latest epoch
+elif [[  $1 = "-m" || $1 = "--email-prep" ]]; then # Prepare all core customer notification emails for the latest epoch
     # Check to see if the latest epoch has already been "notified"
     notified=$(sqlite3 $SQ3DBNAME "SELECT notified FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts)")
     if [ ! -z $notified ]; then
@@ -545,7 +591,7 @@ EOF
 
     # Format all the array data togethor
     for i in "${!notify_data[@]}"; do
-        echo "./send_email.sh --payouts ${notify_data[$i]//|/ } \$SATRATE \$USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
+        echo "${notify_data[$i]//|/ } \$SATRATE \$USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Set the notified flag
@@ -555,7 +601,7 @@ EOF
     echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)." | sudo tee -a $LOG
 
     # Send Email
-    send_email --info "Core Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)."
+    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Core Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Generic Database Queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[  $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
@@ -945,33 +991,12 @@ EOF
 EOF
     );  MESSAGE="$MESSAGE</table>"
 
-    send_email --send-email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+    send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
 
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
 fi
-
-
-#TZ=America/Phoenix date -d @$UNIXTIMECODE
-#First halving occurs in epoch period 183 with an average of 11.25 coins/block - You should verify the math */
-
-#PRAGMA foreign_keys; /* See if it is turned on (1 for on) */
-#PRAGMA foreign_keys = ON; /* Turn it on */
-#.tables /* List all the tables in the database */
-#DROP TABLE $TABLE; /* Deletes a table */
-#DELETE FROM sales /* Delete a row */
-#WHERE order_id = 2;
-#
-#sudo sqlite3 $SQ3DBNAME "INSERT INTO accounts (first_name, email) VALUES ($NAME, $EMAIL);" # Add new account
-#sudo sqlite3 $SQ3DBNAME "INSERT INTO accounts (first_name, last_name, preferred_name, email) VALUES ($NAME, $EMAIL);" # Add new account
-#
-#sudo sqlite3 $SQ3DBNAME "INSERT INTO accounts (first_name, email) VALUES ($NAME, $EMAIL);" # Add new account
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ REMOVE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#sudo sqlite3 $SQ3DBNAME "DELETE FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);" # Remove last epoch_period from payouts
-#sudo sqlite3 $SQ3DBNAME "DELETE FROM txs WHERE tx_id = (SELECT MAX(tx_id) FROM txs);" # Remove last tx from txs table
-
 
 ##################################
 #SQ3DBNAME=/var/lib/btcofaz.db
@@ -988,18 +1013,9 @@ fi
 #tail -n 1 /var/tmp/payout.emails
 #sudo sed -i '$d' /var/tmp/payout.emails
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Administrative Checks ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Send out emails to Level 1 Hubs. What's that look like??
-# Billing and keeping track of how much they have purchased.
-# Tellers Table and accounts
-
 ##################### What's the next thing most critical #######################################
-#2) Send out adminstrative email to level 1 nodes.
 #1) Make it easier to sendout those emails.
 #3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
 #4) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
 #5) Payout number on the payout
 #6) Product Master Emails
-exit
-
-
