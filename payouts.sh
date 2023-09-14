@@ -95,24 +95,24 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 
 ----- Admin/Root Interface --------------------------------------------------------------------------------------------------
       --add-user        Add a new account
-			Parameters: CONTACT_EMAIL  USER_EMAIL  USER_PHONE**  FIRST_NAME  LAST_NAME*  PREFERRED_NAME*  MASTER_EMAIL*
-				Note*: LAST_NAME, PREFERRED_NAME, and MASTER_EMAIL are options
-				Note**: USER_PHONE is optional if MASTER_EMAIL was provided
+            Parameters: CONTACT_EMAIL  USER_EMAIL  USER_PHONE**  FIRST_NAME  LAST_NAME*  PREFERRED_NAME*  MASTER_EMAIL*
+                Note*: LAST_NAME, PREFERRED_NAME, and MASTER_EMAIL are options
+                Note**: USER_PHONE is optional if MASTER_EMAIL was provided
       --disable-user    Disable an account (also disables associated contracts, but not the sales)
-			Parameters: USER_EMAIL
+            Parameters: USER_EMAIL
       --add-sale        Add a sale
-			Parameters: USER_EMAIL  QTY
-				Note: The USER_EMAIL is the one paying, but the resulting contracts can be assigned to anyone (i.e. Sales don't have to match Contracts).
+            Parameters: USER_EMAIL  QTY
+                Note: The USER_EMAIL is the one paying, but the resulting contracts can be assigned to anyone (i.e. Sales don't have to match Contracts).
       --update-sale     Update sale status
-	  		Parameters: USER_EMAIL  SALE_ID  STATUS
-				Note: STATUS  =  0 (Not Paid),  1 (Paid),  2 (Trial Run),  3 (Disabled)
+            Parameters: USER_EMAIL  SALE_ID  STATUS
+                Note: STATUS  =  0 (Not Paid),  1 (Paid),  2 (Trial Run),  3 (Disabled)
       --add-contr       Add a contract
-	  		Parameters: USER_EMAIL  SALE_ID  QTY  MICRO_ADDRESS
+            Parameters: USER_EMAIL  SALE_ID  QTY  MICRO_ADDRESS
       --update-contr    Mark every contract with this address as delivered
-	  		Parameters: MICRO_ADDRESS
+            Parameters: MICRO_ADDRESS
       --disable-contr   Disable a contract
-	  		Parameters: MICRO_ADDRESS  CONTRACT_ID
-				Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
+            Parameters: MICRO_ADDRESS  CONTRACT_ID
+                Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     echo "Installing this script (payouts) in /usr/local/sbin/"
@@ -565,10 +565,10 @@ elif [[  $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
 
 elif [[  $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
-	sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
-	echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
-	echo ""; echo "Note: The contract owners and contract buyers don't have to match."
-	echo "Example: Someone may buy extra contracts for a friend."; echo ""
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
+    echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
+    echo ""; echo "Note: The contract owners and contract buyers don't have to match."
+    echo "Example: Someone may buy extra contracts for a friend."; echo ""
 
 elif [[  $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts"
@@ -583,8 +583,8 @@ elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each con
     echo ""
     sqlite3 $SQ3DBNAME << EOF
 .mode columns
-    SELECT 
-		accounts.first_name || COALESCE(' (' || accounts.preferred_name || ') ', ' ') || COALESCE(accounts.last_name, '') AS Name,
+    SELECT
+        accounts.first_name || COALESCE(' (' || accounts.preferred_name || ') ', ' ') || COALESCE(accounts.last_name, '') AS Name,
         contracts.micro_address AS Address,
         CAST(SUM(txs.amount) as REAL) / 100000000 AS Total
     FROM accounts, contracts, txs
@@ -592,7 +592,7 @@ elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each con
     GROUP BY contracts.micro_address
     ORDER BY accounts.account_id;
 EOF
-	echo ""
+    echo ""
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[  $1 = "--add-user" ]]; then # Add a new account
@@ -748,7 +748,7 @@ elif [[  $1 = "--add-contr" ]]; then # Add a contract
         exit 1
     fi
     total=$(sqlite3 $SQ3DBNAME "SELECT quantity FROM sales WHERE sale_id = $SALE_ID")
-    assigned=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE sale_id = $SALE_ID" AND active = 1)
+    assigned=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE sale_id = $SALE_ID" AND active != 0)
     if [[ ! $QTY -le $((total - assigned)) ]]; then
         echo "Error! The \"Sale ID\" provided cannot accommodate more than $((total - assigned)) \"shares\"!"
         exit 1
@@ -819,6 +819,134 @@ elif [[  $1 = "--disable-contr" ]]; then # Disable a contract
     # Query the DB
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}'"
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+elif [[  $1 = "--send-teller-summary" ]]; then # Send summary to a Teller (Level 1) Hub/Node
+    CONTACT_EMAIL=$2
+
+    NAME=$(sqlite3 $SQ3DBNAME << EOF
+        SELECT
+            CASE WHEN preferred_name IS NULL
+                THEN first_name
+                ELSE preferred_name
+            END
+        FROM accounts
+        WHERE email = '${CONTACT_EMAIL,,}'
+EOF
+    )
+
+    MESSAGE="Hi $NAME<br><br> Here are all your contract details!<br><br><hr>"
+
+    # Accounts
+    MESSAGE="$MESSAGE<br><br><b>Accounts:</b><br><table border="1"><tr><th>Name</th><th>Master</th><th>Email</th><th>Phone</th><th>Total Received</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') || '</td>',
+            '<td>' || COALESCE((SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts _accounts WHERE account_id = accounts.master), '') || '</td>',
+            '<td>' || email || '</td>',
+            '<td>' || COALESCE(phone, '') || '</td>',
+            '<td>' || (SELECT CAST(SUM(amount) AS REAL) / 100000000 FROM txs, contracts WHERE txs.contract_id = contracts.contract_id AND accounts.account_id = contracts.account_id) || '</td>',
+            '</tr>'
+        FROM accounts
+        WHERE contact = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') AND disabled = 0
+EOF
+    );  MESSAGE="$MESSAGE</table>"
+
+    # Sales/Contracts
+    MESSAGE="$MESSAGE<br><br><b>Sales/Contracts:</b><br><table border="1"><tr><th>Name</th><th>QTY/Total</th><th>Sale ID</th><th>Purchaser</th><th>Time</th><th>Address</th><th>Total Received</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = contracts.account_id) || '</td>',
+            '<td>' || quantity || '/' || (SELECT quantity FROM sales WHERE sale_id = contracts.sale_id) || '</td>',
+            '<td>' || sale_id || '</td>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = (SELECT account_id FROM sales WHERE sale_id = contracts.sale_id)) || '</td>',
+            '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
+            '<td>' || micro_address || IIF(active = 2, ' (Opened)', '') || '</td>',
+            '<td>' || (SELECT CAST(SUM(txs.amount) as REAL) / 100000000 FROM txs WHERE contract_id = contracts.contract_id) || '</td>',
+            '</tr>'
+        FROM contracts
+        WHERE active = 1 AND (SELECT contact FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')
+EOF
+);  MESSAGE="$MESSAGE</table>"
+
+    # Not Delivered
+    MESSAGE="$MESSAGE<br><br><b>Not Delivered:</b><br><table border="1"><tr><th>Name</th><th>Email</th><th>Contract ID</th><th>QTY</th><th>Time</th><th>Addresses</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = contracts.account_id) || '</td>',
+            '<td>' || (SELECT email FROM accounts WHERE account_id = contracts.account_id) || '</td>',
+            '<td>' || contract_id || '</td>',
+            '<td>' || quantity || '</td>',
+            '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
+            '<td>' || micro_address || '</td>',
+            '</tr>'
+        FROM contracts
+        WHERE delivered = 0 AND (SELECT contact FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')
+        GROUP BY micro_address
+EOF
+    );  MESSAGE="$MESSAGE</table>"
+
+    #Underutilized
+    MESSAGE="$MESSAGE<br><br><b>Underutilized:</b><br><table border="1"><tr><th>Purchaser</th><th>Email</th><th>Sale ID</th><th>QTY/Total</th><th>Remaining</th><th>Time</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = sales.account_id) || '</td>',
+            '<td>' || (SELECT email FROM accounts WHERE account_id = sales.account_id) || '</td>',
+            '<td>' || sale_id || '</td>',
+            '<td>' || (SELECT SUM(quantity) FROM contracts WHERE sale_id = sales.sale_id AND active != 0) || '\' || quantity || '</td>',
+            '<td>' || quantity - (SELECT SUM(quantity) FROM contracts WHERE sale_id = sales.sale_id AND active != 0) || '</td>',
+            '<td>' || DATETIME(sales.time, 'unixepoch', 'localtime') || '</td>',
+            '</tr>'
+        FROM sales
+        WHERE status != 3 AND (SELECT contact FROM accounts WHERE account_id = sales.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')
+            AND (quantity - (SELECT SUM(quantity) FROM contracts WHERE sale_id = sales.sale_id AND active != 0)) > 0
+EOF
+    );  MESSAGE="$MESSAGE</table>"
+
+    # Not Paid
+    MESSAGE="$MESSAGE<br><br><b>Not Paid:</b><br><table border="1"><tr><th>Name</th><th>Email</th><th>Sale ID</th><th>Total</th><th>Time</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = sales.account_id) || '</td>',
+            '<td>' || (SELECT email FROM accounts WHERE account_id = sales.account_id) || '</td>',
+            '<td>' || sale_id || '</td>',
+            '<td>' || quantity || '</td>',
+            '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
+            '</tr>'
+        FROM sales
+        WHERE status = 0 AND (SELECT contact FROM accounts WHERE account_id = sales.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')
+EOF
+    );  MESSAGE="$MESSAGE</table>"
+
+    # Trials
+    MESSAGE="$MESSAGE<br><br><b>Trials:</b><br><table border="1"><tr><th>Name</th><th>Email</th><th>Sale ID</th><th>Total</th><th>Time</th><th>Days Active</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = sales.account_id) || '</td>',
+            '<td>' || (SELECT email FROM accounts WHERE account_id = sales.account_id) || '</td>',
+            '<td>' || sale_id || '</td>',
+            '<td>' || quantity || '</td>',
+            '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
+            '<td>' || ((STRFTIME('%s') - time) / 86400) || '</td>',
+            '</tr>'
+        FROM sales
+        WHERE status = 2 AND (SELECT contact FROM accounts WHERE account_id = sales.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')
+EOF
+    );  MESSAGE="$MESSAGE</table>"
+
+    send_email --send-email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
@@ -869,114 +997,9 @@ fi
 #2) Send out adminstrative email to level 1 nodes.
 #1) Make it easier to sendout those emails.
 #3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
-
-
-###
-# See all accounts that are associated with contact
-
-
+#4) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
+#5) Payout number on the payout
+#6) Product Master Emails
 exit
-CONTACT_EMAIL="trade@tradeittech.com"
-CONTACT_EMAIL="mqpickens@yahoo.com"
-CONTACT_EMAIL="mla3360@hotmail.com"
-SQ3DBNAME=/var/lib/btcofaz.db
-LOG=/var/log/payout.log
-
-	
-	echo ""; echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Accounts ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    sqlite3 $SQ3DBNAME << EOF
-.mode columns
-	SELECT
-		(SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts _accounts WHERE account_id = accounts.master) AS Master,
-		first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') AS Name,
-		email AS Email,
-		phone AS Phone
-	FROM accounts
-	WHERE contact = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') AND disabled = 0
-EOF
-
-	sqlite3 $SQ3DBNAME << EOF
-.mode columns
-		SELECT
-			(SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = contracts.account_id) AS Name,
-			contracts.sale_id,  /* Show Sale_id with respective Owner */
-			contracts.quantity, /* Show quantity over total of the sale */
-			contracts.time, /* Time of contract in arizona time readable */
-			contracts.micro_address /* associated address - not combined */ /*but maybe indicate if it is in use again maybe */
-		FROM contracts
-		WHERE active = 1 AND (SELECT contact FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')
-EOF
-
-
-
-
-######################################## notes ############################################
-(SELECT contact FROM accounts WHERE account_id = contracts.account_id) = 
-
-	sqlite3 $SQ3DBNAME << EOF
-.mode columns
-		SELECT
-			sales.sale_id AS 'Sale ID',
-			(accounts.first_name || ' ' || accounts.last_name) AS Name,
-			sales.time AS Time,
-			sales.quantity AS Quantity,
-			sales.status AS Status 
-		FROM accounts, sales
-		WHERE accounts.account_id = sales.account_id
-EOF
-
-
-
-
-          
-         
-        active INTEGER, /* Deprecated = 0; Active = 1 or NULL; Opened = 2 */
-        delivered INTEGER, /* NO = 0 or NULL; YES = 1 */
-        micro_address TEXT NOT NULL,
-        FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE,
-        FOREIGN KEY (sale_id) REFERENCES sales (sale_id) ON DELETE CASCADE)
-		
-		
-		
-		
-#So, what do we want to see here???? All the contracts with the associated sales.
-###### Show disable accounts afterwards ###########
-
-
-
-elif [[  $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
-	sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
-	echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
-	echo ""; echo "Note: The contract owners and contract buyers don't have to match."
-	echo "Example: Someone may buy extra contracts for a friend."; echo ""
-
-elif [[  $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts"
-
-elif [[  $1 = "-x" || $1 = "--txs" ]]; then # Show all the transactions associated with the latest payout
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);" # The latest transactions added to the DB
-
-elif [[  $1 = "-p" || $1 = "--payouts" ]]; then # Show all payouts thus far
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM payouts"
-
-elif [[  $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each contract (identical addresses are combinded)
-    echo ""
-    sqlite3 $SQ3DBNAME << EOF
-.mode columns
-    SELECT (accounts.first_name || " " || accounts.last_name) AS Name,
-        contracts.micro_address AS Addresses,
-        CAST(SUM(txs.amount) as REAL) / 100000000 AS Totals
-    FROM accounts, contracts, txs
-    WHERE contracts.contract_id = txs.contract_id AND contracts.account_id = accounts.account_id
-    GROUP BY contracts.micro_address
-    ORDER BY accounts.account_id;
-EOF
-	echo ""
-	
-	
-
-
-
-
 
 
