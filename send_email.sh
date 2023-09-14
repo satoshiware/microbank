@@ -150,6 +150,14 @@ elif [[ $1 = "--info" ]]; then
     NAME="satoshi"
     EMAIL="${ADMINISTRATOREMAIL}"
 
+elif [[ $1 = "--send-email" ]]; then
+    NAME=$2; EMAIL=$3; SUBJECT=$4; MESSAGE=$5
+
+    if [[ -z $NAME || -z $EMAIL || -z $SUBJECT || -z $MESSAGE ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
 elif [[ $1 = "--send" ]]; then
     bank_balance=$2; total_payment=$3; total_sending=$4; post_bank_balance=$5; time=$6; batch_sz=$7; t_txids=$8
 
