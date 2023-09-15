@@ -62,8 +62,8 @@ UNLOCK="$BTC -rpcwallet=bank walletpassphrase $(sudo cat /root/passphrase) 600"
 # Database Location and development mode
 SQ3DBNAME=/var/lib/btcofaz.db
 LOG=/var/log/payout.log
-SQ3DBNAME=/var/lib/btcofaz.db.development # Uncomment this line to switch to the development database.
-if [[ $SQ3DBNAME == *"development"* ]]; then
+SQ3DBNAME=/var/lib/btcofaz.db.development # This line automatically commented out during the --install
+if [[ $SQ3DBNAME == *"development"* && ! ($1 == "-i" || $1 == "--install") ]]; then
     LOG=~/log.payout
     echo ""; echo "log file is located at \"~/log.payout\""
     echo ""; echo "Did you make a recent copy of the production database for development mode?"
@@ -78,7 +78,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       -h, --help        Display this help message and exit
-      -i, --install     Install this script (payouts) in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
+      -i, --install     Install this script (payouts) in /usr/local/sbin, sqlite3, the DB if it hasn't been already, and loads available epochs from the blockchain
       -e, --epoch       Look for next difficulty epoch and prepare the DB for next round of payouts
       -s, --send        Send the Money
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
@@ -121,24 +121,28 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     echo "Installing this script (payouts) in /usr/local/sbin/"
-    if [ ! -f /usr/local/sbin/payouts ]; then
-        sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=\/var\/lib\/btcofaz.db.development /d' | sudo tee /usr/local/sbin/payouts > /dev/null
-        sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/payouts # Make it so this code won't run again in the newly installed script.
-        sudo chmod +x /usr/local/sbin/payouts
-    else
-        echo "\"payouts\" already exists in /usr/local/sbin!"
-        read -p "Would you like to uninstall it? (y|n): "
+    if [ -f /usr/local/sbin/payouts ]; then
+        echo "These scripts (payout and send_email) already exists in /usr/local/sbin!"
+        read -p "Would you like to reinstall them? (y|n): "
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/payouts
+            sudo rm /usr/local/sbin/send_email
+        else
             exit 0
         fi
     fi
 
+    # Install payouts script
+    sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=\/var\/lib\/btcofaz.db.development /d' | sudo tee /usr/local/sbin/payouts > /dev/null
+    sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/payouts # Make it so this code won't run again in the newly installed script.
+    sudo chmod +x /usr/local/sbin/payouts
+
+    # Install send_email script
+    sudo cat $0 | sudo tee /usr/local/sbin/send_email > /dev/null
+    sudo chmod +x /usr/local/sbin/send_email
+
     SQ3DBNAME=/var/lib/btcofaz.db # Make sure it using the production (not the development) database
-    if [ -f "$SQ3DBNAME" ]; then
-        echo "\"$SQ3DBNAME\" Already Exists!"
-        exit 0
-    fi
+    if [ -f "$SQ3DBNAME" ]; then exit 0; fi
 
     sudo apt-get -y install sqlite3
 
@@ -642,7 +646,7 @@ EOF
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[  $1 = "--add-user" ]]; then # Add a new account
-    CONTACT_EMAIL="${2,,}"; USER_EMAIL="${3,,}"; USER_PHONE="${4,,}"; FIRST_NAME="${5,,}"; LAST_NAME="${6,,}"; PREFERRED_NAME="${7,,}"; MASTER_EMAIL="${8,,}"
+    CONTACT_EMAIL="${2,,}"; USER_EMAIL="${3,,}"; USER_PHONE="${4,,}"; FIRST_NAME="${5,,}"; LAST_NAME=$6; PREFERRED_NAME="${7,,}"; MASTER_EMAIL="${8,,}"
 
     # Very basic input checking
     if [[ -z $CONTACT_EMAIL || -z $USER_EMAIL || -z $USER_PHONE || -z $FIRST_NAME || -z $LAST_NAME || -z $PREFERRED_NAME || -z $MASTER_EMAIL ]]; then
@@ -659,7 +663,7 @@ elif [[  $1 = "--add-user" ]]; then # Add a new account
     # Check for correct formats
     if [[ ! "$USER_EMAIL" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then echo "Error! Invalid Email!"; exit 1; fi
     if [[ ! "$FIRST_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid First Name!"; exit 1; fi
-    if [[ ! "$LAST_NAME" =~ ^[a-z-]+$ ]]; then echo "Error! Invalid Last Name!"; exit 1; fi
+    if [[ ! "$LAST_NAME" =~ ^[a-zA-Z-]+$ ]]; then echo "Error! Invalid Last Name!"; exit 1; fi
     if [[ ! "$PREFERRED_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid Preferred Name!"; exit 1; fi
     if [[ "$USER_PHONE" != "null" && ! "$USER_PHONE" =~ ^[0-9]{3}-[0-9]{3}-[0-9]{4}$ ]]; then echo "Error! Invalid Phone Number (Format)!"; exit 1; fi
 
@@ -683,7 +687,7 @@ elif [[  $1 = "--add-user" ]]; then # Add a new account
 
     # Prepare variables that may contain the string "null" for the DB
     if [[ $USER_PHONE == "null" ]]; then USER_PHONE="NULL"; else USER_PHONE="'$USER_PHONE'"; fi
-    if [[ $LAST_NAME == "null" ]]; then LAST_NAME="NULL"; else LAST_NAME="'${LAST_NAME^}'"; fi
+    if [[ $LAST_NAME == "null" ]]; then LAST_NAME="NULL"; else LAST_NAME="'$LAST_NAME'"; fi
     if [[ $PREFERRED_NAME == "null" ]]; then PREFERRED_NAME="NULL"; else PREFERRED_NAME="'${PREFERRED_NAME^}'"; fi
 
     # Insert into the DB
@@ -794,7 +798,7 @@ elif [[  $1 = "--add-contr" ]]; then # Add a contract
         exit 1
     fi
     total=$(sqlite3 $SQ3DBNAME "SELECT quantity FROM sales WHERE sale_id = $SALE_ID")
-    assigned=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE sale_id = $SALE_ID" AND active != 0)
+    assigned=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE sale_id = $SALE_ID AND active != 0")
     if [[ ! $QTY -le $((total - assigned)) ]]; then
         echo "Error! The \"Sale ID\" provided cannot accommodate more than $((total - assigned)) \"shares\"!"
         exit 1
@@ -993,10 +997,98 @@ EOF
 
     send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
 
+elif [[ $1 = "--email-cc" ]]; then # Send a payout email to a core customer
+    NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; ADDRESSES=${11}; TXIDS=${12}
+
+    if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $CONTACTPHONE || -z $CONTACTEMAIL || -z $COINVALUESATS || -z $USDVALUESATS || -z $ADDRESSES || -z $TXIDS ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    elif [[ ! $(echo "${ADDRESSES}" | awk '{print toupper($0)}') == *"${NETWORKPREFIX}1Q"* ]]; then
+        echo "Error! Incorrect Address Type!"
+        exit 1
+    fi
+
+    ADDRESSES=${ADDRESSES//./<br>}
+    ADDRESSES=${ADDRESSES//_0/ -- Deprecated}
+    ADDRESSES=${ADDRESSES//_1/} # Active
+    ADDRESSES=${ADDRESSES//_2/ -- Opened} # Active, but opened
+
+    TXIDS=${TXIDS//./<\/li><li>}
+
+    MESSAGE=$(cat << EOF
+        <html><head></head><body>
+            Hi ${NAME},<br><br>
+
+            You have successfully mined <b><u>$AMOUNT</u></b> coins on the \"${NETWORK}\" network ${CLARIFY}with a hashrate of <b>${HASHRATE} GH/s</b> to the following address(es):<br><br>
+            <b>${ADDRESSES}</b><br><br>
+            So far, you have mined a total of <b><u>${TOTAL}</u></b> coins<sup>${NETWORKPREFIX}</sup> worth <b>$(awk -v total=${TOTAL} -v coinvaluesats=${COINVALUESATS} 'BEGIN {printf "%'"'"'.2f\n", total * coinvaluesats}') \$ATS </b><sup>(\$$(awk -v total=${TOTAL} -v coinvaluesats=${COINVALUESATS} -v usdvaluesats=${USDVALUESATS} 'BEGIN {printf "%'"'"'.2f\n", total * coinvaluesats / usdvaluesats}') USD)</sup> as of this email!<br><br>
+            Notice! Always ensure the key(s) associated with this/these address(es) are in your possession!!
+            Please reach out ASAP if you need a new savings card!<br><br>
+            Please utilize our ${NETWORK} block explorer to get more details on an address or TXID: $EXPLORER<br>
+            <br><hr><br>
+
+            <b><u>Market Data</u></b> (as of this email)
+            <table>
+                <tr>
+                    <td></td>
+                    <td>\$1.00 USD</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                    <td>$(awk -v usdvaluesats=${USDVALUESATS} 'BEGIN {printf "%'"'"'.2f\n", usdvaluesats}') \$ATS</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                    <td>($(awk -v usdvaluesats=${USDVALUESATS} 'BEGIN {printf "%'"'"'.8f\n", usdvaluesats / 100000000}') bitcoins)</td>
+                </tr><tr>
+                    <td></td>
+                    <td>1 ${NETWORKPREFIX} coin</sup></td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                    <td>$(awk -v coinvaluesats=${COINVALUESATS} 'BEGIN {printf "%'"'"'.2f\n", coinvaluesats}') \$ATS</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                    <td>($(awk -v coinvaluesats=${COINVALUESATS} 'BEGIN {printf "%'"'"'.8f\n", coinvaluesats / 100000000}') bitcoins)</td>
+                </tr>
+            </table><br>
+
+            <b><u>Key Terms</u></b>
+            <table>
+                <tr>
+                    <td></td>
+                    <td>\$ATS</td>
+                    <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    <td>Short for satoshis. The smallest unit in a bitcoin. There are 100,000,000 satoshis in 1 bitcoin.</td>
+                </tr><tr>
+                    <td></td>
+                    <td>${DENOMINATION}</td>
+                    <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    <td>Short for ${DENOMINATIONNAME}. The smallest unit in an ${NETWORKPREFIX} coin. There are 100,000,000 ${DENOMINATIONNAME} in 1 ${NETWORKPREFIX} coin.</td>
+                </tr>
+            </table><br>
+
+            <b><u>Contact Details</u></b><br>
+            <ul>
+                <li>${CONTACTPHONE}</li>
+                <li>${CONTACTEMAIL}</li>
+            </ul><br>
+
+            <b><u>TXID(s):</u></b><br>
+            <ul>
+                <li>${TXIDS}</li>
+            </ul><br>
+
+            <b><u>We\`re Here to Help!</u></b><br>
+            <ul>
+                <li>Don't hesitate to reach out to purchase more mining power!!!</li>
+                <li>If you’re interested in mining for yourself, ask us about the ${NETWORKPREFIX} / BTC Quarter Stick miner.</li>
+                <li>To join the \"${NETWORKPREFIX} Money\" community and the discussion check out the forum @ <a href=\"https://forum.satoshiware.org\"><u><i>forum.satoshiware.org</i></u></a></li>
+            </ul><br>
+        </body></html>
+EOF
+    )
+
+    send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
+
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
 fi
+
 
 ##################################
 #SQ3DBNAME=/var/lib/btcofaz.db
@@ -1020,5 +1112,6 @@ fi
 #5) Payout number on the payout
 #6) Product Master Emails
 
-#payouts --add-contr Ch@ymail.com 46 5 az1q3q....2p7
-#Error: near "AND": syntax error
+#### Installing the email script won't work. 
+#### Why will some characters not go through with way of emailing
+#### Simply or combine the email-cc routine
