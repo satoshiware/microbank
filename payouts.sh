@@ -659,7 +659,7 @@ elif [[  $1 = "--add-user" ]]; then # Add a new account
     # Check for correct formats
     if [[ ! "$USER_EMAIL" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then echo "Error! Invalid Email!"; exit 1; fi
     if [[ ! "$FIRST_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid First Name!"; exit 1; fi
-    if [[ ! "$LAST_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid Last Name!"; exit 1; fi
+    if [[ ! "$LAST_NAME" =~ ^[a-z-]+$ ]]; then echo "Error! Invalid Last Name!"; exit 1; fi
     if [[ ! "$PREFERRED_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid Preferred Name!"; exit 1; fi
     if [[ "$USER_PHONE" != "null" && ! "$USER_PHONE" =~ ^[0-9]{3}-[0-9]{3}-[0-9]{4}$ ]]; then echo "Error! Invalid Phone Number (Format)!"; exit 1; fi
 
@@ -1019,3 +1019,6 @@ fi
 #4) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
 #5) Payout number on the payout
 #6) Product Master Emails
+
+#payouts --add-contr Ch@ymail.com 46 5 az1q3q....2p7
+#Error: near "AND": syntax error
