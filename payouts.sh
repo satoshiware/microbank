@@ -9,37 +9,6 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    exit 1
 fi
 
-# Create the file with the needed envrionment variables if it has not been already
-if [ ! -f /etc/default/payouts.env ]; then
-    cat << EOF | sudo tee /etc/default/_payouts.env > /dev/null
-NETWORK=""                      # Example: "AZ Money"
-CLARIFY=""                      # Leave blank; variable is used in the core customer contract email notification to clarify difference names (see Deseret Money)
-NETWORKPREFIX=""                # Example: "AZ"
-DENOMINATION=""                 # Example: "SAGZ"
-DENOMINATIONNAME=""             # Example: "saguaros"
-EXPLORER=""                     # Example: "<a href=https://somemicrocurrency.com/explorer><u>Some microcurrency Explorer</u></a>"
-
-API=""                          # API address (e.g. "https://api.brevo.com/v3/smtp/email"
-KEY=""                          # API key to send email (e.g. "xkeysib-05...76-9...1")
-
-SENDEREMAIL=""                  # Sender email (e.g. satoshi@somemicrocurrency.com)
-
-INITIALREWARD=                  # Initial block subsidy (e.g. 1500000000)
-EPOCHBLOCKS=                    # Number of blocks before each difficulty adjustment (e.g. 1440)
-HALVINGINTERVAL=                # Number of blocks in before the next halving (e.g. 262800)
-HASHESPERCONTRACT=              # Hashes per second for each contract (e.g. 10000000000)
-BLOCKINTERVAL=                  # Number of seconds (typically) between blocks (e.g. 120)
-
-TX_BATCH_SZ=                    # Number of outputs for each send transaction (e.g. 10)
-
-ADMINISTRATOREMAIL=""           # Administrator email (e.g. your_email@somedomain.com)
-EOF
-
-    echo "Assign static values to all the variables in the \"/etc/default/_payouts.env\" file"
-    echo "Rename file to \"payouts.env\" (from \"_payouts.env\") when finished"
-    exit 0
-fi
-
 # Make sure the send_email routine is installed
 if ! command -v send_email &> /dev/null; then
     echo "Error! The \"send_email\" routine could not be found!" | sudo tee -a $LOG
@@ -48,11 +17,17 @@ if ! command -v send_email &> /dev/null; then
 fi
 
 # Load envrionment variables and then verify
-source /etc/default/payouts.env
-if [[ -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $NETWORK || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $EXPLORER || -z $API || -z $KEY ]]; then
-    echo ""; echo "Error! Not all variables have assignments in the \"/etc/default/payouts.env\" file"
-    sudo rm /etc/default/payouts.env; echo "File \"/etc/default/payouts.env\" has been deleted!"; echo ""
-    $0 # Rerun this script creating new "_payouts.env" file
+if [[ -f /etc/default/payouts.env && ! ($1 == "-i" || $1 == "--install") ]]; then
+    source /etc/default/payouts.env
+    if [[ -z $NETWORK || -z $CLARIFY || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $EXPLORER || -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $TX_BATCH_SZ || -z $ADMINISTRATOREMAIL ]]; then
+        echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/payouts.env\" file"
+        exit 1;
+    fi
+elif [[ $1 == "-i" || $1 == "--install" ]]; then echo ""
+else
+    echo "Error! The \"/etc/default/payouts.env\" environment file does not exist!"
+    echo "Run this script with the \"-i\" or \"--install\" parameter."
+    exit 1;
 fi
 
 # Universal envrionment variables
@@ -62,15 +37,11 @@ UNLOCK="$BTC -rpcwallet=bank walletpassphrase $(sudo cat /root/passphrase) 600"
 # Database Location and development mode
 SQ3DBNAME=/var/lib/btcofaz.db
 LOG=/var/log/payout.log
-SQ3DBNAME=/var/lib/btcofaz.db.development # This line automatically commented out during the --install
+SQ3DBNAME=~/btcofaz.db.development # This line is automatically commented out during the --install
 if [[ $SQ3DBNAME == *"development"* && ! ($1 == "-i" || $1 == "--install") ]]; then
-    LOG=~/log.payout
-    echo ""; echo "log file is located at \"~/log.payout\""
-    echo ""; echo "Did you make a recent copy of the production database for development mode?"
-    echo "\"sudo cp /var/lib/btcofaz.db /var/lib/btcofaz.db.development\""
-    echo ""; echo "Did you make backups of the production database?"
-    echo "\"sudo cp /var/lib/btcofaz.db /var/lib/btcofaz.db.bak(1, 2, 3...)\""
-    echo ""; read -p "You are in development mode! Press any enter to continue ..."
+    LOG=~/log.payout.development
+    if [ ! -f ~/btcofaz.db.development ]; then sudo cp /var/lib/btcofaz.db ~/btcofaz.db.development; fi
+    echo ""; read -p "You are in development mode! Press any enter to continue ..."; echo ""
 fi
 
 # See which payouts parameter was passed and execute accordingly
@@ -120,29 +91,46 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
+    # Installing the payouts script
     echo "Installing this script (payouts) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/payouts ]; then
-        echo "These scripts (payout and send_email) already exists in /usr/local/sbin!"
-        read -p "Would you like to reinstall them? (y|n): "
+        echo "This script (payouts) already exists in /usr/local/sbin!"
+        read -p "Would you like to reinstall it? (y|n): "
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/payouts
-            sudo rm /usr/local/sbin/send_email
         else
             exit 0
         fi
     fi
-
-    # Install payouts script
-    sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=\/var\/lib\/btcofaz.db.development /d' | sudo tee /usr/local/sbin/payouts > /dev/null
+    sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=~\/btcofaz.db.development/d' | sudo tee /usr/local/sbin/payouts > /dev/null
     sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/payouts # Make it so this code won't run again in the newly installed script.
     sudo chmod +x /usr/local/sbin/payouts
 
-    # Install send_email script
-    sudo cat $0 | sudo tee /usr/local/sbin/send_email > /dev/null
-    sudo chmod +x /usr/local/sbin/send_email
+    # Create the file with the needed envrionment variables if it has not been done already
+    if [ ! -f /etc/default/payouts.env ]; then
+        read -p "Network Name (e.g. AZ Money): "; echo "NETWORK=\"$REPLY\"" | sudo tee /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+        read -p "Clarifying comment to highlight the commonality between the \"network name\" and the \"microcurrency name\" (e.g. Deseret Money and UT Money): "; echo "CLARIFY=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Network Prefix (e.g. AZ): "; echo "NETWORKPREFIX=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Denomination (e.g. SAGZ): "; echo "DENOMINATION=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Denomination Name (e.g. saguaros): "; echo "DENOMINATIONNAME=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Microcurrency Block Explorer (e.g. <a href=https://somemicrocurrency.com/explorer><u>Some microcurrency Explorer</u></a>): "; echo "EXPLORER=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+        read -p "Initial block subsidy (e.g. 1500000000): "; echo "INITIALREWARD=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; INITIALREWARD=$REPLY
+        read -p "Number of blocks before each difficulty adjustment (e.g. 1440): "; echo "EPOCHBLOCKS=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Hashes per second for each contract (e.g. 10000000000): "; echo "HASHESPERCONTRACT=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+        read -p "Number of outputs for each send transaction (e.g. 10): "; echo "TX_BATCH_SZ=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+        read -p "Administrator email (e.g. your_email@somedomain.com): "; echo "ADMINISTRATOREMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+    else
+        echo "The environment file \"/etc/default/payouts.env\" already exits."
+    fi
 
     SQ3DBNAME=/var/lib/btcofaz.db # Make sure it using the production (not the development) database
-    if [ -f "$SQ3DBNAME" ]; then exit 0; fi
+    if [ -f "$SQ3DBNAME" ]; then exit 0; fi # Exit! As we do not want to accidentally overwrite our database!
 
     sudo apt-get -y install sqlite3
 
@@ -226,26 +214,27 @@ $(printf '\t')endscript
 EOF
 
     # Insert payout for genesis block
+    source /etc/default/payouts.env # Load the environment variables
     tmp=$($BTC getblock $($BTC getblockhash 0))
     sudo sqlite3 $SQ3DBNAME "INSERT INTO payouts (epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount, notified, satrate) VALUES (0, 0, $INITIALREWARD, 0, $(echo $tmp | jq '.time'), $(echo $tmp | jq '.difficulty'), 0, 1, NULL);"
 
     # Load all payout periods thus far
     while [ -z $output ]; do
-        output=$($0 -e 2> /dev/null | grep "next epoch"); i=$((i + 1))
-        echo "Finished loading epoch period number $i into the payout table"
+        NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
+        BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
+        if [ $($BTC getblockcount) -ge $BLOCKEPOCH ]; then # See if there's another epoch to load
+            tmp=$($BTC getblock $($BTC getblockhash $BLOCKEPOCH))
+            EXPONENT=$(awk -v eblcks=$BLOCKEPOCH -v interval=$HALVINGINTERVAL 'BEGIN {printf("%d\n", eblcks / interval)}')
+            SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%d\n", reward / 2 ^ expo)}')
+            sudo sqlite3 $SQ3DBNAME "INSERT INTO payouts (epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount) VALUES ($NEXTEPOCH, $BLOCKEPOCH, $SUBSIDY, 0, $(echo $tmp | jq '.time'), $(echo $tmp | jq '.difficulty'), 0)"
+        else
+            sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET amount = 0, notified = 1" # Set all payout amounts to 0 and notified flag to 1
+            exit 0
+        fi
+        echo "Epoch period number $NEXTEPOCH has been loaded into the payout table"
     done
 
-    # Set all payout amounts to 0 and notified flag to 1
-    sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET amount = 0, notified = 1"
-
-    # Show the user their new database
-    echo ""
-    sqlite3 $SQ3DBNAME ".dump"
-
 elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch and prepare the DB for next round of payouts
-    # echo $SQ3DBNAME
-    # sudo sqlite3 $SQ3DBNAME "DELETE FROM txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-    # sudo sqlite3 $SQ3DBNAME "DELETE FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
     BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
 
@@ -359,7 +348,6 @@ EOF
         send_email "Satoshi" "${ADMINISTRATOREMAIL}" "New Epoch Has Been Delivered" "$MESSAGE"
 
     else
-        # Don't change text on next line! The string "next epoch" used for a conditional statement above.
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
     fi
 
@@ -997,7 +985,7 @@ EOF
 
     send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
 
-elif [[ $1 = "--email-cc" ]]; then # Send a payout email to a core customer
+elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core customer
     NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; ADDRESSES=${11}; TXIDS=${12}
 
     if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $CONTACTPHONE || -z $CONTACTEMAIL || -z $COINVALUESATS || -z $USDVALUESATS || -z $ADDRESSES || -z $TXIDS ]]; then
@@ -1106,12 +1094,11 @@ fi
 #sudo sed -i '$d' /var/tmp/payout.emails
 
 ##################### What's the next thing most critical #######################################
-#1) Make it easier to sendout those emails.
 #3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
 #4) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
-#5) Payout number on the payout
-#6) Product Master Emails
+#5) Payout number on the payout????
+#6) Produce Master Emails
 
-#### Installing the email script won't work. 
 #### Why will some characters not go through with way of emailing
 #### Simply or combine the email-cc routine
+#####Change the name of btcofaz.db
