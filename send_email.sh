@@ -1,5 +1,39 @@
 #!/bin/bash
-source /etc/default/payouts.env
+# Installing the send_email script
+if [[ $1 = "--install" ]]; then
+    echo "Installing this script (send_email) in /usr/local/sbin/"
+    if [ -f /usr/local/sbin/send_email ]; then
+        echo "This script (send_email) already exists in /usr/local/sbin!"
+        read -p "Would you like to reinstall it? (y|n): "
+        if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
+            sudo rm /usr/local/sbin/send_email
+        else
+            exit 0
+        fi
+    fi
+    sudo cat $0 | sudo tee /usr/local/sbin/send_email > /dev/null
+    sudo chmod +x /usr/local/sbin/send_email
+
+    read -p "API address (e.g. \"https://api.brevo.com/v3/smtp/email\"): "; echo "API=\"$REPLY\"" | sudo tee /etc/default/send_email.env > /dev/null
+    read -p "API key to send email (e.g. \"xkeysib-05...76-9...1\"): "; echo "KEY=\"$REPLY\"" | sudo tee -a /etc/default/send_email.env > /dev/null
+    read -p "Sender name (e.g. \"AZ Money\"): "; echo "SENDER_NAME=\"$REPLY\"" | sudo tee -a /etc/default/send_email.env > /dev/null
+    read -p "Sender email (e.g. satoshi@somemicrocurrency.com): "; echo "SENDER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/send_email.env > /dev/null
+
+    exit 0
+fi
+
+# Load envrionment variables and then verify
+if [[ -f /etc/default/send_email.env ]]; then
+    source /etc/default/send_email.env
+    if [[ -z $API || -z $KEY || -z $SENDER_NAME || -z $SENDER_EMAIL ]]; then
+        echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/send_email.env\" file"
+        exit 1;
+    fi
+else
+    echo "Error! The \"/etc/default/send_email.env\" environment file does not exist!"
+    echo "Run this script with the --install parameter."
+    exit 1
+fi
 
 NAME=$1; EMAIL=$2; SUBJECT=$3; MESSAGE=$4
 
@@ -15,8 +49,8 @@ generate_post_data()
     cat <<EOF
     {
             "sender":{
-            "name":"${NETWORK}",
-            "email":"${SENDEREMAIL}"
+            "name":"${SENDER_NAME}",
+            "email":"${SENDER_EMAIL}"
         },
         "to":[
             {
