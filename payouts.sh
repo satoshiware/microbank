@@ -19,7 +19,7 @@ fi
 # Load envrionment variables and then verify
 if [[ -f /etc/default/payouts.env && ! ($1 == "-i" || $1 == "--install") ]]; then
     source /etc/default/payouts.env
-    if [[ -z $NETWORK || -z $CLARIFY || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $EXPLORER || -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $TX_BATCH_SZ || -z $ADMINISTRATOREMAIL ]]; then
+    if [[ -z $NETWORK || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $EXPLORER || -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $TX_BATCH_SZ || -z $ADMINISTRATOREMAIL ]]; then
         echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/payouts.env\" file"
         exit 1;
     fi
