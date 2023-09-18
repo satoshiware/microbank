@@ -86,9 +86,12 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                 Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
 
 ----- Email -----------------------------------------------------------------------------------------------------------------
+      --email-core-customer     Send payout email to "core customer"
+            Parameters: NAME  EMAIL  AMOUNT  TOTAL  HASHRATE  CONTACTPHONE  CONTACTEMAIL  COINVALUESATS  USDVALUESATS  ADDRESSES  TXIDS  EMAIL_ADMIN_IF_SET
       --send-teller-summary     Send summary to a Teller (Level 1) Hub/Node
-            Parameters: EMAIL
-
+            Parameters: EMAIL  EMAIL_ADMIN_IF_SET
+      --email-master-summary    Send sub account(s) summary to a master
+            Parameters: EMAIL  EMAIL_ADMIN_IF_SET
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     # Installing the payouts script
@@ -581,19 +584,33 @@ EOF
         txids[${tmp_txids[i]%|*}]=${txids[${tmp_txids[i]%|*}]}.${tmp_txids[i]#*|}
     done
 
-    # Format all the array data togethor
+    # Format all the array data togethor for core customer emails and add them to the payout.emails file
     for i in "${!notify_data[@]}"; do
         echo "payouts --email-core-customer ${notify_data[$i]//|/ } \$SATRATE \$USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
+    done
+
+    # Add Master emails to the list (payout.emails)
+    tmp=$(sudo sqlite3 $SQ3DBNAME "SELECT email FROM accounts WHERE EXISTS(SELECT * FROM accounts sub WHERE master = accounts.account_id)")
+    eol=$'\n'; read -a master_emails <<< ${tmp//$eol/ }
+    for i in "${!master_emails[@]}"; do
+        echo "payouts --email-master-summary ${master_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
+    done
+
+    # Add Teller Summaries-emails to the list (payout.emails)
+    tmp=$(sudo sqlite3 $SQ3DBNAME "SELECT email FROM accounts WHERE EXISTS(SELECT * FROM accounts sub WHERE contact = accounts.account_id)")
+    eol=$'\n'; read -a contact_emails <<< ${tmp//$eol/ }
+    for i in "${!contact_emails[@]}"; do
+        echo "payouts --email-teller-summary ${contact_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Set the notified flag
     sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
 
     # Log Results
-    echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)." | sudo tee -a $LOG
+    echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)." | sudo tee -a $LOG
 
     # Send Email
-    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Core Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to core customer(s)."
+    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)."
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Generic Database Queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[  $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
@@ -858,8 +875,48 @@ elif [[  $1 = "--disable-contr" ]]; then # Disable a contract
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '${MICRO_ADDRESS,,}'"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-elif [[  $1 = "--send-teller-summary" ]]; then # Send summary to a Teller (Level 1) Hub/Node
-    CONTACT_EMAIL=$2
+elif [[  $1 = "--email-master-summary" ]]; then # Send sub account summary to a master
+    MASTER_EMAIL=$2; EMAIL_ADMIN_IF_SET=$3
+
+    NAME=$(sqlite3 $SQ3DBNAME << EOF
+        SELECT
+            CASE WHEN preferred_name IS NULL
+                THEN first_name
+                ELSE preferred_name
+            END
+        FROM accounts
+        WHERE email = '${MASTER_EMAIL,,}'
+EOF
+    )
+
+    MESSAGE="Hi $NAME,<br><br>Here is an overall detailed summary of your sub account(s)!<br><br><hr>"
+
+    # Accounts/Sales/Contracts
+    MESSAGE="$MESSAGE<br><br><table border="1"><tr><th>Name</th><th>Mining Power (GH/s)</th><th>Time (Established)</th><th>Address (Savings Card)</th><th>Total Received</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = contracts.account_id) || '</td>',
+            '<td>' || (quantity * $HASHESPERCONTRACT / 1000000000)  || '</td>',
+            '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
+            '<td>' || micro_address || IIF(active = 2, ' (Opened)', '') || '</td>',
+            '<td>' || (SELECT CAST(SUM(txs.amount) as REAL) / 100000000 FROM txs WHERE contract_id = contracts.contract_id) || '</td>',
+            '</tr>'
+        FROM contracts
+        WHERE active = 1 AND (SELECT master FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${MASTER_EMAIL,,}')
+EOF
+);  MESSAGE="$MESSAGE</table>"
+
+    # Send Email
+    if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
+        send_email "$NAME" "${MASTER_EMAIL,,}" "Sub Account(s) Summary" "$MESSAGE"
+    else
+        send_email "$NAME" "$ADMINISTRATOREMAIL" "Sub Account(s) Summary" "$MESSAGE"
+    fi
+
+elif [[  $1 = "--email-teller-summary" ]]; then # Send summary to a Teller (Level 1) Hub/Node
+    CONTACT_EMAIL=$2; EMAIL_ADMIN_IF_SET=$3
 
     NAME=$(sqlite3 $SQ3DBNAME << EOF
         SELECT
@@ -872,7 +929,7 @@ elif [[  $1 = "--send-teller-summary" ]]; then # Send summary to a Teller (Level
 EOF
     )
 
-    MESSAGE="Hi $NAME<br><br> Here are all your contract details!<br><br><hr>"
+    MESSAGE="Hi $NAME,<br><br> Here are all your contract details!<br><br><hr>"
 
     # Accounts
     MESSAGE="$MESSAGE<br><br><b>Accounts:</b><br><table border="1"><tr><th>Name</th><th>Master</th><th>Email</th><th>Phone</th><th>Total Received</th></tr>"
@@ -983,10 +1040,15 @@ EOF
 EOF
     );  MESSAGE="$MESSAGE</table>"
 
-    send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+    # Send Email
+    if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
+        send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+    else
+        send_email "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+    fi
 
 elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core customer
-    NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; ADDRESSES=${11}; TXIDS=${12}
+    NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; ADDRESSES=${11}; TXIDS=${12}; EMAIL_ADMIN_IF_SET=${13}
 
     if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $CONTACTPHONE || -z $CONTACTEMAIL || -z $COINVALUESATS || -z $USDVALUESATS || -z $ADDRESSES || -z $TXIDS ]]; then
         echo "Error! Insufficient Parameters!"
@@ -1070,7 +1132,12 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
 EOF
     )
 
-    send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
+    # Send Email
+    if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
+        send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
+    else
+        send_email "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
+    fi
 
 else
     echo "Method not found"
@@ -1094,13 +1161,13 @@ fi
 #sudo sed -i '$d' /var/tmp/payout.emails
 
 ##################### What's the next thing most critical #######################################
-# Produce Master Emails
-# Add both lvl1 summary and master emails to the payout.email file when created
 #5) Payout number on the payout???? (165/500) It can be added to the title
 #### Why will some characters not go through with way of emailing
 #####Change the name of btcofaz.db
 
 #### Simply or combine the email-cc routine????
+
+
 
 #3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
 
