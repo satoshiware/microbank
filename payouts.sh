@@ -130,7 +130,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
     fi
 
     SQ3DBNAME=/var/lib/btcofaz.db # Make sure it using the production (not the development) database
-    if [ -f "$SQ3DBNAME" ]; then exit 0; fi # Exit! As we do not want to accidentally overwrite our database!
+    if [ -f "$SQ3DBNAME" ]; then echo "The database \"$SQ3DBNAME\" already exits."; exit 0; fi # Exit! As we do not want to accidentally overwrite our database!
 
     sudo apt-get -y install sqlite3
 
@@ -583,7 +583,7 @@ EOF
 
     # Format all the array data togethor
     for i in "${!notify_data[@]}"; do
-        echo "${notify_data[$i]//|/ } \$SATRATE \$USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
+        echo "payouts --email-core-customer ${notify_data[$i]//|/ } \$SATRATE \$USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Set the notified flag
@@ -1094,11 +1094,18 @@ fi
 #sudo sed -i '$d' /var/tmp/payout.emails
 
 ##################### What's the next thing most critical #######################################
-#3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
-#4) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
-#5) Payout number on the payout????
-#6) Produce Master Emails
-
+# Produce Master Emails
+# Add both lvl1 summary and master emails to the payout.email file when created
+#5) Payout number on the payout???? (165/500) It can be added to the title
 #### Why will some characters not go through with way of emailing
-#### Simply or combine the email-cc routine
 #####Change the name of btcofaz.db
+
+#### Simply or combine the email-cc routine????
+
+#3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
+
+#4) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
+
+
+
+
