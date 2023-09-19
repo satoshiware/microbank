@@ -35,12 +35,12 @@ BTC=$(cat /etc/bash.bashrc | grep "alias btc=" | cut -d "\"" -f 2)
 UNLOCK="$BTC -rpcwallet=bank walletpassphrase $(sudo cat /root/passphrase) 600"
 
 # Database Location and development mode
-SQ3DBNAME=/var/lib/btcofaz.db
+SQ3DBNAME=/var/lib/payouts.db
 LOG=/var/log/payout.log
-SQ3DBNAME=~/btcofaz.db.development # This line is automatically commented out during the --install
+SQ3DBNAME=~/payouts.db.development # This line is automatically commented out during the --install
 if [[ $SQ3DBNAME == *"development"* && ! ($1 == "-i" || $1 == "--install") ]]; then
     LOG=~/log.payout.development
-    if [ ! -f ~/btcofaz.db.development ]; then sudo cp /var/lib/btcofaz.db ~/btcofaz.db.development; fi
+    if [ ! -f ~/payouts.db.development ]; then sudo cp /var/lib/payouts.db ~/payouts.db.development; fi
     echo ""; read -p "You are in development mode! Press any enter to continue ..."; echo ""
 fi
 
@@ -105,7 +105,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
             exit 0
         fi
     fi
-    sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=~\/btcofaz.db.development/d' | sudo tee /usr/local/sbin/payouts > /dev/null
+    sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=~\/payouts.db.development/d' | sudo tee /usr/local/sbin/payouts > /dev/null
     sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/payouts # Make it so this code won't run again in the newly installed script.
     sudo chmod +x /usr/local/sbin/payouts
 
@@ -123,8 +123,9 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
         read -p "Number of blocks before each difficulty adjustment (e.g. 1440): "; echo "EPOCHBLOCKS=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
         read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
         read -p "Hashes per second for each contract (e.g. 10000000000): "; echo "HASHESPERCONTRACT=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
-
+        read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+		read -p "Max number of payout periods for this microcurrency (e.g. 910): "; echo "MAX_EPOCH_PERIOD=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+		
         read -p "Number of outputs for each send transaction (e.g. 10): "; echo "TX_BATCH_SZ=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
 
         read -p "Administrator email (e.g. your_email@somedomain.com): "; echo "ADMINISTRATOREMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
@@ -132,7 +133,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
         echo "The environment file \"/etc/default/payouts.env\" already exits."
     fi
 
-    SQ3DBNAME=/var/lib/btcofaz.db # Make sure it using the production (not the development) database
+    SQ3DBNAME=/var/lib/payouts.db # Make sure it using the production (not the development) database
     if [ -f "$SQ3DBNAME" ]; then echo "The database \"$SQ3DBNAME\" already exits."; exit 0; fi # Exit! As we do not want to accidentally overwrite our database!
 
     sudo apt-get -y install sqlite3
@@ -549,7 +550,7 @@ EOF
         notify_data[${tmp_notify_data[i]%%|*}]=${tmp_notify_data[i]#*|}
     done
 
-    # Pivot all addresses associated with each account for this payout ('.' delimiter)
+    # Pivot all addresses associated with each account for this payout ('_' delimiter)
     tmp=$(sqlite3 $SQ3DBNAME << EOF
 .separator "_"
     SELECT
@@ -567,7 +568,7 @@ EOF
         addresses[${tmp_addresses[i]%%_*}]=${addresses[${tmp_addresses[i]%%_*}]}.${tmp_addresses[i]#*_}
     done
 
-    # Pivot all TXIDs ossociated with each account for this payout ('.' delimiter)
+    # Pivot all TXIDs ossociated with each account for this payout
     tmp=$(sqlite3 $SQ3DBNAME << EOF
     SELECT
         contracts.account_id,
@@ -585,8 +586,9 @@ EOF
     done
 
     # Format all the array data togethor for core customer emails and add them to the payout.emails file
+	latest_epoch_period=$(sqlite3 $SQ3DBNAME "SELECT MAX(epoch_period) FROM payouts")
     for i in "${!notify_data[@]}"; do
-        echo "payouts --email-core-customer ${notify_data[$i]//|/ } \$SATRATE \$USDSATS ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
+        echo "payouts --email-core-customer ${notify_data[$i]//|/ } \$SATRATE \$USDSATS $latest_epoch_period ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Add Master emails to the list (payout.emails)
@@ -1048,7 +1050,7 @@ EOF
     fi
 
 elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core customer
-    NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; ADDRESSES=${11}; TXIDS=${12}; EMAIL_ADMIN_IF_SET=${13}
+    NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; LATEST_EPOCH_PERIOD=${11}; ADDRESSES=${12}; TXIDS=${13}; EMAIL_ADMIN_IF_SET=${14}
 
     if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $CONTACTPHONE || -z $CONTACTEMAIL || -z $COINVALUESATS || -z $USDVALUESATS || -z $ADDRESSES || -z $TXIDS ]]; then
         echo "Error! Insufficient Parameters!"
@@ -1136,7 +1138,7 @@ EOF
     if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
         send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
     else
-        send_email "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
+        send_email "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
     fi
 
 else
@@ -1146,7 +1148,7 @@ fi
 
 
 ##################################
-#SQ3DBNAME=/var/lib/btcofaz.db
+#SQ3DBNAME=/var/lib/payouts.db
 #LOG=/var/log/payout.log
 # echo $SQ3DBNAME
 #    # Get btc/usd exchange rates from populat exchanges
@@ -1161,17 +1163,14 @@ fi
 #sudo sed -i '$d' /var/tmp/payout.emails
 
 ##################### What's the next thing most critical #######################################
-#5) Payout number on the payout???? (165/500) It can be added to the title
-#### Why will some characters not go through with way of emailing
-#####Change the name of btcofaz.db
-
-#### Simply or combine the email-cc routine????
-
-
-
 #3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
 
-#4) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
+#4) Create a sendout email routine that can capture market data
+
+#5) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
+
+
+
 
 
 
