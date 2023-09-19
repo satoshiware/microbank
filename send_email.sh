@@ -47,7 +47,7 @@ if [[ -z $NAME || -z $EMAIL || -z $SUBJECT || -z $MESSAGE ]]; then
 fi
 
 # Replace every character not in the REGEX expression. Helps prevent JSON errors.
-MESSAGE=$(echo $MESSAGE | sed 's/[^A-Za-z0-9.<>(),$/"\¢#@`:&;?!-]/ /g')
+MESSAGE=$(echo $MESSAGE | sed 's/[^A-Za-z0-9.<>(),$/"\¢#@`:&;?!+-]/ /g')
 
 generate_post_data()
 {
