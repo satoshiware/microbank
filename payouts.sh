@@ -88,8 +88,10 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 ----- Email -----------------------------------------------------------------------------------------------------------------
       --email-core-customer     Send payout email to "core customer"
             Parameters: NAME  EMAIL  AMOUNT  TOTAL  HASHRATE  CONTACTPHONE  CONTACTEMAIL  COINVALUESATS  USDVALUESATS  ADDRESSES  TXIDS  EMAIL_ADMIN_IF_SET
-      --send-teller-summary     Send summary to a Teller (Level 1) Hub/Node
-            Parameters: EMAIL  EMAIL_ADMIN_IF_SET
+      --email-teller-summary     Send summary to a Teller (Level 1) Hub/Node
+            Parameters: EMAIL  EMAIL_EXECUTIVE
+                Note: If "EMAIL_EXECUTIVE" is null (i.e. left blank), The Teller's "EMAIL" receives the summary; otherwise, the administrator will unless...
+                        the "EMAIL_EXECUTIVE" is a valid email then that email will receive the summary.
       --email-master-summary    Send sub account(s) summary to a master
             Parameters: EMAIL  EMAIL_ADMIN_IF_SET
 EOF
@@ -918,7 +920,7 @@ EOF
     fi
 
 elif [[  $1 = "--email-teller-summary" ]]; then # Send summary to a Teller (Level 1) Hub/Node
-    CONTACT_EMAIL=$2; EMAIL_ADMIN_IF_SET=$3
+    CONTACT_EMAIL=$2; EMAIL_EXECUTIVE=$3
 
     NAME=$(sqlite3 $SQ3DBNAME << EOF
         SELECT
@@ -1043,10 +1045,14 @@ EOF
     );  MESSAGE="$MESSAGE</table>"
 
     # Send Email
-    if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
+    if [[ -z $EMAIL_EXECUTIVE ]]; then
         send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
     else
-        send_email "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+        if [[ "$EMAIL_EXECUTIVE" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then # See if there is a valid email passed
+            send_email "$NAME" "$EMAIL_EXECUTIVE" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Send email to passed email
+        else
+            send_email "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Otherwise, send email to administrator
+        fi
     fi
 
 elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core customer
@@ -1164,6 +1170,9 @@ fi
 
 ##################### What's the next thing most critical #######################################
 #3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
+    Well, There's sales. There are contracts. What if we put those extra one as a sale. and then looked at how many are utlized.
+
+    I guess, that is where we start, we start. It makes sense. Right.
 
 #4) Create a sendout email routine that can capture market data
 
