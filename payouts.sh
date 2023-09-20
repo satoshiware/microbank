@@ -58,11 +58,12 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 ----- Generic Database Queries ----------------------------------------------------------------------------------------------
       -d, --dump        Show all the contents of the database
       -a, --accounts    Show all accounts
-      -l, --sales       Show all sales
+      -l, --sales       Show all sales; Optional Parameter: TELLER
       -r, --contracts   Show all contracts
-      -x, --txs         Show all the transactions associated with the latest payout
+      -x, --txs         Show all the transactions associated with the latest payout; Optional Parameter: TELLER
       -p, --payouts     Show all payouts thus far
       -t, --totals      Show total amounts for each contract (identical addresses are combinded)
+      --teller-addr     Show all Teller Addresses followed by just the active ones
 
 ----- Admin/Root Interface --------------------------------------------------------------------------------------------------
       --add-user        Add a new account
@@ -72,11 +73,13 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       --disable-user    Disable an account (also disables associated contracts, but not the sales)
             Parameters: USER_EMAIL
       --add-sale        Add a sale
-            Parameters: USER_EMAIL  QTY
+            Parameters: USER_EMAIL  QTY  (TELLER)
                 Note: The USER_EMAIL is the one paying, but the resulting contracts can be assigned to anyone (i.e. Sales don't have to match Contracts).
+                    If TELLER is present (can be anything) then the new addition is directed to the teller_sales table.
       --update-sale     Update sale status
-            Parameters: USER_EMAIL  SALE_ID  STATUS
+            Parameters: USER_EMAIL  SALE_ID  STATUS  (TELLER)
                 Note: STATUS  =  0 (Not Paid),  1 (Paid),  2 (Trial Run),  3 (Disabled)
+                    If TELLER is present (can be anything) then update is directed to the teller_sales table (Trial Run not available in this table).
       --add-contr       Add a contract
             Parameters: USER_EMAIL  SALE_ID  QTY  MICRO_ADDRESS
       --update-contr    Mark every contract with this address as delivered
@@ -84,16 +87,19 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       --disable-contr   Disable a contract
             Parameters: MICRO_ADDRESS  CONTRACT_ID
                 Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
+      --add-teller-addr Add (new) address to teller address book
+            Parameters: EMAIL  MICRO_ADDRESS
+                Note: There can only be one active address at a time per account_id. The active old address (if any) is automatically deprecated.
 
 ----- Email -----------------------------------------------------------------------------------------------------------------
       --email-core-customer     Send payout email to "core customer"
-            Parameters: NAME  EMAIL  AMOUNT  TOTAL  HASHRATE  CONTACTPHONE  CONTACTEMAIL  COINVALUESATS  USDVALUESATS  ADDRESSES  TXIDS  EMAIL_ADMIN_IF_SET
+            Parameters: NAME  EMAIL  AMOUNT  TOTAL  HASHRATE  CONTACTPHONE  CONTACTEMAIL  COINVALUESATS  USDVALUESATS  ADDRESSES  TXIDS  (EMAIL_ADMIN_IF_SET)
       --email-teller-summary     Send summary to a Teller (Level 1) Hub/Node
-            Parameters: EMAIL  EMAIL_EXECUTIVE
+            Parameters: EMAIL  (EMAIL_EXECUTIVE)
                 Note: If "EMAIL_EXECUTIVE" is null (i.e. left blank), The Teller's "EMAIL" receives the summary; otherwise, the administrator will unless...
                         the "EMAIL_EXECUTIVE" is a valid email then that email will receive the summary.
       --email-master-summary    Send sub account(s) summary to a master
-            Parameters: EMAIL  EMAIL_ADMIN_IF_SET
+            Parameters: EMAIL  (EMAIL_ADMIN_IF_SET)
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     # Installing the payouts script
@@ -150,20 +156,14 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
         preferred_name TEXT,
         email TEXT NOT NULL UNIQUE,
         phone TEXT,
-        disabled INTEGER) /* FALSE = 0 or NULL; TRUE = 1 */
-EOF
-
-    sudo sqlite3 $SQ3DBNAME << EOF
+        disabled INTEGER); /* FALSE = 0 or NULL; TRUE = 1 */
     CREATE TABLE sales (
         sale_id INTEGER PRIMARY KEY,
         account_id INTEGER NOT NULL, /* This is who is/was accountable for the payment; it may vary from the account_id on the corresponding contracts. */
         time INTEGER NOT NULL,
         quantity INTEGER NOT NULL,
         status INTEGER, /* NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3 */
-        FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE)
-EOF
-
-    sudo sqlite3 $SQ3DBNAME << EOF
+        FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE);
     CREATE TABLE contracts (
         contract_id INTEGER PRIMARY KEY,
         account_id INTEGER NOT NULL,
@@ -174,10 +174,7 @@ EOF
         delivered INTEGER, /* NO = 0 or NULL; YES = 1 */
         micro_address TEXT NOT NULL,
         FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE,
-        FOREIGN KEY (sale_id) REFERENCES sales (sale_id) ON DELETE CASCADE)
-EOF
-
-    sudo sqlite3 $SQ3DBNAME << EOF
+        FOREIGN KEY (sale_id) REFERENCES sales (sale_id) ON DELETE CASCADE);
     CREATE TABLE payouts (
         epoch_period INTEGER PRIMARY KEY,
         block_height INTEGER NOT NULL,
@@ -187,10 +184,7 @@ EOF
         difficulty REAL NOT NULL,
         amount INTEGER NOT NULL,
         notified INTEGER, /* Have the emails been prepared for the core customers? FALSE = 0 or NULL; TRUE = 1*/
-        satrate INTEGER)
-EOF
-
-    sudo sqlite3 $SQ3DBNAME << EOF
+        satrate INTEGER);
     CREATE TABLE txs (
         tx_id INTEGER PRIMARY KEY,
         contract_id INTEGER NOT NULL,
@@ -200,7 +194,31 @@ EOF
         amount INTEGER NOT NULL,
         block_height INTEGER,
         FOREIGN KEY (contract_id) REFERENCES contracts (contract_id),
-        FOREIGN KEY (epoch_period) REFERENCES payouts (epoch_period))
+        FOREIGN KEY (epoch_period) REFERENCES payouts (epoch_period));
+    CREATE TABLE teller_sales (
+        sale_id INTEGER PRIMARY KEY,
+        account_id INTEGER NOT NULL, /* This is who is/was accountable for the payment. Unlike the core customer contracts table, the contracts are always assigned to the purchaser. */
+        time INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        status INTEGER, /* NOT_PAID = 0 or NULL; PAID = 1; DISABLED = 3 */
+        FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE);
+    CREATE TABLE teller_address_book (
+        address_id INTEGER PRIMARY KEY,
+        account_id INTEGER NOT NULL, /* Unlike the core customer contracts table, the contracts are always assigned to the purchaser.
+        time INTEGER NOT NULL,
+        active INTEGER, /* Deprecated = 0; Active = 1 or NULL*/
+        micro_address TEXT NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE);
+    CREATE TABLE teller_txs (
+        tx_id INTEGER PRIMARY KEY,
+        contract_id INTEGER NOT NULL,
+        epoch_period INTEGER NOT NULL,
+        txid BLOB,
+        vout INTEGER,
+        amount INTEGER NOT NULL,
+        block_height INTEGER,
+        FOREIGN KEY (contract_id) REFERENCES teller_address_book (contract_id),
+        FOREIGN KEY (epoch_period) REFERENCES payouts (epoch_period));
 EOF
 
     # Configure bitcoind's Log Files; Prevents them from Filling up the Partition
@@ -624,10 +642,17 @@ elif [[  $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
 
 elif [[  $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
-    echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
-    echo ""; echo "Note: The contract owners and contract buyers don't have to match."
-    echo "Example: Someone may buy extra contracts for a friend."; echo ""
+    TELLER=$2
+
+    if [[ -z $TELLER ]]; then
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
+        echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
+        echo ""; echo "Note: The contract owners and contract buyers don't have to match."
+        echo "Example: Someone may buy extra contracts for a friend."; echo ""
+    else
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_sales"
+        echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; DISABLED = 3"; echo ""
+    fi
 
 elif [[  $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts"
@@ -724,7 +749,7 @@ elif [[  $1 = "--disable-user" ]]; then # Disable an account (i.e. marks an acco
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE account_id = $account_id"
 
 elif [[  $1 = "--add-sale" ]]; then # Add a sale - Note: The User_Email is the one paying, but the resulting contracts can be assigned to anyone
-    USER_EMAIL=$2; QTY=$3
+    USER_EMAIL=$2; QTY=$3; TELLER=$4
 
     exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
     if [[ $exists == "0" ]]; then
@@ -738,25 +763,27 @@ elif [[  $1 = "--add-sale" ]]; then # Add a sale - Note: The User_Email is the o
     account_id=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'") # Get the account_id
 
     # Insert into the DB
+    if [[ -z $TELLER ]]; then table="sales"; else table="teller_sales"; fi
     sudo sqlite3 $SQ3DBNAME << EOF
         PRAGMA foreign_keys = ON;
-        INSERT INTO sales (account_id, time, quantity, status)
+        INSERT INTO $table (account_id, time, quantity, status)
         VALUES ($account_id, $(date +%s), $QTY, 0);
 EOF
 
     # Query the DB
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales WHERE account_id = $account_id"
-    SALE_ID=$(sqlite3 $SQ3DBNAME "SELECT sale_id FROM sales WHERE account_id = $account_id ORDER BY sale_id DESC LIMIT 1")
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $table WHERE account_id = $account_id"
+    SALE_ID=$(sqlite3 $SQ3DBNAME "SELECT sale_id FROM $table WHERE account_id = $account_id ORDER BY sale_id DESC LIMIT 1")
     echo ""; echo "Current Unix Time: $(date +%s)"
     echo "Your new \"Sale ID\": $SALE_ID"; echo ""
 
 elif [[  $1 = "--update-sale" ]]; then # Update sale status
-    USER_EMAIL=$2; SALE_ID=$3; STATUS=$4
+    USER_EMAIL=$2; SALE_ID=$3; STATUS=$4; TELLER=$5
 
     if ! [[ $SALE_ID =~ ^[0-9]+$ ]]; then echo "Error! \"Sale ID\" is not a number!"; exit 1; fi
-    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM sales WHERE account_id = (SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}') AND sale_id = $SALE_ID)")
+    if [[ -z $TELLER ]]; then table="sales"; else table="teller_sales"; fi
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM $table WHERE account_id = (SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}') AND sale_id = $SALE_ID)")
     if [[ $exists == "0" ]]; then
-        echo "Error! \"User Email\" with provided \"Sale ID\" does not exist in the database!"
+        echo "Error! \"User Email\" with provided \"Sale ID\" does not exist in the database (\"$table\" table)!"
         exit 1
     fi
 
@@ -765,21 +792,21 @@ elif [[  $1 = "--update-sale" ]]; then # Update sale status
         exit 1
     elif [[ $STATUS == "0" ]]; then echo "Update to \"Not Paid\""
     elif [[ $STATUS == "1" ]]; then echo "Update to \"Paid\""
-    elif [[ $STATUS == "2" ]]; then echo "Update to \"Trial Run\""
+    elif [[ $STATUS == "2" && -z $TELLER ]]; then echo "Update to \"Trial Run\""
     elif [[ $STATUS == "3" ]]; then echo "Update to \"Disabled\""; else
         echo "Error! Invalid status code!";
         exit 1
     fi
 
     # Update the DB
-    sudo sqlite3 $SQ3DBNAME "UPDATE sales SET status = $STATUS WHERE sale_id = $SALE_ID"
-    if [[ $STATUS == "3" ]]; then
+    sudo sqlite3 $SQ3DBNAME "UPDATE $table SET status = $STATUS WHERE sale_id = $SALE_ID"
+    if [[ $STATUS == "3" && -z $TELLER ]]; then
         sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE sale_id = $SALE_ID"
     fi
 
     # Query the DB
-    echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales WHERE sale_id = $SALE_ID"; echo ""
-    if [[ $STATUS == "3" ]]; then
+    echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $table WHERE sale_id = $SALE_ID"; echo ""
+    if [[ $STATUS == "3" && -z $TELLER ]]; then
         sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE sale_id = $SALE_ID"; echo ""
     fi
 
@@ -1170,15 +1197,22 @@ fi
 
 ##################### What's the next thing most critical #######################################
 #3) Upgrate db to accomidate Level 1 more professionally. You know, payout those extra hashes!!!
-    Well, There's sales. There are contracts. What if we put those extra one as a sale. and then looked at how many are utlized.
-
-    I guess, that is where we start, we start. It makes sense. Right.
 
 #4) Create a sendout email routine that can capture market data
 
 #5) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
 
 
+
+
+#Add routine:
+#--add-teller-addr  Add (new) address to teller address book
+#            Parameters: EMAIL  MICRO_ADDRESS
+#                Note: There can only be one active address at a time per account_id. The active old address (if any) is automatically deprecated.
+
+#Update routine:
+#      -x, --txs         Show all the transactions associated with the latest payout; Optional Parameter: TELLER
+#      --teller-addr     Show all Teller Addresses followed by just the active ones
 
 
 
