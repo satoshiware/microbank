@@ -211,14 +211,14 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
         FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE);
     CREATE TABLE teller_txs (
         tx_id INTEGER PRIMARY KEY,
-        contract_id INTEGER NOT NULL,
+        account_id INTEGER NOT NULL,
         epoch_period INTEGER NOT NULL,
         txid BLOB,
         vout INTEGER,
         amount INTEGER NOT NULL,
         block_height INTEGER,
-        FOREIGN KEY (contract_id) REFERENCES teller_address_book (contract_id),
-        FOREIGN KEY (epoch_period) REFERENCES payouts (epoch_period));
+        FOREIGN KEY (epoch_period) REFERENCES payouts (epoch_period),
+        FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE);
 EOF
 
     # Configure bitcoind's Log Files; Prevents them from Filling up the Partition
@@ -305,6 +305,22 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         done
         SQL_VALUES="${SQL_VALUES%?}"
 
+        # Produce an array of the total amount of contracts PURCHASED by each teller (exclude tellers without a payout address)
+        tmp=$(sqlite3 $SQ3DBNAME "SELECT account_id, SUM(quantity) FROM teller_sales WHERE status != 3 AND EXISTS(SELECT * FROM teller_address_book sub WHERE active = 1 AND account_id = teller_sales.account_id) GROUP BY account_id")
+        eol=$'\n'; read -a arr_purchased  <<< ${tmp//$eol/ }
+        read -a ARR_ACCOUNT_IDS <<< ${arr_purchased[*]%|*}
+        read -a ARR_QTY_PURCHASED <<< ${arr_purchased[*]#*|}
+
+        SQL_TELLER_VALUES=""
+        for ((i=0; i<${#ARR_ACCOUNT_IDS[@]}; i++)); do
+            SOLD=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = ${ARR_ACCOUNT_IDS[i]})")
+            if [[ ${ARR_QTY_PURCHASED[i]} -gt $SOLD ]]; then # Make sure they are not all sold out
+                OUTPUT=$(awk -v qty=${ARR_QTY_PURCHASED[i]} -v sold=$SOLD -v amnt=$AMOUNT 'BEGIN {printf("%d\n", ((qty - sold) * amnt))}')
+                SQL_TELLER_VALUES="$SQL_TELLER_VALUES(${ARR_ACCOUNT_IDS[i]}, $NEXTEPOCH, $OUTPUT),"
+            fi
+        done
+        SQL_TELLER_VALUES="${SQL_TELLER_VALUES%?}" # Remove the last character (',')
+
         # Insert into database
         echo "$(date) - Attempting to insert next epoch (Number $NEXTEPOCH) into DB" | sudo tee -a $LOG
         sudo sqlite3 -bail $SQ3DBNAME << EOF
@@ -314,6 +330,8 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         VALUES ($NEXTEPOCH, $BLOCKEPOCH, $SUBSIDY, $TOTAL_FEES, $BLOCKTIME, $DIFFICULTY, $AMOUNT);
         INSERT INTO txs (contract_id, epoch_period, amount)
         VALUES $SQL_VALUES;
+        INSERT INTO teller_txs (account_id, epoch_period, amount)
+        VALUES $SQL_TELLER_VALUES;
         COMMIT;
 EOF
 
@@ -374,6 +392,11 @@ EOF
     else
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
     fi
+
+
+    #todos####what about the case where all tellers are sold out???? and there's nothing to add. We have an error
+    ####Still need to update the query, log, and email for teller
+
 
 elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     # See if error flag is present
@@ -659,13 +682,13 @@ elif [[ $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
 
 elif [[ $1 = "-x" || $1 = "--txs" ]]; then # Show all the transactions associated with the latest payout
     TELLER=$2
-	
-	# The latest transactions added to the DB
-	if [[ -z $TELLER ]]; then
-		sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-	else
-		sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-	fi
+
+    # The latest transactions added to the DB
+    if [[ -z $TELLER ]]; then
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
+    else
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_txs WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
+    fi
 
 elif [[ $1 = "-p" || $1 = "--payouts" ]]; then # Show all payouts thus far
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM payouts"
@@ -1232,16 +1255,16 @@ fi
 #sudo sed -i '$d' /var/tmp/payout.emails
 
 ##################### What's the next thing most critical #######################################
-#3) 
-	add it to 
-		payouts
-		send
-		confirm
-		email - send that summary here to adminstrator
-		
-	**Administrative Emails that show who owes what and how much. Payouts, send, confirm, prepare emails...     then send emails.... Nope, I think it would be it's own email system. 
-	Update teller/node LVL1 summary to include how much they own.
-	Auto add sale when they've exceeded the amount they've purchased. 
+#3)
+    add it to
+        payouts
+        send
+        confirm
+        email - send that summary here to adminstrator
+
+    **Administrative Emails that show who owes what and how much. Payouts, send, confirm, prepare emails...     then send emails.... Nope, I think it would be it's own email system.
+    Update teller/node LVL1 summary to include how much they own.
+    Auto add sale when they've exceeded the amount they've purchased.
 
 #4) Create a sendout email routine that can capture market data
 
