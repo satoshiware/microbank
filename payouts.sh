@@ -265,7 +265,7 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
     if [ $($BTC getblockcount) -ge $BLOCKEPOCH ]; then # See if it is time for the next payout
         # Find total fees for the epoch period
         TOTAL_FEES=0; TX_COUNT=0; TOTAL_WEIGHT=0; MAXFEERATE=0
-        for ((i = $(($BLOCKEPOCH - $EPOCHBLOCKS)); i < $BLOCKEPOCH; i++)); do
+        for ((i = $(($BLOCKEPOCH - $EPOCHBLOCKS + 1350)); i < $BLOCKEPOCH; i++)); do
             tmp=$($BTC getblockstats $i)
             TOTAL_FEES=$(($TOTAL_FEES + $(echo $tmp | jq '.totalfee')))
             TX_COUNT=$(($TX_COUNT + $(echo $tmp | jq '.txs') - 1))
@@ -311,12 +311,24 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         read -a ARR_ACCOUNT_IDS <<< ${arr_purchased[*]%|*}
         read -a ARR_QTY_PURCHASED <<< ${arr_purchased[*]#*|}
 
+        # Prepare teller values to inserted into the DB
         SQL_TELLER_VALUES=""
+        qty_teller_contracts=0 # Prepare to tally the total amount of (unused) teller contracts across all accounts
         for ((i=0; i<${#ARR_ACCOUNT_IDS[@]}; i++)); do
             SOLD=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = ${ARR_ACCOUNT_IDS[i]})")
+			echo ${ARR_ACCOUNT_IDS[i]} ####################
+			echo ${ARR_QTY_PURCHASED[i]} ####################
+			echo $SOLD ##########################
+			
             if [[ ${ARR_QTY_PURCHASED[i]} -gt $SOLD ]]; then # Make sure they are not all sold out
-                OUTPUT=$(awk -v qty=${ARR_QTY_PURCHASED[i]} -v sold=$SOLD -v amnt=$AMOUNT 'BEGIN {printf("%d\n", ((qty - sold) * amnt))}')
-                SQL_TELLER_VALUES="$SQL_TELLER_VALUES(${ARR_ACCOUNT_IDS[i]}, $NEXTEPOCH, $OUTPUT),"
+                echo "   $AMOUNT" ##########################
+				echo "   $SOLD" ##########################
+				echo "   ${ARR_QTY_PURCHASED[i]}" ##########################
+				OUTPUT=$(awk -v qty=${ARR_QTY_PURCHASED[i]} -v sold=$SOLD -v amnt=$AMOUNT 'BEGIN {printf("%d\n", ((qty - sold) * amnt))}')
+                echo "   $OUTPUT" ##############
+				SQL_TELLER_VALUES="$SQL_TELLER_VALUES(${ARR_ACCOUNT_IDS[i]}, $NEXTEPOCH, $OUTPUT),"
+                qty_teller_contracts=$((qty_teller_contracts + ARR_QTY_PURCHASED[i] - SOLD))
+				echo "   $qty_teller_contracts" ##########################
             fi
         done
         SQL_TELLER_VALUES="${SQL_TELLER_VALUES%?}" # Remove the last character (',')
@@ -336,15 +348,22 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
 EOF
 
         # Query DB
-        echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount FROM payouts WHERE epoch_period = $NEXTEPOCH" "SELECT * FROM txs WHERE epoch_period = $NEXTEPOCH"; echo ""
+        echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount FROM payouts WHERE epoch_period = $NEXTEPOCH"
+		echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_txs WHERE epoch_period = $NEXTEPOCH"
+        echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE epoch_period = $NEXTEPOCH"; echo ""
         t_payout=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT 'Epoch Period: ' || epoch_period, 'Epoch Block: ' || block_height, 'Block Time: ' || datetime(block_time, 'unixepoch', 'localtime') as dates, 'Difficulty: ' || difficulty, 'Payout: ' || printf('%.8f', (CAST(amount AS REAL) / 100000000)), 'Subsidy: ' || printf('%.8f', (CAST(subsidy AS REAL) / 100000000)), 'Blocks: ' || (block_height - $EPOCHBLOCKS) || ' - ' || (block_height - 1), 'Total Fees: ' || printf('%.8f', (CAST(total_fees AS REAL) / 100000000)) FROM payouts WHERE epoch_period = $NEXTEPOCH")
         payout_amount=$(sqlite3 $SQ3DBNAME "SELECT amount FROM payouts WHERE epoch_period = $NEXTEPOCH")
         qty_contracts=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active != 0 AND time<=$BLOCKTIME")
-        qty_utxo=$(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE epoch_period = $NEXTEPOCH")
+			#qty_teller_contracts # Calculated above
+        qty_utxo=$(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE epoch_period = $NEXTEPOCH") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE epoch_period = $NEXTEPOCH")))
         total_payment=$(sqlite3 $SQ3DBNAME "SELECT printf('%.8f', (CAST(SUM(amount) AS REAL) / 100000000)) FROM txs WHERE epoch_period = $NEXTEPOCH")
+        total_teller_payment=$(sqlite3 $SQ3DBNAME "SELECT printf('%.8f', (CAST(SUM(amount) AS REAL) / 100000000)) FROM teller_txs WHERE epoch_period = $NEXTEPOCH")
+		total=$(awk -v total_1=$total_payment -v total_2=$total_teller_payment 'BEGIN {printf("%.8f\n", total_1 + total_2)}')
 
         # Log Results
         expected_payment=$(awk -v qty=$qty_contracts -v amount=$payout_amount 'BEGIN {printf("%.8f\n", qty * amount / 100000000)}')
+        expected_teller_payment=$(awk -v qty=$qty_teller_contracts -v amount=$payout_amount 'BEGIN {printf("%.8f\n", qty * amount / 100000000)}')
+		expected=$(awk -v total_1=$expected_payment -v total_2=$expected_teller_payment 'BEGIN {printf("%.8f\n", total_1 + total_2)}')
         ENTRY="$(date) - New Epoch (Number $NEXTEPOCH)!"$'\n'
         ENTRY="$ENTRY    Fee Results:"$'\n'
         ENTRY="$ENTRY        Total Fees: $TOTAL_FEES"$'\n'
@@ -354,9 +373,8 @@ EOF
         ENTRY="$ENTRY    DB Query (payouts table)"$'\n'
         ENTRY="$ENTRY        $t_payout"$'\n'
         ENTRY="$ENTRY    UTXOs QTY: $qty_utxo"$'\n'
-        ENTRY="$ENTRY    Expected Payment: $expected_payment"$'\n'
-        ENTRY="$ENTRY    Total Payment: $total_payment"
-
+        ENTRY="$ENTRY    Expected Payment: $expected"$'\n'
+        ENTRY="$ENTRY    Total Payment: $total"
         echo "$ENTRY" | sudo tee -a $LOG
 
         # Send Email
@@ -378,8 +396,8 @@ EOF
             $t_payout<br><br>
 
             <b>UTXOs QTY:</b> $qty_utxo<br>
-            <b>Expected Payment:</b> $expected_payment<br>
-            <b>Total Payment:</b> $total_payment<br><br>
+            <b>Expected Payment:</b> $expected<br>
+            <b>Total Payment:</b> $total<br><br>
 
             There was a <b>${fee_percent_diff} percent</b> effect upon the total payout from the tx fees collected.<br>
             Note: If this percent ever gets significantly and repeatedly large, there may be some bad players in the network gaming the system.<br><br>
@@ -392,11 +410,6 @@ EOF
     else
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
     fi
-
-
-    #todos####what about the case where all tellers are sold out???? and there's nothing to add. We have an error
-    ####Still need to update the query, log, and email for teller
-
 
 elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     # See if error flag is present
@@ -1256,19 +1269,28 @@ fi
 
 ##################### What's the next thing most critical #######################################
 #3)
-    add it to
-        payouts
-        send
-        confirm
-        email - send that summary here to adminstrator
+#    add it to
+#        payouts
+#        send
+#        confirm
+#        email - send that summary here to adminstrator
 
-    **Administrative Emails that show who owes what and how much. Payouts, send, confirm, prepare emails...     then send emails.... Nope, I think it would be it's own email system.
-    Update teller/node LVL1 summary to include how much they own.
-    Auto add sale when they've exceeded the amount they've purchased.
+#    **Administrative Emails that show who owes what and how much. Payouts, send, confirm, prepare emails...     then send emails.... Nope, I think it would be it's own email system.
+#    Update teller/node LVL1 summary to include how much they own.
+#    Auto add sale when they've exceeded the amount they've purchased.
 
 #4) Create a sendout email routine that can capture market data
 
 #5) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
 
 
+    
+################################################
+######################### Remove the 1440
+#todos####what about the case where all tellers are sold out???? and there's nothing to add. We have an error
+#SQ3DBNAME=~/payouts.db.development
+#echo $SQ3DBNAME
 
+#sudo sqlite3 $SQ3DBNAME "DELETE FROM payouts WHERE epoch_period = 113"
+#sudo sqlite3 $SQ3DBNAME "DELETE FROM txs WHERE epoch_period = 113"
+#sudo sqlite3 $SQ3DBNAME "DELETE FROM teller_txs WHERE epoch_period = 113"
