@@ -249,7 +249,7 @@ EOF
         if [ $($BTC getblockcount) -ge $BLOCKEPOCH ]; then # See if there's another epoch to load
             tmp=$($BTC getblock $($BTC getblockhash $BLOCKEPOCH))
             EXPONENT=$(awk -v eblcks=$BLOCKEPOCH -v interval=$HALVINGINTERVAL 'BEGIN {printf("%d\n", eblcks / interval)}')
-            SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%d\n", reward / 2 ^ expo)}')
+            SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%0.f\n", reward / 2 ^ expo)}')
             sudo sqlite3 $SQ3DBNAME "INSERT INTO payouts (epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount) VALUES ($NEXTEPOCH, $BLOCKEPOCH, $SUBSIDY, 0, $(echo $tmp | jq '.time'), $(echo $tmp | jq '.difficulty'), 0)"
         else
             sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET amount = 0, notified = 1" # Set all payout amounts to 0 and notified flag to 1
@@ -265,7 +265,7 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
     if [ $($BTC getblockcount) -ge $BLOCKEPOCH ]; then # See if it is time for the next payout
         # Find total fees for the epoch period
         TOTAL_FEES=0; TX_COUNT=0; TOTAL_WEIGHT=0; MAXFEERATE=0
-        for ((i = $(($BLOCKEPOCH - $EPOCHBLOCKS + 1350)); i < $BLOCKEPOCH; i++)); do
+        for ((i = $(($BLOCKEPOCH - $EPOCHBLOCKS)); i < $BLOCKEPOCH; i++)); do
             tmp=$($BTC getblockstats $i)
             TOTAL_FEES=$(($TOTAL_FEES + $(echo $tmp | jq '.totalfee')))
             TX_COUNT=$(($TX_COUNT + $(echo $tmp | jq '.txs') - 1))
@@ -284,10 +284,10 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
 
         # Calculate subsidy
         EXPONENT=$(awk -v eblcks=$BLOCKEPOCH -v interval=$HALVINGINTERVAL 'BEGIN {printf("%d\n", eblcks / interval)}')
-        SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%d\n", reward / 2 ^ expo)}')
+        SUBSIDY=$(awk -v reward=$INITIALREWARD -v expo=$EXPONENT 'BEGIN {printf("%0.f\n", reward / 2 ^ expo)}')
 
         # Calculate payout amount
-        AMOUNT=$(awk -v hashrate=$HASHESPERCONTRACT -v btime=$BLOCKINTERVAL -v subs=$SUBSIDY -v totalfee=$TOTAL_FEES -v diff=$DIFFICULTY -v eblcks=$EPOCHBLOCKS 'BEGIN {printf("%d\n", ((hashrate * btime) / (diff * 2^32)) * ((subs * eblcks) + totalfee))}')
+        AMOUNT=$(awk -v hashrate=$HASHESPERCONTRACT -v btime=$BLOCKINTERVAL -v subs=$SUBSIDY -v totalfee=$TOTAL_FEES -v diff=$DIFFICULTY -v eblcks=$EPOCHBLOCKS 'BEGIN {printf("%0.f\n", ((hashrate * btime) / (diff * 2^32)) * ((subs * eblcks) + totalfee))}')
 
         # Get array of contract_ids (from active contracts only before this epoch).
         tmp=$(sqlite3 $SQ3DBNAME "SELECT contract_id, quantity FROM contracts WHERE active != 0 AND time<=$BLOCKTIME")
@@ -300,7 +300,7 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         # Prepare values to INSERT into the sqlite db.
         SQL_VALUES=""
         for ((i=0; i<${#QTYS[@]}; i++)); do
-            OUTPUT=$(awk -v qty=${QTYS[i]} -v amnt=$AMOUNT 'BEGIN {printf("%d\n", (qty * amnt))}')
+            OUTPUT=$(awk -v qty=${QTYS[i]} -v amnt=$AMOUNT 'BEGIN {printf("%0.f\n", (qty * amnt))}')
             SQL_VALUES="$SQL_VALUES(${CONTIDS[i]}, $NEXTEPOCH, $OUTPUT),"
         done
         SQL_VALUES="${SQL_VALUES%?}"
@@ -316,19 +316,10 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         qty_teller_contracts=0 # Prepare to tally the total amount of (unused) teller contracts across all accounts
         for ((i=0; i<${#ARR_ACCOUNT_IDS[@]}; i++)); do
             SOLD=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = ${ARR_ACCOUNT_IDS[i]})")
-			echo ${ARR_ACCOUNT_IDS[i]} ####################
-			echo ${ARR_QTY_PURCHASED[i]} ####################
-			echo $SOLD ##########################
-			
             if [[ ${ARR_QTY_PURCHASED[i]} -gt $SOLD ]]; then # Make sure they are not all sold out
-                echo "   $AMOUNT" ##########################
-				echo "   $SOLD" ##########################
-				echo "   ${ARR_QTY_PURCHASED[i]}" ##########################
-				OUTPUT=$(awk -v qty=${ARR_QTY_PURCHASED[i]} -v sold=$SOLD -v amnt=$AMOUNT 'BEGIN {printf("%d\n", ((qty - sold) * amnt))}')
-                echo "   $OUTPUT" ##############
-				SQL_TELLER_VALUES="$SQL_TELLER_VALUES(${ARR_ACCOUNT_IDS[i]}, $NEXTEPOCH, $OUTPUT),"
+                OUTPUT=$(awk -v qty=${ARR_QTY_PURCHASED[i]} -v sold=$SOLD -v amnt=$AMOUNT 'BEGIN {printf("%0.f\n", ((qty - sold) * amnt))}')
+                SQL_TELLER_VALUES="$SQL_TELLER_VALUES(${ARR_ACCOUNT_IDS[i]}, $NEXTEPOCH, $OUTPUT),"
                 qty_teller_contracts=$((qty_teller_contracts + ARR_QTY_PURCHASED[i] - SOLD))
-				echo "   $qty_teller_contracts" ##########################
             fi
         done
         SQL_TELLER_VALUES="${SQL_TELLER_VALUES%?}" # Remove the last character (',')
@@ -342,28 +333,28 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         VALUES ($NEXTEPOCH, $BLOCKEPOCH, $SUBSIDY, $TOTAL_FEES, $BLOCKTIME, $DIFFICULTY, $AMOUNT);
         INSERT INTO txs (contract_id, epoch_period, amount)
         VALUES $SQL_VALUES;
+        COMMIT;
         INSERT INTO teller_txs (account_id, epoch_period, amount)
         VALUES $SQL_TELLER_VALUES;
-        COMMIT;
 EOF
 
         # Query DB
         echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT epoch_period, block_height, subsidy, total_fees, block_time, difficulty, amount FROM payouts WHERE epoch_period = $NEXTEPOCH"
-		echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_txs WHERE epoch_period = $NEXTEPOCH"
+        echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_txs WHERE epoch_period = $NEXTEPOCH"
         echo ""; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE epoch_period = $NEXTEPOCH"; echo ""
         t_payout=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT 'Epoch Period: ' || epoch_period, 'Epoch Block: ' || block_height, 'Block Time: ' || datetime(block_time, 'unixepoch', 'localtime') as dates, 'Difficulty: ' || difficulty, 'Payout: ' || printf('%.8f', (CAST(amount AS REAL) / 100000000)), 'Subsidy: ' || printf('%.8f', (CAST(subsidy AS REAL) / 100000000)), 'Blocks: ' || (block_height - $EPOCHBLOCKS) || ' - ' || (block_height - 1), 'Total Fees: ' || printf('%.8f', (CAST(total_fees AS REAL) / 100000000)) FROM payouts WHERE epoch_period = $NEXTEPOCH")
         payout_amount=$(sqlite3 $SQ3DBNAME "SELECT amount FROM payouts WHERE epoch_period = $NEXTEPOCH")
         qty_contracts=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active != 0 AND time<=$BLOCKTIME")
-			#qty_teller_contracts # Calculated above
+            #qty_teller_contracts # Calculated above
         qty_utxo=$(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE epoch_period = $NEXTEPOCH") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE epoch_period = $NEXTEPOCH")))
         total_payment=$(sqlite3 $SQ3DBNAME "SELECT printf('%.8f', (CAST(SUM(amount) AS REAL) / 100000000)) FROM txs WHERE epoch_period = $NEXTEPOCH")
         total_teller_payment=$(sqlite3 $SQ3DBNAME "SELECT printf('%.8f', (CAST(SUM(amount) AS REAL) / 100000000)) FROM teller_txs WHERE epoch_period = $NEXTEPOCH")
-		total=$(awk -v total_1=$total_payment -v total_2=$total_teller_payment 'BEGIN {printf("%.8f\n", total_1 + total_2)}')
+        total=$(awk -v total_1=$total_payment -v total_2=$total_teller_payment 'BEGIN {printf("%.8f\n", total_1 + total_2)}')
 
         # Log Results
         expected_payment=$(awk -v qty=$qty_contracts -v amount=$payout_amount 'BEGIN {printf("%.8f\n", qty * amount / 100000000)}')
         expected_teller_payment=$(awk -v qty=$qty_teller_contracts -v amount=$payout_amount 'BEGIN {printf("%.8f\n", qty * amount / 100000000)}')
-		expected=$(awk -v total_1=$expected_payment -v total_2=$expected_teller_payment 'BEGIN {printf("%.8f\n", total_1 + total_2)}')
+        expected=$(awk -v total_1=$expected_payment -v total_2=$expected_teller_payment 'BEGIN {printf("%.8f\n", total_1 + total_2)}')
         ENTRY="$(date) - New Epoch (Number $NEXTEPOCH)!"$'\n'
         ENTRY="$ENTRY    Fee Results:"$'\n'
         ENTRY="$ENTRY        Total Fees: $TOTAL_FEES"$'\n'
@@ -422,7 +413,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     fi
 
     # If there are no payments to process then just exit
-    total_payment=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL")
+    total_payment=$(($(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM teller_txs WHERE txid IS NULL")))
     if [ -z $total_payment ]; then
         echo "$(date) - There are currently no payments to process." | sudo tee -a $LOG
         exit 0
@@ -441,8 +432,9 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     eol=$'\n'; read -a query <<< ${tmp//$eol/ }
     total_sending=0
     start_time=$(date +%s)
+    table="txs" # Will be working on the "txs" table initially then the "teller_txs" afterwards
     while [ ! -z "${tmp}" ]; do
-        count=$(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") # Get the total count of utxos to be generated
+        count=$(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) # Get the total count of utxos to be generated
         echo "There are $count UTXOs left to be generated and submitted. (Batch Size: $TX_BATCH_SZ UTXOs/TX)"
 
         # Create individual arrays for each column (database insertion)
@@ -474,11 +466,11 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
 
         # Update the DB with the TXID and vout
         for ((i=0; i<${#TX_ID[@]}; i++)); do
-            sudo sqlite3 $SQ3DBNAME "UPDATE txs SET txid = $TXID, vout = $(echo $TX | jq .details[$i].vout) WHERE tx_id = ${TX_ID[i]};"
+            sudo sqlite3 $SQ3DBNAME "UPDATE $table SET txid = $TXID, vout = $(echo $TX | jq .details[$i].vout) WHERE tx_id = ${TX_ID[i]};"
         done
 
         # Make sure the "count" of utxos to be generated is going down
-        if [ $count -le $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") ]; then
+        if [ $count -le $(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) ]; then
             echo "$(date) - Serious Error!!! Infinite loop while sending out payments!" | sudo tee -a $LOG
             send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
             sudo touch /etc/send_payments_error_flag
@@ -487,12 +479,17 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
 
         # Query db for the next tx_id, address, and amount - preparation to officially send out payments for the next iteration of this loop.
         tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
+        table="txs"
+        if [ -z "${tmp}" ]; then
+            tmp=$(sqlite3 $SQ3DBNAME "SELECT tx_id, (SELECT micro_address FROM teller_address_book sub WHERE active = 1 AND account_id = teller_txs.account_id), amount FROM teller_txs WHERE txid IS NULL LIMIT $TX_BATCH_SZ")
+            table="teller_txs" # Now working on the teller txs
+        fi
         eol=$'\n'; read -a query <<< ${tmp//$eol/ }
     done
     end_time=$(date +%s)
 
     # Make sure all payments have been sent!
-    if [ 0 -lt $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") ]; then
+    if [ 0 -lt $(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) ]; then
         echo "$(date) - Serious Error!!! Unfulfilled TXs in the DB after sending payments!" | sudo tee -a $LOG
         send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
         sudo touch /etc/send_payments_error_flag
@@ -514,7 +511,8 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     echo "$ENTRY" | sudo tee -a $LOG
 
     # Send Email
-    t_txids=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL;")
+    t_txids=$(sqlite3 -separator '<br>' $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL;")
+    t_txids="${t_txids}<br>$(sqlite3 -separator '<br>' $SQ3DBNAME "SELECT DISTINCT txid FROM teller_txs WHERE block_height IS NULL AND txid IS NOT NULL;")"
     time=$((end_time - start_time))
     MESSAGE=$(cat << EOF
         <b>$(date) - All Payments have been completed successfully</b><br>
@@ -534,8 +532,8 @@ EOF
     send_email "Satoshi" "${ADMINISTRATOREMAIL}" "All Payments have been completed successfully" "$MESSAGE"
 
 elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are confirmed in the blockchain; update the DB
-    # Get all the txs that have a valid TXID without a block height
-    tmp=$(sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL;")
+    # Get all the txs (including teller_txs) that have a valid TXID without a block height
+    tmp=$(sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL"; sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM teller_txs WHERE block_height IS NULL AND txid IS NOT NULL")
     eol=$'\n'; read -a query <<< ${tmp//$eol/ }
 
     if [ -z "${tmp}" ]; then
@@ -550,11 +548,15 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
 
         CONFIRMATIONS=$(echo $tmp | jq '.confirmations')
         if [ $CONFIRMATIONS -ge "6" ]; then
-            sudo sqlite3 $SQ3DBNAME "UPDATE txs SET block_height = $(echo $tmp | jq '.blockheight') WHERE txid = \"${query[i]}\";"
+            sudo sqlite3 $SQ3DBNAME "UPDATE txs SET block_height = $(echo $tmp | jq '.blockheight') WHERE txid = \"${query[i]}\""
+            sudo sqlite3 $SQ3DBNAME "UPDATE teller_txs SET block_height = $(echo $tmp | jq '.blockheight') WHERE txid = \"${query[i]}\""
             confirmed=$((confirmed + 1))
 
             # Query DB
-            echo "Confirmed:"; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE txid = \"${query[i]}\";"; echo ""
+            echo "Confirmed:"
+            sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM txs WHERE txid = \"${query[i]}\""
+            sqlite3 $SQ3DBNAME ".mode columns" "SELECT tx_id AS 'Teller TXs', * FROM teller_txs WHERE txid = \"${query[i]}\""
+            echo ""
         else
             echo "NOT Confirmed! TXID \"${query[i]}\" has $CONFIRMATIONS confirmations (needs 6 or more)."; echo ""
         fi
@@ -1268,11 +1270,6 @@ fi
 #sudo sed -i '$d' /var/tmp/payout.emails
 
 ##################### What's the next thing most critical #######################################
-#3)
-#    add it to
-#        payouts
-#        send
-#        confirm
 #        email - send that summary here to adminstrator
 
 #    **Administrative Emails that show who owes what and how much. Payouts, send, confirm, prepare emails...     then send emails.... Nope, I think it would be it's own email system.
@@ -1282,15 +1279,3 @@ fi
 #4) Create a sendout email routine that can capture market data
 
 #5) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
-
-
-    
-################################################
-######################### Remove the 1440
-#todos####what about the case where all tellers are sold out???? and there's nothing to add. We have an error
-#SQ3DBNAME=~/payouts.db.development
-#echo $SQ3DBNAME
-
-#sudo sqlite3 $SQ3DBNAME "DELETE FROM payouts WHERE epoch_period = 113"
-#sudo sqlite3 $SQ3DBNAME "DELETE FROM txs WHERE epoch_period = 113"
-#sudo sqlite3 $SQ3DBNAME "DELETE FROM teller_txs WHERE epoch_period = 113"
