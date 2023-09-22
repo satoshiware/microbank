@@ -37,10 +37,10 @@ UNLOCK="$BTC -rpcwallet=bank walletpassphrase $(sudo cat /root/passphrase) 600"
 # Database Location and development mode
 SQ3DBNAME=/var/lib/payouts.db
 LOG=/var/log/payout.log
-SQ3DBNAME=~/payouts.db.development # This line is automatically commented out during the --install
+SQ3DBNAME=~/tmp_payouts.db.development # This line is automatically commented out during the --install
 if [[ $SQ3DBNAME == *"development"* && ! ($1 == "-i" || $1 == "--install") ]]; then
     LOG=~/log.payout.development
-    if [ ! -f ~/payouts.db.development ]; then sudo cp /var/lib/payouts.db ~/payouts.db.development; fi
+    if [ ! -f ~/tmp_payouts.db.development ]; then sudo cp /var/lib/payouts.db ~/tmp_payouts.db.development; fi
     echo ""; read -p "You are in development mode! Press any enter to continue ..."; echo ""
 fi
 
@@ -92,6 +92,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                 Note: There can only be one active address at a time per account_id. The active old address (if any) is automatically deprecated.
 
 ----- Email -----------------------------------------------------------------------------------------------------------------
+      --email-banker-summary    Send summary of tellers to the administrator (Satoshi) and manager (Bitcoin CEO)
       --email-core-customer     Send payout email to "core customer"
             Parameters: NAME  EMAIL  AMOUNT  TOTAL  HASHRATE  CONTACTPHONE  CONTACTEMAIL  COINVALUESATS  USDVALUESATS  ADDRESSES  TXIDS  (EMAIL_ADMIN_IF_SET)
       --email-teller-summary     Send summary to a Teller (Level 1) Hub/Node
@@ -113,7 +114,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
             exit 0
         fi
     fi
-    sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=~\/payouts.db.development/d' | sudo tee /usr/local/sbin/payouts > /dev/null
+    sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=~\/tmp_payouts.db.development/d' | sudo tee /usr/local/sbin/payouts > /dev/null
     sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/payouts # Make it so this code won't run again in the newly installed script.
     sudo chmod +x /usr/local/sbin/payouts
 
@@ -137,6 +138,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
         read -p "Number of outputs for each send transaction (e.g. 10): "; echo "TX_BATCH_SZ=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
 
         read -p "Administrator email (e.g. your_email@somedomain.com): "; echo "ADMINISTRATOREMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Manager email (e.g. friends_email@somedomain.com): "; echo "MANAGER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
     else
         echo "The environment file \"/etc/default/payouts.env\" already exits."
     fi
@@ -663,6 +665,9 @@ EOF
         echo "payouts --email-teller-summary ${contact_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
     done
 
+    # Add command to send out banker summary on the list (payout.emails)
+    echo "payouts --email-banker-summary" | sudo tee -a /var/tmp/payout.emails
+
     # Set the notified flag
     sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
 
@@ -980,6 +985,43 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
     sqlite3 $SQ3DBNAME "SELECT * FROM teller_address_book WHERE account_id = $act_id"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
+    MESSAGE="Hi Satoshi,<br><br>Here is a summary about each teller.<br>"
+    MESSAGE="$MESSAGE<br><hr><br><b>Unpaid:</b><br><table border="1"><tr><th>Name</th><th>Mining Power (GH/s)</th><th>Time (Established)</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
+            '<td>' || (quantity * $HASHESPERCONTRACT / 1000000000)  || '</td>',
+            '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
+            '</tr>'
+        FROM teller_sales
+        WHERE status IS NULL OR status = 0
+EOF
+);  MESSAGE="$MESSAGE</table>"
+
+    # Some details about each teller
+    MESSAGE="$MESSAGE<br><br><b>Basic Information:</b>"
+    MESSAGE="$MESSAGE<table border="1"><tr><th>Name</th><th>TOTAL Mining Power (GH/s)</th><th>SOLD Mining Power (GH/s)</th><th>Total Customers</th><th>Payout Address</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '')) || '</td>',
+            '<td>' || COALESCE(((SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
+            '<td>' || ((SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = accounts.account_id)) * $HASHESPERCONTRACT / 1000000000)  || '</td>',
+            '<td>' || (SELECT COUNT(*) FROM accounts sub WHERE contact = accounts.account_id) || '</td>',
+            '<td>' || COALESCE((SELECT micro_address FROM teller_address_book WHERE active = 1 AND account_id = accounts.account_id), '') || '</td>',
+            '</tr>'
+        FROM accounts
+        WHERE disabled = 0 AND EXISTS(SELECT * FROM accounts sub WHERE contact = accounts.account_id)
+EOF
+    ); MESSAGE="$MESSAGE</table>"
+
+    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
+    send_email "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
+
 elif [[ $1 = "--email-master-summary" ]]; then # Send sub account summary to a master
     MASTER_EMAIL=$2; EMAIL_ADMIN_IF_SET=$3
 
@@ -1034,7 +1076,73 @@ elif [[ $1 = "--email-teller-summary" ]]; then # Send summary to a Teller (Level
 EOF
     )
 
-    MESSAGE="Hi $NAME,<br><br> Here are all your contract details!<br><br><hr>"
+
+
+
+
+
+
+
+
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    MESSAGE="Hi $NAME,<br><br>This email contains a summary of all your contracts!<br><br>"
+    MESSAGE="${MESSAGE}Your personal bulk contract (teller) payout address is \"   $$$$$$$$$$$   \"<br><br>"
+    MESSAGE="${MESSAGE}You currently have <b><u>?????????0 GH/s of UNPAID</u></b> hash power.<br><br>"
+    MESSAGE="${MESSAGE}You currently have <b><u>?????????0 GH/s of UNSOLD</u></b> hash power.<br><br>"
+    MESSAGE="$MESSAGE<br><br><hr>"
+
+
+    OWE=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND ???????????"
+    PURCHASED=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND ???????????"
+    SOLD=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND ???????????"
+
+
+
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+
+            '<td>' || COALESCE(((SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
+
+            '<td>' || ((SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = accounts.account_id)) * $HASHESPERCONTRACT / 1000000000)  || '</td>',
+
+            '<td>' || (SELECT COUNT(*) FROM accounts sub WHERE contact = accounts.account_id) || '</td>',
+            '<td>' || COALESCE((SELECT micro_address FROM teller_address_book WHERE active = 1 AND account_id = accounts.account_id), '') || '</td>',
+            '</tr>'
+        FROM accounts
+        WHERE disabled = 0 AND EXISTS(SELECT * FROM accounts sub WHERE contact = accounts.account_id)
+EOF
+    ); MESSAGE="$MESSAGE</table>"
+
+    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
+    send_email "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
+
+
+
+
+
+
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # Accounts
     MESSAGE="$MESSAGE<br><br><b>Accounts:</b><br><table border="1"><tr><th>Name</th><th>Master</th><th>Email</th><th>Phone</th><th>Total Received</th></tr>"
@@ -1269,13 +1377,21 @@ fi
 #tail -n 1 /var/tmp/payout.emails
 #sudo sed -i '$d' /var/tmp/payout.emails
 
-##################### What's the next thing most critical #######################################
-#        email - send that summary here to adminstrator
 
-#    **Administrative Emails that show who owes what and how much. Payouts, send, confirm, prepare emails...     then send emails.... Nope, I think it would be it's own email system.
+#SQ3DBNAME=/var/lib/payouts.db
+#BTCUSD=$(curl https://api.coinbase.com/v2/prices/BTC-USD/spot | jq '.data.amount') # Coinbase BTC/USD Price
+#BTCUSD=${BTCUSD//\"/}
+#USDSATS=$(awk -v btcusd=$BTCUSD 'BEGIN {printf("%.3f\n", 100000000 / btcusd)}')
+#read -p "What is today's price (in $ATS)? " SATRATE
+#sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = $SATRATE WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
+
+##################### What's the next thing most critical #######################################)
 #    Update teller/node LVL1 summary to include how much they own.
-#    Auto add sale when they've exceeded the amount they've purchased.
+#    Auto add sale when they've exceeded the amount they've purchased. Send email to teller letting them know.
 
-#4) Create a sendout email routine that can capture market data
+# Create a sendout email routine that can capture market data
+# Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
+# Let the user know they owe some money
+# Automate the process of sending out the payments
 
-#5) Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
+#### a much better teller interface/ experience updating the database
