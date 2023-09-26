@@ -132,6 +132,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
         read -p "Number of blocks before each difficulty adjustment (e.g. 1440): "; echo "EPOCHBLOCKS=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
         read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
         read -p "Hashes per second for each contract (e.g. 10000000000): "; echo "HASHESPERCONTRACT=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Teller's bulk purchase size (e.g. 10): "; echo "TELLERBULKPURCHASE=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
         read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
         read -p "Max number of payout periods for this microcurrency (e.g. 910): "; echo "MAX_EPOCH_PERIOD=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
 
@@ -415,10 +416,18 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     fi
 
     # If there are no payments to process then just exit
-    total_payment=$(($(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM teller_txs WHERE txid IS NULL")))
+    total_payment=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL")
     if [ -z $total_payment ]; then
-        echo "$(date) - There are currently no payments to process." | sudo tee -a $LOG
-        exit 0
+        total_payment=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM teller_txs WHERE txid IS NULL")
+        if [ -z $total_payment ]; then
+            echo "$(date) - There are currently no payments to process." | sudo tee -a $LOG
+            exit 0
+        fi
+    else
+        tmp_teller=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM teller_txs WHERE txid IS NULL")
+        if [ ! -z $tmp_teller ]; then
+            total_payment=$((total_payment + tmp_teller))
+        fi
     fi
 
     # Find out if there is enough money in the bank to execute payments
@@ -513,8 +522,9 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     echo "$ENTRY" | sudo tee -a $LOG
 
     # Send Email
-    t_txids=$(sqlite3 -separator '<br>' $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL;")
-    t_txids="${t_txids}<br>$(sqlite3 -separator '<br>' $SQ3DBNAME "SELECT DISTINCT txid FROM teller_txs WHERE block_height IS NULL AND txid IS NOT NULL;")"
+    t_txids=$(sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL")
+    t_txids="${t_txids}<br>$(sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM teller_txs WHERE block_height IS NULL AND txid IS NOT NULL;")"
+    eol=$'\n'; t_txids=${t_txids//$eol/<br>}
     time=$((end_time - start_time))
     MESSAGE=$(cat << EOF
         <b>$(date) - All Payments have been completed successfully</b><br>
@@ -733,7 +743,7 @@ elif [[ $1 = "--teller-addr" ]]; then # Show all Teller Addresses followed by ju
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--add-user" ]]; then # Add a new account
-    CONTACT_EMAIL="${2,,}"; USER_EMAIL="${3,,}"; USER_PHONE="${4,,}"; FIRST_NAME="${5,,}"; LAST_NAME=$6; PREFERRED_NAME="${7,,}"; MASTER_EMAIL="${8,,}"
+    CONTACT_EMAIL="${2,,}"; USER_EMAIL="${3,,}"; USER_PHONE="${4,,}"; FIRST_NAME="$5"; LAST_NAME=$6; PREFERRED_NAME="${7,,}"; MASTER_EMAIL="${8,,}"
 
     # Very basic input checking
     if [[ -z $CONTACT_EMAIL || -z $USER_EMAIL || -z $USER_PHONE || -z $FIRST_NAME || -z $LAST_NAME || -z $PREFERRED_NAME || -z $MASTER_EMAIL ]]; then
@@ -749,7 +759,7 @@ elif [[ $1 = "--add-user" ]]; then # Add a new account
 
     # Check for correct formats
     if [[ ! "$USER_EMAIL" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then echo "Error! Invalid Email!"; exit 1; fi
-    if [[ ! "$FIRST_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid First Name!"; exit 1; fi
+    if [[ ! "$FIRST_NAME" =~ ^[a-zA-Z]+$ ]]; then echo "Error! Invalid First Name!"; exit 1; fi
     if [[ ! "$LAST_NAME" =~ ^[a-zA-Z-]+$ ]]; then echo "Error! Invalid Last Name!"; exit 1; fi
     if [[ ! "$PREFERRED_NAME" =~ ^[a-z]+$ ]]; then echo "Error! Invalid Preferred Name!"; exit 1; fi
     if [[ "$USER_PHONE" != "null" && ! "$USER_PHONE" =~ ^[0-9]{3}-[0-9]{3}-[0-9]{4}$ ]]; then echo "Error! Invalid Phone Number (Format)!"; exit 1; fi
@@ -915,6 +925,25 @@ EOF
     # Query the DB
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE account_id = $ACCOUNT_ID"
 
+    # Let's see if the teller needs to make another bulk purchase
+    TOTAL=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
+    SOLD=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active = 1 AND (SELECT contact FROM accounts WHERE account_id = contracts.account_id) = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
+        # NOTE: "$SOLD" is the qty of contracts that have been sold to customers AND allocated with the "--add-contr". Non allocated contracts will not count.
+    if [[ $((TOTAL - SOLD)) -lt 0 ]]; then
+        NAME=$(sqlite3 $SQ3DBNAME "SELECT (CASE WHEN accounts.preferred_name IS NULL THEN accounts.first_name ELSE accounts.preferred_name END) FROM accounts WHERE account_id = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
+        EMAIL=$(sqlite3 $SQ3DBNAME "SELECT email FROM accounts WHERE account_id = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
+
+        # Add bulk (teller) sales
+        while [[ $((TOTAL - SOLD)) -lt 0 ]]; do
+            $0 --add-sale $EMAIL $TELLERBULKPURCHASE TELLER_SALE
+            TOTAL=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
+            echo "$(date) - Bulk teller sale was made (automatically) for $NAME ($EMAIL)!" | sudo tee -a $LOG
+        done
+
+        # Send email
+        send_email "$NAME" "$EMAIL" "Bulk Hash Rate Purchase" "Hi $NAME,<br><br>Congratulations!!! You have purchased (automatically) some more hash rate (in bulk) to cover all your core customers!<br><br>At your convienence, negotiate payment (in SATS please) with your Lvl2 (Banker) Hub"
+    fi
+
 elif [[ $1 = "--deliver-contr" ]]; then # Mark a contract as delivered
     MICRO_ADDRESS=$2
 
@@ -985,8 +1014,29 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
     sqlite3 $SQ3DBNAME "SELECT * FROM teller_address_book WHERE account_id = $act_id"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+elif [[ $1 = "--send-prepared-emails" ]]; then # Sends summary of tellers to the administrator and manager
+     # Check if file "payout.emails" exists or if it is empty
+    if [ -f /var/tmp/payout.emails ]; then
+        if [ ! -s /var/tmp/payout.emails ]; then echo "File \"/var/tmp/payout.emails\" is empty!"; exit; fi # Check if file is empty
+    else
+        echo "File \"/var/tmp/payout.emails\" did not exist... 'till now!"
+        sudo touch /var/tmp/payout.emails
+        exit
+    fi
+
+    # Grab market data!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    # Sending Emails NOW!!
+    sudo mv /var/tmp/payout.emails /var/tmp/payout.emails.bak
+    sudo touch /var/tmp/payout.emails
+    while read -r line; do
+        $line
+    done < /var/tmp/payout.emails.bak
+
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
-    MESSAGE="Hi Satoshi,<br><br>Here is a summary about each teller.<br>"
+    MESSAGE="Hi Satoshi,<br><br>Here is a summary about each teller.<br><br>"
+    MESSAGE="${MESSAGE}<i>Note: Any unsold hash power by your tellers is paid out to their addresses.<br>"
+    MESSAGE="${MESSAGE}Also, this unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.</i><br>"
     MESSAGE="$MESSAGE<br><hr><br><b>Unpaid:</b><br><table border="1"><tr><th>Name</th><th>Mining Power (GH/s)</th><th>Time (Established)</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
@@ -1075,77 +1125,26 @@ elif [[ $1 = "--email-teller-summary" ]]; then # Send summary to a Teller (Level
         WHERE email = '${CONTACT_EMAIL,,}'
 EOF
     )
+    ADDRESS=$(sqlite3 $SQ3DBNAME "SELECT micro_address FROM teller_address_book WHERE active = 1 AND account_id = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
+    UNPAID=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND account_id = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
+    TOTAL=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE status != 3 AND account_id = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
+    SOLD=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM contracts WHERE active = 1 AND (SELECT contact FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
 
-
-
-
-
-
-
-
-
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    if [ -z $ADDRESS ]; then ADDRESS="You Need To Set One!!!"; fi
+    if [ -z $UNPAID ]; then UNPAID=0; fi
+    if [ -z $TOTAL ]; then TOTAL=0; SOLD=0; fi
+    if [ -z $SOLD ]; then SOLD=0; fi
 
     MESSAGE="Hi $NAME,<br><br>This email contains a summary of all your contracts!<br><br>"
-    MESSAGE="${MESSAGE}Your personal bulk contract (teller) payout address is \"   $$$$$$$$$$$   \"<br><br>"
-    MESSAGE="${MESSAGE}You currently have <b><u>?????????0 GH/s of UNPAID</u></b> hash power.<br><br>"
-    MESSAGE="${MESSAGE}You currently have <b><u>?????????0 GH/s of UNSOLD</u></b> hash power.<br><br>"
-    MESSAGE="$MESSAGE<br><br><hr>"
-
-
-    OWE=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND ???????????"
-    PURCHASED=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND ???????????"
-    SOLD=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND ???????????"
-
-
-
-    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
-.separator ''
-        SELECT
-            '<tr>',
-
-            '<td>' || COALESCE(((SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
-
-            '<td>' || ((SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = accounts.account_id)) * $HASHESPERCONTRACT / 1000000000)  || '</td>',
-
-            '<td>' || (SELECT COUNT(*) FROM accounts sub WHERE contact = accounts.account_id) || '</td>',
-            '<td>' || COALESCE((SELECT micro_address FROM teller_address_book WHERE active = 1 AND account_id = accounts.account_id), '') || '</td>',
-            '</tr>'
-        FROM accounts
-        WHERE disabled = 0 AND EXISTS(SELECT * FROM accounts sub WHERE contact = accounts.account_id)
-EOF
-    ); MESSAGE="$MESSAGE</table>"
-
-    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
-    send_email "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
-
-
-
-
-
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    MESSAGE="${MESSAGE}Your personal bulk contract (teller) payout address: <b><u>$ADDRESS</u></b><br>"
+    MESSAGE="${MESSAGE}You currently have <b><u>$UNPAID GH/s of UNPAID</u></b> bulk hash power.<br>"
+    MESSAGE="${MESSAGE}There is <b><u>$((TOTAL - SOLD)) GH/s of UNSOLD</u></b> hash power for your current and future core customers.<br><br>"
+    MESSAGE="${MESSAGE}<i>Note: Any unsold hash power is paid out to your teller address.<br>"
+    MESSAGE="${MESSAGE}Also, unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.</i><br>"
+    MESSAGE="$MESSAGE<br><hr>"
 
     # Accounts
-    MESSAGE="$MESSAGE<br><br><b>Accounts:</b><br><table border="1"><tr><th>Name</th><th>Master</th><th>Email</th><th>Phone</th><th>Total Received</th></tr>"
+    MESSAGE="$MESSAGE<br><b>Accounts:</b><br><table border="1"><tr><th>Name</th><th>Master</th><th>Email</th><th>Phone</th><th>Total Received</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
         SELECT
@@ -1386,12 +1385,13 @@ fi
 #sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = $SATRATE WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
 
 ##################### What's the next thing most critical #######################################)
-#    Update teller/node LVL1 summary to include how much they own.
-#    Auto add sale when they've exceeded the amount they've purchased. Send email to teller letting them know.
-
-# Create a sendout email routine that can capture market data
-# Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
 # Let the user know they owe some money
+# Create a sendout email routine that can capture market data
+# Backup system
 # Automate the process of sending out the payments
 
+
+# Write a routine that sees if any of the addresses have been opened and mark the DB accordinally. Also, how much does it have and how does it compare. Send adminstrative email.
+
 #### a much better teller interface/ experience updating the database
+### The email script needs a logging system
