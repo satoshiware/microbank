@@ -92,6 +92,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                 Note: There can only be one active address at a time per account_id. The active old address (if any) is automatically deprecated.
 
 ----- Email -----------------------------------------------------------------------------------------------------------------
+      --send-prepared-emails    Sends all the prepared emails in the file "/var/tmp/payout.emails"
       --email-banker-summary    Send summary of tellers to the administrator (Satoshi) and manager (Bitcoin CEO)
       --email-core-customer     Send payout email to "core customer"
             Parameters: NAME  EMAIL  AMOUNT  TOTAL  HASHRATE  CONTACTPHONE  CONTACTEMAIL  COINVALUESATS  USDVALUESATS  ADDRESSES  TXIDS  (EMAIL_ADMIN_IF_SET)
@@ -1014,7 +1015,7 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
     sqlite3 $SQ3DBNAME "SELECT * FROM teller_address_book WHERE account_id = $act_id"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-elif [[ $1 = "--send-prepared-emails" ]]; then # Sends summary of tellers to the administrator and manager
+elif [[ $1 = "--send-prepared-emails" ]]; then # Sends all the prepared emails in the file "/var/tmp/payout.emails"
      # Check if file "payout.emails" exists or if it is empty
     if [ -f /var/tmp/payout.emails ]; then
         if [ ! -s /var/tmp/payout.emails ]; then echo "File \"/var/tmp/payout.emails\" is empty!"; exit; fi # Check if file is empty
@@ -1024,13 +1025,20 @@ elif [[ $1 = "--send-prepared-emails" ]]; then # Sends summary of tellers to the
         exit
     fi
 
-    # Grab market data!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # Get market data
+    old_satrate=$(sqlite3 $SQ3DBNAME "SELECT satrate FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) - 1")
+    SATRATE=$(market --getmicrorate $old_satrate)
+    USDSATS=$(market --getusdrate)
+    if [[ -z $SATRATE || -z $USDSATS ]]; then echo "Error! Could not get market rates!"; exit 1; fi
+    sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = $SATRATE WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) AND satrate IS NULL"
 
     # Sending Emails NOW!!
+    echo "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!" | sudo tee -a $LOG
+    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
     sudo mv /var/tmp/payout.emails /var/tmp/payout.emails.bak
     sudo touch /var/tmp/payout.emails
     while read -r line; do
-        $line
+        eval "$line"
     done < /var/tmp/payout.emails.bak
 
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
@@ -1360,38 +1368,13 @@ else
     echo "Run script with \"--help\" flag"
 fi
 
-
-##################################
-#SQ3DBNAME=/var/lib/payouts.db
-#LOG=/var/log/payout.log
-# echo $SQ3DBNAME
-#    # Get btc/usd exchange rates from populat exchanges
-#    BTCUSD=$(curl https://api.coinbase.com/v2/prices/BTC-USD/spot | jq '.data.amount') # Coinbase BTC/USD Price
-#   #BTCUSD=$(curl "https://api.kraken.com/0/public/Ticker?pair=BTCUSD" | jq '.result.XXBTZUSD.a[0]') # Kraken BTC/USD Price
-#    BTCUSD=${BTCUSD//\"/}
-#    USDSATS=$(awk -v btcusd=$BTCUSD 'BEGIN {printf("%.3f\n", 100000000 / btcusd)}')
-
-#    read -p "What is today's price (in $ATS) for ???????????????????????? : " SATRATE
-# sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = 245 WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-#tail -n 1 /var/tmp/payout.emails
-#sudo sed -i '$d' /var/tmp/payout.emails
-
-
-#SQ3DBNAME=/var/lib/payouts.db
-#BTCUSD=$(curl https://api.coinbase.com/v2/prices/BTC-USD/spot | jq '.data.amount') # Coinbase BTC/USD Price
-#BTCUSD=${BTCUSD//\"/}
-#USDSATS=$(awk -v btcusd=$BTCUSD 'BEGIN {printf("%.3f\n", 100000000 / btcusd)}')
-#read -p "What is today's price (in $ATS)? " SATRATE
-#sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = $SATRATE WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts);"
-
 ##################### What's the next thing most critical #######################################)
+# market.sh could use a little more work
+
 # Let the user know they owe some money
-# Create a sendout email routine that can capture market data
 # Backup system
 # Automate the process of sending out the payments
-
 
 # Write a routine that sees if any of the addresses have been opened and mark the DB accordinally. Also, how much does it have and how does it compare. Send adminstrative email.
 
 #### a much better teller interface/ experience updating the database
-### The email script needs a logging system
