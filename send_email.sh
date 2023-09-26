@@ -14,6 +14,23 @@ if [[ $1 = "--install" ]]; then
     sudo cat $0 | sudo tee /usr/local/sbin/send_email > /dev/null
     sudo chmod +x /usr/local/sbin/send_email
 
+    # Prepare for send_email logging
+    sudo touch /var/log/send_email.log
+    sudo chown root:root /var/log/send_email.log
+    sudo chmod 644 /var/log/send_email.log
+    cat << EOF | sudo tee /etc/logrotate.d/send_email
+/var/log/send_email.log {
+$(printf '\t')create 644 root root
+$(printf '\t')monthly
+$(printf '\t')rotate 6
+$(printf '\t')compress
+$(printf '\t')delaycompress
+$(printf '\t')postrotate
+$(printf '\t')endscript
+}
+EOF
+
+    # Prepare for send_email environment file
     if [ ! -f /etc/default/send_email.env ]; then
         read -p "API address (e.g. \"https://api.brevo.com/v3/smtp/email\"): "; echo "API=\"$REPLY\"" | sudo tee /etc/default/send_email.env > /dev/null
         read -p "API key to send email (e.g. \"xkeysib-05...76-9...1\"): "; echo "KEY=\"$REPLY\"" | sudo tee -a /etc/default/send_email.env > /dev/null
@@ -27,6 +44,7 @@ if [[ $1 = "--install" ]]; then
 fi
 
 # Load envrionment variables and then verify
+LOG=/var/log/send_email.log
 if [[ -f /etc/default/send_email.env ]]; then
     source /etc/default/send_email.env
     if [[ -z $API || -z $KEY || -z $SENDER_NAME || -z $SENDER_EMAIL ]]; then
@@ -69,9 +87,8 @@ generate_post_data()
 EOF
 }
 
-curl --request POST \
-  --url $API \
-  --header 'accept: application/json' \
-  --header "api-key: ${KEY}" \
-  --header 'content-type: application/json' \
-  --data "$(generate_post_data)"
+# Sending email
+RESPONSE=$(curl --request POST --url $API --header 'accept: application/json' --header "api-key: ${KEY}" --header 'content-type: application/json' --data "$(generate_post_data)")
+
+# Log entry
+echo "$(date) - $RESPONSE; Name=\"$NAME\"; Email=\"$EMAIL\"; Subject=\"$SUBJECT\"; Message=\"${MESSAGE:0:100}...\"" | sudo tee -a $LOG
