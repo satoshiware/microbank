@@ -82,7 +82,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                     If TELLER is present (can be anything) then update is directed to the teller_sales table (Trial Run not available in this table).
       --add-contr       Add a contract
             Parameters: USER_EMAIL  SALE_ID  QTY  MICRO_ADDRESS
-      --update-contr    Mark every contract with this address as delivered
+      --deliver-contr   Mark every contract with this address as delivered
             Parameters: MICRO_ADDRESS
       --disable-contr   Disable a contract
             Parameters: MICRO_ADDRESS  CONTRACT_ID
@@ -1378,3 +1378,6 @@ fi
 # Write a routine that sees if any of the addresses have been opened and mark the DB accordinally. Also, how much does it have and how does it compare. Send adminstrative email.
 
 #### a much better teller interface/ experience updating the database
+
+###epoch has an error when there are no teller's to payout. 
+	# "Error: near line 8: near ";": syntax error
