@@ -54,6 +54,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -s, --send        Send the Money
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
       -m, --email-prep  Prepare all core customer notification emails for the latest epoch
+      -n, --send-email  Sends all the prepared emails in the file "/var/tmp/payout.emails"
 
 ----- Generic Database Queries ----------------------------------------------------------------------------------------------
       -d, --dump        Show all the contents of the database
@@ -63,45 +64,45 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -x, --txs         Show all the transactions associated with the latest payout; Optional Parameter: TELLER
       -p, --payouts     Show all payouts thus far
       -t, --totals      Show total amounts for each contract (identical addresses are combinded)
-      --teller-addr     Show all Teller Addresses followed by just the active ones
+      -z, --tel-addr    Show all Teller Addresses followed by just the active ones
 
 ----- Admin/Root Interface --------------------------------------------------------------------------------------------------
       --add-user        Add a new account
-            Parameters: CONTACT_EMAIL  USER_EMAIL  USER_PHONE**  FIRST_NAME  LAST_NAME*  PREFERRED_NAME*  MASTER_EMAIL*
-                Note*: LAST_NAME, PREFERRED_NAME, and MASTER_EMAIL are options
-                Note**: USER_PHONE is optional if MASTER_EMAIL was provided
+                        Parameters: CONTACT_EMAIL  USER_EMAIL  USER_PHONE**  FIRST_NAME  LAST_NAME*  PREFERRED_NAME*  MASTER_EMAIL*
+                            Note*: LAST_NAME, PREFERRED_NAME, and MASTER_EMAIL are options
+                            Note**: USER_PHONE is optional if MASTER_EMAIL was provided
       --disable-user    Disable an account (also disables associated contracts, but not the sales)
-            Parameters: USER_EMAIL
+                        Parameters: USER_EMAIL
       --add-sale        Add a sale
-            Parameters: USER_EMAIL  QTY  (TELLER)
-                Note: The USER_EMAIL is the one paying, but the resulting contracts can be assigned to anyone (i.e. Sales don't have to match Contracts).
-                    If TELLER is present (can be anything) then the new addition is directed to the teller_sales table.
+                        Parameters: USER_EMAIL  QTY  (TELLER)
+                            Note: The USER_EMAIL is the one paying, but the resulting contracts can be assigned to anyone (i.e. Sales don't have to match Contracts).
+                            Note: If TELLER is present (can be anything) then the new addition is directed to the teller_sales table.
       --update-sale     Update sale status
-            Parameters: USER_EMAIL  SALE_ID  STATUS  (TELLER)
-                Note: STATUS  =  0 (Not Paid),  1 (Paid),  2 (Trial Run),  3 (Disabled)
-                    If TELLER is present (can be anything) then update is directed to the teller_sales table (Trial Run not available in this table).
+                        Parameters: USER_EMAIL  SALE_ID  STATUS  (TELLER)
+                            Note: STATUS  =  0 (Not Paid),  1 (Paid),  2 (Trial Run),  3 (Disabled)
+                            Note: If TELLER is present (can be anything) then update is directed to the teller_sales table (Trial Run not available in this table).
       --add-contr       Add a contract
-            Parameters: USER_EMAIL  SALE_ID  QTY  MICRO_ADDRESS
+                        Parameters: USER_EMAIL  SALE_ID  QTY  MICRO_ADDRESS
       --deliver-contr   Mark every contract with this address as delivered
-            Parameters: MICRO_ADDRESS
+                        Parameters: MICRO_ADDRESS
       --disable-contr   Disable a contract
-            Parameters: MICRO_ADDRESS  CONTRACT_ID
-                Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
+                        Parameters: MICRO_ADDRESS  CONTRACT_ID
+                            Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
       --add-teller-addr Add (new) address to teller address book
-            Parameters: EMAIL  MICRO_ADDRESS
-                Note: There can only be one active address at a time per account_id. The active old address (if any) is automatically deprecated.
+                        Parameters: EMAIL  MICRO_ADDRESS
+                            Note: There can only be one active address at a time per account_id. The active old address (if any) is automatically deprecated.
 
 ----- Email -----------------------------------------------------------------------------------------------------------------
-      --send-prepared-emails    Sends all the prepared emails in the file "/var/tmp/payout.emails"
       --email-banker-summary    Send summary of tellers to the administrator (Satoshi) and manager (Bitcoin CEO)
       --email-core-customer     Send payout email to "core customer"
-            Parameters: NAME  EMAIL  AMOUNT  TOTAL  HASHRATE  CONTACTPHONE  CONTACTEMAIL  COINVALUESATS  USDVALUESATS  ADDRESSES  TXIDS  (EMAIL_ADMIN_IF_SET)
-      --email-teller-summary     Send summary to a Teller (Level 1) Hub/Node
-            Parameters: EMAIL  (EMAIL_EXECUTIVE)
-                Note: If "EMAIL_EXECUTIVE" is null (i.e. left blank), The Teller's "EMAIL" receives the summary; otherwise, the administrator will unless...
-                        the "EMAIL_EXECUTIVE" is a valid email then that email will receive the summary.
+                                Parameters: NAME; EMAIL; AMOUNT; TOTAL; HASHRATE; CONTACTPHONE; CONTACTEMAIL; COINVALUESATS;
+                                            USDVALUESATS; ADDRESSES; TXIDS; (EMAIL_ADMIN_IF_SET)
+      --email-teller-summary    Send summary to a Teller (Level 1) Hub/Node
+                                Parameters: EMAIL  (EMAIL_EXECUTIVE)
+                                    Note: If "EMAIL_EXECUTIVE" is null (i.e. left blank), The Teller's "EMAIL" receives the summary; otherwise,
+                                        the administrator will unless the "EMAIL_EXECUTIVE" is a valid email then that email will receive the summary.
       --email-master-summary    Send sub account(s) summary to a master
-            Parameters: EMAIL  (EMAIL_ADMIN_IF_SET)
+                                Parameters: EMAIL  (EMAIL_ADMIN_IF_SET)
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     # Installing the payouts script
@@ -326,7 +327,7 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
                 qty_teller_contracts=$((qty_teller_contracts + ARR_QTY_PURCHASED[i] - SOLD))
             fi
         done
-        SQL_TELLER_VALUES="${SQL_TELLER_VALUES%?}" # Remove the last character (',')
+        if [[ ! -z $SQL_TELLER_VALUES ]]; then SQL_TELLER_VALUES="INSERT INTO teller_txs (account_id, epoch_period, amount) VALUES ${SQL_TELLER_VALUES%?};"; fi # Notice: "${SQL_TELLER_VALUES%?}" removes the last character (',')
 
         # Insert into database
         echo "$(date) - Attempting to insert next epoch (Number $NEXTEPOCH) into DB" | sudo tee -a $LOG
@@ -338,8 +339,7 @@ elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch an
         INSERT INTO txs (contract_id, epoch_period, amount)
         VALUES $SQL_VALUES;
         COMMIT;
-        INSERT INTO teller_txs (account_id, epoch_period, amount)
-        VALUES $SQL_TELLER_VALUES;
+        $SQL_TELLER_VALUES
 EOF
 
         # Query DB
@@ -739,7 +739,7 @@ elif [[ $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each cont
 EOF
     echo ""
 
-elif [[ $1 = "--teller-addr" ]]; then # Show all Teller Addresses followed by just the active ones
+elif [[ $1 = "--tel-addr" ]]; then # Show all Teller Addresses followed by just the active ones
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_address_book ORDER BY active"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1015,7 +1015,7 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
     sqlite3 $SQ3DBNAME "SELECT * FROM teller_address_book WHERE account_id = $act_id"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-elif [[ $1 = "--send-prepared-emails" ]]; then # Sends all the prepared emails in the file "/var/tmp/payout.emails"
+elif [[ $1 = "--send-email" ]]; then # Sends all the prepared emails in the file "/var/tmp/payout.emails"
      # Check if file "payout.emails" exists or if it is empty
     if [ -f /var/tmp/payout.emails ]; then
         if [ ! -s /var/tmp/payout.emails ]; then echo "File \"/var/tmp/payout.emails\" is empty!"; exit; fi # Check if file is empty
@@ -1274,6 +1274,7 @@ EOF
 elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core customer
     NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; LATEST_EPOCH_PERIOD=${11}; ADDRESSES=${12}; TXIDS=${13}; EMAIL_ADMIN_IF_SET=${14}
 
+	# Input checking
     if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $CONTACTPHONE || -z $CONTACTEMAIL || -z $COINVALUESATS || -z $USDVALUESATS || -z $ADDRESSES || -z $TXIDS ]]; then
         echo "Error! Insufficient Parameters!"
         exit 1
@@ -1282,6 +1283,17 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
         exit 1
     fi
 
+	# Find out if the user has unpaid or trial mode sales
+	STATUS=$(sqlite3 $SQ3DBNAME "SELECT status FROM sales WHERE (SELECT account_id FROM accounts WHERE email = '$EMAIL') = account_id AND (status = 0 OR status = 2) ORDER BY status ASC LIMIT 1")
+	if [[ -z $STATUS ]]; then
+		STATUS=""
+	elif [[ $STATUS -eq 0 ]]; then
+		STATUS="<br>Also, just a quick reminder to get the money (cash) sent to cover the unpaid mining contract(s)... Thank You!<br>"
+	elif [[ $STATUS -eq 2 ]]; then
+		STATUS="<br>Also, a quick reminder that this mining contract is in trial mode. Reach out today and let's make it official! Thank You!<br>"
+	fi
+
+	# There may be an added suffix to the address to indicate its status
     ADDRESSES=${ADDRESSES//./<br>}
     ADDRESSES=${ADDRESSES//_0/ -- Deprecated}
     ADDRESSES=${ADDRESSES//_1/} # Active
@@ -1299,7 +1311,8 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
             Notice! Always ensure the key(s) associated with this/these address(es) are in your possession!!
             Please reach out ASAP if you need a new savings card!<br><br>
             Please utilize our ${NETWORK} block explorer to get more details on an address or TXID: $EXPLORER<br>
-            <br><hr><br>
+            ${STATUS}
+			<br><hr><br>
 
             <b><u>Market Data</u></b> (as of this email)
             <table>
@@ -1369,15 +1382,36 @@ else
 fi
 
 ##################### What's the next thing most critical #######################################)
-# market.sh could use a little more work
+# Backup system.
+# Automate the process of sending out the payments.
+# Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
+    # How much does it compare with the total in the database.
+    # Send adminstrative email.
 
-# Let the user know they owe some money
-# Backup system
-# Automate the process of sending out the payments
 
-# Write a routine that sees if any of the addresses have been opened and mark the DB accordinally. Also, how much does it have and how does it compare. Send adminstrative email.
 
-#### a much better teller interface/ experience updating the database
 
-###epoch has an error when there are no teller's to payout. 
-	# "Error: near line 8: near ";": syntax error
+
+
+
+# Create better (more informative) teller message
+
+
+#You have 0 GH/s (5 contracts) of remaining (UNSOLD) hash power that is currently directed to for your current and future core customers.
+
+
+#Stats:
+#	Your Total (Teller) Bulk Hashrate: 500 GH/s (50 contracts worth)
+#	How much youve Sold: 500 GH/s (50 contracts worth)
+#	You still have 70Ghz (potentially 7 Contracts worth)
+#	This unsold hashrate is still generating reventue to this address:  You should have that. HOw to change it. 
+#	"There is still an issue, with you account, let's get it settled"?
+
+#Your personal bulk contract (teller) payout address: You Need To Set One!!!
+#You currently have 0 GH/s of UNPAID bulk hash power.
+#There is 0 GH/s of UNSOLD hash power for your current and future core customers.
+
+#Note: Any unsold hash power is paid out to your teller address.
+#Also, unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.
+
+
