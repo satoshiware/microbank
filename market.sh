@@ -1,4 +1,6 @@
 #!/bin/bash
+LOG=/var/log/market.log
+
 # Installing the market script
 if [[ $1 = "--install" ]]; then
     echo "Installing this script (market) in /usr/local/sbin/"
@@ -33,7 +35,8 @@ EOF
 elif [[ $1 = "--getmicrorate" ]]; then
     old_satrate=$2
     if [ ! -z $old_satrate ]; then
-        echo $((old_satrate + 1))
+        echo "$(date) - microcurrency Rate (\$ATS)" | sudo tee -a $LOG > /dev/null
+        echo $((old_satrate + 1)) | sudo tee -a $LOG
     fi
 
 elif [[ $1 = "--getusdrate" ]]; then # Get btc/usd exchange rates from a popular exchanges
@@ -41,7 +44,8 @@ elif [[ $1 = "--getusdrate" ]]; then # Get btc/usd exchange rates from a popular
 #   BTCUSD=$(curl -s "https://api.kraken.com/0/public/Ticker?pair=BTCUSD" | jq '.result.XXBTZUSD.a[0]') # Kraken BTC/USD Price
 
     BTCUSD=${BTCUSD//\"/} # Remove quotes
-    echo $(awk -v btcusd=$BTCUSD 'BEGIN {printf("%.3f\n", 100000000 / btcusd)}') # Convert to $ATS
+    echo "$(date) - USD Rate (\$ATS)" | sudo tee -a $LOG > /dev/null
+    echo $(awk -v btcusd=$BTCUSD 'BEGIN {printf("%.3f\n", 100000000 / btcusd)}') | sudo tee -a $LOG # Convert to $ATS
 
 else
     echo "Method not found"
