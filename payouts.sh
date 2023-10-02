@@ -50,6 +50,8 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     Options:
       -h, --help        Display this help message and exit
       -i, --install     Install this script (payouts) in /usr/local/sbin, sqlite3, the DB if it hasn't been already, and loads available epochs from the blockchain
+      -o, --control     Main control for the regular payouts; Run this in cron every 2 to 4 hours
+                        Install Example (Every Two Hours): Run "crontab -e" and insert the following line: "0 */2 * * * /usr/local/sbin/payouts -o"
       -e, --epoch       Look for next difficulty epoch and prepare the DB for next round of payouts
       -s, --send        Send the Money
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
@@ -262,6 +264,39 @@ EOF
         fi
         echo "Epoch period number $NEXTEPOCH has been loaded into the payout table"
     done
+
+elif [[ $1 = "-o" || $1 = "--control" ]]; then # Main control for the regular payouts; Run this in cron every 2 to 4 hours
+    # Process next epoch period if it has arrived (then exit)
+    NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
+    BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
+    if [[ $($BTC getblockcount) -ge $BLOCKEPOCH ]]; then
+        payouts -e &
+        exit
+    fi
+
+    # Send out prepared transactions if any (then exit)
+    peek1=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL")
+    peek2=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM teller_txs WHERE txid IS NULL")
+    if [[ ! -z $peek1 || ! -z $peek2 ]]; then
+        payouts -s &
+        exit
+    fi
+
+    # Verify transactions have been confirmed on the blockchain (then exit)
+    peek=$(sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL"; sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM teller_txs WHERE block_height IS NULL AND txid IS NOT NULL")
+    if [[ ! -z $peek ]]; then
+        payouts -c &
+        exit
+    fi
+
+    # Prepare the emails
+    payouts -m
+
+    # Send out emails (between 12:00PM and 10:00PM only!)
+    TIME=$((10#$(date '+%H%M%S'))) # Force base-10 interpretations; constants with a leading 0 are interpreted as octal numbers.
+    if [[ $TIME -ge 120000 && $TIME -le 220000 ]]; then
+        payouts -n &
+    fi
 
 elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch and prepare the DB for next round of payouts
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
@@ -688,6 +723,32 @@ EOF
     # Send Email
     send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)."
 
+elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared emails in the file "/var/tmp/payout.emails"
+     # Check if file "payout.emails" exists or if it is empty
+    if [ -f /var/tmp/payout.emails ]; then
+        if [ ! -s /var/tmp/payout.emails ]; then echo "File \"/var/tmp/payout.emails\" is empty!"; exit; fi # Check if file is empty
+    else
+        echo "File \"/var/tmp/payout.emails\" did not exist... 'till now!"
+        sudo touch /var/tmp/payout.emails
+        exit
+    fi
+
+    # Get market data
+    old_satrate=$(sqlite3 $SQ3DBNAME "SELECT satrate FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) - 1")
+    SATRATE=$(market --getmicrorate $old_satrate)
+    USDSATS=$(market --getusdrate)
+    if [[ -z $SATRATE || -z $USDSATS ]]; then echo "Error! Could not get market rates!"; exit 1; fi
+    sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = $SATRATE WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) AND satrate IS NULL"
+
+    # Sending Emails NOW!!
+    echo "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!" | sudo tee -a $LOG
+    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
+    sudo mv /var/tmp/payout.emails /var/tmp/payout.emails.bak
+    sudo touch /var/tmp/payout.emails
+    while read -r line; do
+        eval "$line"
+    done < /var/tmp/payout.emails.bak
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Generic Database Queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
     sqlite3 $SQ3DBNAME ".dump"
@@ -1015,32 +1076,6 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
     sqlite3 $SQ3DBNAME "SELECT * FROM teller_address_book WHERE account_id = $act_id"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-elif [[ $1 = "--send-email" ]]; then # Sends all the prepared emails in the file "/var/tmp/payout.emails"
-     # Check if file "payout.emails" exists or if it is empty
-    if [ -f /var/tmp/payout.emails ]; then
-        if [ ! -s /var/tmp/payout.emails ]; then echo "File \"/var/tmp/payout.emails\" is empty!"; exit; fi # Check if file is empty
-    else
-        echo "File \"/var/tmp/payout.emails\" did not exist... 'till now!"
-        sudo touch /var/tmp/payout.emails
-        exit
-    fi
-
-    # Get market data
-    old_satrate=$(sqlite3 $SQ3DBNAME "SELECT satrate FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) - 1")
-    SATRATE=$(market --getmicrorate $old_satrate)
-    USDSATS=$(market --getusdrate)
-    if [[ -z $SATRATE || -z $USDSATS ]]; then echo "Error! Could not get market rates!"; exit 1; fi
-    sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = $SATRATE WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) AND satrate IS NULL"
-
-    # Sending Emails NOW!!
-    echo "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!" | sudo tee -a $LOG
-    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
-    sudo mv /var/tmp/payout.emails /var/tmp/payout.emails.bak
-    sudo touch /var/tmp/payout.emails
-    while read -r line; do
-        eval "$line"
-    done < /var/tmp/payout.emails.bak
-
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
     MESSAGE="Hi Satoshi,<br><br>Here is a summary about each teller.<br><br>"
     MESSAGE="${MESSAGE}<i>Note: Any unsold hash power by your tellers is paid out to their addresses.<br>"
@@ -1274,7 +1309,7 @@ EOF
 elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core customer
     NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; LATEST_EPOCH_PERIOD=${11}; ADDRESSES=${12}; TXIDS=${13}; EMAIL_ADMIN_IF_SET=${14}
 
-	# Input checking
+    # Input checking
     if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $CONTACTPHONE || -z $CONTACTEMAIL || -z $COINVALUESATS || -z $USDVALUESATS || -z $ADDRESSES || -z $TXIDS ]]; then
         echo "Error! Insufficient Parameters!"
         exit 1
@@ -1283,17 +1318,17 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
         exit 1
     fi
 
-	# Find out if the user has unpaid or trial mode sales
-	STATUS=$(sqlite3 $SQ3DBNAME "SELECT status FROM sales WHERE (SELECT account_id FROM accounts WHERE email = '$EMAIL') = account_id AND (status = 0 OR status = 2) ORDER BY status ASC LIMIT 1")
-	if [[ -z $STATUS ]]; then
-		STATUS=""
-	elif [[ $STATUS -eq 0 ]]; then
-		STATUS="<br>Also, just a quick reminder to get the money (cash) sent to cover the unpaid mining contract(s)... Thank You!<br>"
-	elif [[ $STATUS -eq 2 ]]; then
-		STATUS="<br>Also, a quick reminder that this mining contract is in trial mode. Reach out today and let's make it official! Thank You!<br>"
-	fi
+    # Find out if the user has unpaid or trial mode sales
+    STATUS=$(sqlite3 $SQ3DBNAME "SELECT status FROM sales WHERE (SELECT account_id FROM accounts WHERE email = '$EMAIL') = account_id AND (status = 0 OR status = 2) ORDER BY status ASC LIMIT 1")
+    if [[ -z $STATUS ]]; then
+        STATUS=""
+    elif [[ $STATUS -eq 0 ]]; then
+        STATUS="<br>Also, just a quick reminder to get the money (cash) sent to cover the unpaid mining contract(s)... Thank You!<br>"
+    elif [[ $STATUS -eq 2 ]]; then
+        STATUS="<br>Also, a quick reminder that this mining contract is in trial mode. Reach out today and let's make it official! Thank You!<br>"
+    fi
 
-	# There may be an added suffix to the address to indicate its status
+    # There may be an added suffix to the address to indicate its status
     ADDRESSES=${ADDRESSES//./<br>}
     ADDRESSES=${ADDRESSES//_0/ -- Deprecated}
     ADDRESSES=${ADDRESSES//_1/} # Active
@@ -1312,7 +1347,7 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
             Please reach out ASAP if you need a new savings card!<br><br>
             Please utilize our ${NETWORK} block explorer to get more details on an address or TXID: $EXPLORER<br>
             ${STATUS}
-			<br><hr><br>
+            <br><hr><br>
 
             <b><u>Market Data</u></b> (as of this email)
             <table>
@@ -1381,31 +1416,27 @@ else
     echo "Run script with \"--help\" flag"
 fi
 
-##################### What's the next thing most critical #######################################)
-# Backup system.
-# Automate the process of sending out the payments.
+
+##################################################################################################
+# Make a backup - rsync onto node level 3's.
 # Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
     # How much does it compare with the total in the database.
     # Send adminstrative email.
 
-
-
-
-
-
-
+# Add log info, script, and db info
+##################################################################################################
 # Create better (more informative) teller message
-
 
 #You have 0 GH/s (5 contracts) of remaining (UNSOLD) hash power that is currently directed to for your current and future core customers.
 
 
 #Stats:
-#	Your Total (Teller) Bulk Hashrate: 500 GH/s (50 contracts worth)
-#	How much youve Sold: 500 GH/s (50 contracts worth)
-#	You still have 70Ghz (potentially 7 Contracts worth)
-#	This unsold hashrate is still generating reventue to this address:  You should have that. HOw to change it. 
-#	"There is still an issue, with you account, let's get it settled"?
+#       Your personal bulk contract (teller) payout address: az1qjyz6na5v53kud0getxsa5trht6rqrrjtsg59e2
+#   Your Total (Teller) Bulk Hashrate: 500 GH/s (50 contracts worth)
+#   How much youve Sold: 430 GH/s (43 contracts worth)
+#   You still have 70Ghz (potentially 7 Contracts worth)
+#   This unsold hashrate is still generating reventue to this address:  You should have that. HOw to change it.
+#   "There is still an issue, with you account, let's get it settled"?
 
 #Your personal bulk contract (teller) payout address: You Need To Set One!!!
 #You currently have 0 GH/s of UNPAID bulk hash power.
@@ -1414,4 +1445,5 @@ fi
 #Note: Any unsold hash power is paid out to your teller address.
 #Also, unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.
 
-
+#######################!!!!!!!!!!!!!!!!!!!!!!!!No emails to prepare at this time!
+#######################!!!!!!!!!!!!!!!!!!!!!!!!/usr/local/sbin/payouts: line 293: [[: 081413: value too great for base (error token is "081413")
