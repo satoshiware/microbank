@@ -10,7 +10,7 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 
 # Make sure the send_email routine is installed
-if ! command -v send_email &> /dev/null; then
+if ! command -v /usr/local/sbin/send_email &> /dev/null; then
     echo "Error! The \"send_email\" routine could not be found!" | sudo tee -a $LOG
     echo "Download the script and execute \"./send_email.sh --install\" to install this routine."
     read -p "Press any enter to continue ..."
@@ -105,6 +105,13 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                                         the administrator will unless the "EMAIL_EXECUTIVE" is a valid email then that email will receive the summary.
       --email-master-summary    Send sub account(s) summary to a master
                                 Parameters: EMAIL  (EMAIL_ADMIN_IF_SET)
+
+    Locations:
+      This:                     /usr/local/sbin/payouts
+      Email Script:             /usr/local/sbin/send_email
+      Market Script:            /usr/local/sbin/market
+      Log:                      /var/log/payout.log (~/log.payout.development)
+      Data Base:                /var/lib/payouts.db (~/tmp_payouts.db.development)
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     # Installing the payouts script
@@ -270,7 +277,7 @@ elif [[ $1 = "-o" || $1 = "--control" ]]; then # Main control for the regular pa
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
     BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
     if [[ $($BTC getblockcount) -ge $BLOCKEPOCH ]]; then
-        payouts -e &
+        $0 -e &
         exit
     fi
 
@@ -278,24 +285,24 @@ elif [[ $1 = "-o" || $1 = "--control" ]]; then # Main control for the regular pa
     peek1=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM txs WHERE txid IS NULL")
     peek2=$(sqlite3 $SQ3DBNAME "SELECT SUM(amount) FROM teller_txs WHERE txid IS NULL")
     if [[ ! -z $peek1 || ! -z $peek2 ]]; then
-        payouts -s &
+        $0 -s &
         exit
     fi
 
     # Verify transactions have been confirmed on the blockchain (then exit)
     peek=$(sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL"; sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM teller_txs WHERE block_height IS NULL AND txid IS NOT NULL")
     if [[ ! -z $peek ]]; then
-        payouts -c &
+        $0 -c &
         exit
     fi
 
     # Prepare the emails
-    payouts -m
+    $0 -m
 
     # Send out emails (between 12:00PM and 10:00PM only!)
     TIME=$((10#$(date '+%H%M%S'))) # Force base-10 interpretations; constants with a leading 0 are interpreted as octal numbers.
     if [[ $TIME -ge 120000 && $TIME -le 220000 ]]; then
-        payouts -n &
+        $0 -n &
     fi
 
 elif [[ $1 = "-e" || $1 = "--epoch" ]]; then # Look for next difficulty epoch and prepare the DB for next round of payouts
@@ -435,7 +442,7 @@ EOF
             <b>Wallet (bank) Balance:</b> $bank_balance
 EOF
         )
-        send_email "Satoshi" "${ADMINISTRATOREMAIL}" "New Epoch Has Been Delivered" "$MESSAGE"
+        /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "New Epoch Has Been Delivered" "$MESSAGE"
 
     else
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
@@ -471,7 +478,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     if [ $((total_payment + 100000000)) -gt $bank_balance ]; then
         message="$(date) - Not enough money in the bank to send payouts! The bank has $bank_balance $DENOMINATION, but it needs $((total_payment + 100000000)) $DENOMINATION before any payouts will be sent."
         echo $message | sudo tee -a $LOG
-        send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Not Enough Money in The Bank" "$message"
+        /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Not Enough Money in The Bank" "$message"
     fi
 
     # Query db for tx_id, address, and amount - preparation to send out first set of payments
@@ -505,7 +512,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" conf_target=10 estimate_mode="economical" | jq '.txid')
         if [[ ! ${TXID//\"/} =~ ^[0-9a-f]{64}$ ]]; then
             echo "$(date) - Serious Error!!! Invalid TXID: $TXID" | sudo tee -a $LOG
-            send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
+            /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
             sudo touch /etc/send_payments_error_flag
             exit 1
         fi
@@ -519,7 +526,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         # Make sure the "count" of utxos to be generated is going down
         if [ $count -le $(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) ]; then
             echo "$(date) - Serious Error!!! Infinite loop while sending out payments!" | sudo tee -a $LOG
-            send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
+            /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
             sudo touch /etc/send_payments_error_flag
             exit 1
         fi
@@ -538,7 +545,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     # Make sure all payments have been sent!
     if [ 0 -lt $(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) ]; then
         echo "$(date) - Serious Error!!! Unfulfilled TXs in the DB after sending payments!" | sudo tee -a $LOG
-        send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
+        /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
         sudo touch /etc/send_payments_error_flag
         exit 1
     fi
@@ -577,7 +584,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         $t_txids
 EOF
     )
-    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "All Payments have been completed successfully" "$MESSAGE"
+    /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "All Payments have been completed successfully" "$MESSAGE"
 
 elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are confirmed in the blockchain; update the DB
     # Get all the txs (including teller_txs) that have a valid TXID without a block height
@@ -620,7 +627,7 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
         message="$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations.<br><br>"
         message="${message} $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations."
 
-        send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Confirming Transaction(s) on The Blockchain" "$message"
+        /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Confirming Transaction(s) on The Blockchain" "$message"
     fi
 
 elif [[ $1 = "-m" || $1 = "--email-prep" ]]; then # Prepare all core customer notification emails for the latest epoch
@@ -694,25 +701,25 @@ EOF
     # Format all the array data togethor for core customer emails and add them to the payout.emails file
     latest_epoch_period=$(sqlite3 $SQ3DBNAME "SELECT MAX(epoch_period) FROM payouts")
     for i in "${!notify_data[@]}"; do
-        echo "payouts --email-core-customer ${notify_data[$i]//|/ } \$SATRATE \$USDSATS $latest_epoch_period ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
+        echo "$0 --email-core-customer ${notify_data[$i]//|/ } \$SATRATE \$USDSATS $latest_epoch_period ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Add Master emails to the list (payout.emails)
     tmp=$(sudo sqlite3 $SQ3DBNAME "SELECT email FROM accounts WHERE EXISTS(SELECT * FROM accounts sub WHERE master = accounts.account_id)")
     eol=$'\n'; read -a master_emails <<< ${tmp//$eol/ }
     for i in "${!master_emails[@]}"; do
-        echo "payouts --email-master-summary ${master_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
+        echo "$0 --email-master-summary ${master_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Add Teller Summaries-emails to the list (payout.emails)
     tmp=$(sudo sqlite3 $SQ3DBNAME "SELECT email FROM accounts WHERE EXISTS(SELECT * FROM accounts sub WHERE contact = accounts.account_id)")
     eol=$'\n'; read -a contact_emails <<< ${tmp//$eol/ }
     for i in "${!contact_emails[@]}"; do
-        echo "payouts --email-teller-summary ${contact_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
+        echo "$0 --email-teller-summary ${contact_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Add command to send out banker summary on the list (payout.emails)
-    echo "payouts --email-banker-summary" | sudo tee -a /var/tmp/payout.emails
+    echo "$0 --email-banker-summary" | sudo tee -a /var/tmp/payout.emails
 
     # Set the notified flag
     sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
@@ -721,7 +728,7 @@ EOF
     echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)." | sudo tee -a $LOG
 
     # Send Email
-    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)."
+    /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)."
 
 elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared emails in the file "/var/tmp/payout.emails"
      # Check if file "payout.emails" exists or if it is empty
@@ -735,14 +742,14 @@ elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared email
 
     # Get market data
     old_satrate=$(sqlite3 $SQ3DBNAME "SELECT satrate FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) - 1")
-    SATRATE=$(market --getmicrorate $old_satrate)
-    USDSATS=$(market --getusdrate)
+    SATRATE=$(/usr/local/sbin/market --getmicrorate $old_satrate)
+    USDSATS=$(/usr/local/sbin/market --getusdrate)
     if [[ -z $SATRATE || -z $USDSATS ]]; then echo "Error! Could not get market rates!"; exit 1; fi
     sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = $SATRATE WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) AND satrate IS NULL"
 
     # Sending Emails NOW!!
     echo "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!" | sudo tee -a $LOG
-    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
+    /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
     sudo mv /var/tmp/payout.emails /var/tmp/payout.emails.bak
     sudo touch /var/tmp/payout.emails
     while read -r line; do
@@ -1003,7 +1010,7 @@ EOF
         done
 
         # Send email
-        send_email "$NAME" "$EMAIL" "Bulk Hash Rate Purchase" "Hi $NAME,<br><br>Congratulations!!! You have purchased (automatically) some more hash rate (in bulk) to cover all your core customers!<br><br>At your convienence, negotiate payment (in SATS please) with your Lvl2 (Banker) Hub"
+        /usr/local/sbin/send_email "$NAME" "$EMAIL" "Bulk Hash Rate Purchase" "Hi $NAME,<br><br>Congratulations!!! You have purchased (automatically) some more hash rate (in bulk) to cover all your core customers!<br><br>At your convienence, negotiate payment (in SATS please) with your Lvl2 (Banker) Hub"
     fi
 
 elif [[ $1 = "--deliver-contr" ]]; then # Mark a contract as delivered
@@ -1112,8 +1119,8 @@ EOF
 EOF
     ); MESSAGE="$MESSAGE</table>"
 
-    send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
-    send_email "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
+    /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
+    /usr/local/sbin/send_email "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
 
 elif [[ $1 = "--email-master-summary" ]]; then # Send sub account summary to a master
     MASTER_EMAIL=$2; EMAIL_ADMIN_IF_SET=$3
@@ -1150,9 +1157,9 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
-        send_email "$NAME" "${MASTER_EMAIL,,}" "Sub Account(s) Summary" "$MESSAGE"
+        /usr/local/sbin/send_email "$NAME" "${MASTER_EMAIL,,}" "Sub Account(s) Summary" "$MESSAGE"
     else
-        send_email "$NAME" "$ADMINISTRATOREMAIL" "Sub Account(s) Summary" "$MESSAGE"
+        /usr/local/sbin/send_email "$NAME" "$ADMINISTRATOREMAIL" "Sub Account(s) Summary" "$MESSAGE"
     fi
 
 elif [[ $1 = "--email-teller-summary" ]]; then # Send summary to a Teller (Level 1) Hub/Node
@@ -1177,6 +1184,45 @@ EOF
     if [ -z $UNPAID ]; then UNPAID=0; fi
     if [ -z $TOTAL ]; then TOTAL=0; SOLD=0; fi
     if [ -z $SOLD ]; then SOLD=0; fi
+
+
+
+
+
+
+##################################################################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Create better (more informative) teller message
+
+#You have 0 GH/s (5 contracts) of remaining (UNSOLD) hash power that is currently directed to for your current and future core customers.
+
+
+#Stats:
+#       Your personal bulk contract (teller) payout address: az1qjyz6na5v53kud0getxsa5trht6rqrrjtsg59e2
+#   Your Total (Teller) Bulk Hashrate: 500 GH/s (50 contracts worth)
+#   How much youve Sold: 430 GH/s (43 contracts worth)
+#   You still have 70Ghz (potentially 7 Contracts worth)
+#   This unsold hashrate is still generating reventue to this address:  You should have that. HOw to change it.
+#   "There is still an issue, with you account, let's get it settled"?
+
+#Your personal bulk contract (teller) payout address: You Need To Set One!!!
+#You currently have 0 GH/s of UNPAID bulk hash power.
+#There is 0 GH/s of UNSOLD hash power for your current and future core customers.
+
+#Note: Any unsold hash power is paid out to your teller address.
+#Also, unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     MESSAGE="Hi $NAME,<br><br>This email contains a summary of all your contracts!<br><br>"
     MESSAGE="${MESSAGE}Your personal bulk contract (teller) payout address: <b><u>$ADDRESS</u></b><br>"
@@ -1297,12 +1343,12 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_EXECUTIVE ]]; then
-        send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+        /usr/local/sbin/send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
     else
         if [[ "$EMAIL_EXECUTIVE" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then # See if there is a valid email passed
-            send_email "$NAME" "$EMAIL_EXECUTIVE" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Send email to passed email
+            /usr/local/sbin/send_email "$NAME" "$EMAIL_EXECUTIVE" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Send email to passed email
         else
-            send_email "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Otherwise, send email to administrator
+            /usr/local/sbin/send_email "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Otherwise, send email to administrator
         fi
     fi
 
@@ -1406,9 +1452,9 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
-        send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
+        /usr/local/sbin/send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
     else
-        send_email "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
+        /usr/local/sbin/send_email "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
     fi
 
 else
@@ -1418,32 +1464,8 @@ fi
 
 
 ##################################################################################################
+# Update Teller email - already some new code going on.
 # Make a backup - rsync onto node level 3's.
 # Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
     # How much does it compare with the total in the database.
     # Send adminstrative email.
-
-# Add log info, script, and db info
-##################################################################################################
-# Create better (more informative) teller message
-
-#You have 0 GH/s (5 contracts) of remaining (UNSOLD) hash power that is currently directed to for your current and future core customers.
-
-
-#Stats:
-#       Your personal bulk contract (teller) payout address: az1qjyz6na5v53kud0getxsa5trht6rqrrjtsg59e2
-#   Your Total (Teller) Bulk Hashrate: 500 GH/s (50 contracts worth)
-#   How much youve Sold: 430 GH/s (43 contracts worth)
-#   You still have 70Ghz (potentially 7 Contracts worth)
-#   This unsold hashrate is still generating reventue to this address:  You should have that. HOw to change it.
-#   "There is still an issue, with you account, let's get it settled"?
-
-#Your personal bulk contract (teller) payout address: You Need To Set One!!!
-#You currently have 0 GH/s of UNPAID bulk hash power.
-#There is 0 GH/s of UNSOLD hash power for your current and future core customers.
-
-#Note: Any unsold hash power is paid out to your teller address.
-#Also, unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.
-
-#######################!!!!!!!!!!!!!!!!!!!!!!!!No emails to prepare at this time!
-#######################!!!!!!!!!!!!!!!!!!!!!!!!/usr/local/sbin/payouts: line 293: [[: 081413: value too great for base (error token is "081413")
