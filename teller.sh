@@ -28,6 +28,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
                     Parameters: ADDRESS  NAME  DESCRIPTION  (NOSCAN)
                         Note: Prevent the blockchain from being rescanned by including "NOSCAN" (optional)
                         Note: To rescan the blockchain manually enter "btc -rpcwallet=watch rescanblockchain"
+                              To rescan the Import wallet on the blockchain manually enter "btc -rpcwallet=import rescanblockchain"
       --remove      Remove watch wallet
                     Parameters: ADDRESS
 
@@ -54,6 +55,9 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --receive     Create new address to receive funds into the Bank wallet
       --mining      Create new address to receive funds into the Mining wallet
       --recent      Show recent (last 50) Bank wallet transactions
+	  
+	  --blockchain  Show blockchain stats
+	  --mempool     Show mempool stats
 EOF
 elif [[ $1 = "--install" ]]; then # Installing this script (teller) in /usr/local/sbin/teller
     # Installing the payouts script
@@ -95,6 +99,7 @@ elif [[ $1 = "--watch" ]]; then # See all (watch) imports and corresponding deta
     echo "                 Address                      Received          Spent          Balance      UTXOs  TXIDs   Used?   Name                           Description"
     echo "------------------------------------------  --------------  --------------  --------------  -----  -----  -------  ----------------------------   ----------------------------"
     awk -F ';' '{printf("%s %15.8f %15.8f %15.8f %6d %6d %5d     %-30s %-s\n", $1, $2, $2 - $3, $3, $4, $5, $5 - $4, $6, $7)}' <<< ${data%?}
+    echo ""
 
 elif [[ $1 = "--import" ]]; then # Import watch wallet (can also be used to update the NAME and DESCRIPTION)
     ADDRESS="${2,,}"; NAME=$3; DESCRIPTION=$4
@@ -104,7 +109,12 @@ elif [[ $1 = "--import" ]]; then # Import watch wallet (can also be used to upda
     fi
 
     if [[ -z $5 ]]; then # If the 5th pameter is absent then rescan the blockchain
+        echo ""; echo -n "    Scanning the entire blockchain... This could take awhile! "
+        while true;do echo -n .;sleep 1;done & # Show user that progress is being made
         $BTC -rpcwallet=watch importaddress "$ADDRESS" "${NAME//;};${DESCRIPTION//;}" true
+        kill $!; trap 'kill $!' SIGTERM
+        echo "done"; echo ""
+
     else
         $BTC -rpcwallet=watch importaddress "$ADDRESS" "${NAME//;};${DESCRIPTION//;}" false
     fi
@@ -122,7 +132,11 @@ elif [[ $1 = "--sweep" ]]; then # Sweep or import private keys into the Import w
 
     elif [[ -z $3 || ${3,,} == "noscan" ]]; then # Import Private Key: PRIVATE_KEY (NOSCAN)
         if [[ -z $3 ]]; then
+            echo ""; echo -n "    Scanning the entire blockchain... This could take awhile! "
+            while true;do echo -n .;sleep 1;done & # Show user that progress is being made
             $BTC -rpcwallet=import importprivkey $2 "" true
+            kill $!; trap 'kill $!' SIGTERM
+            echo "done"; echo ""
         else
             $BTC -rpcwallet=import importprivkey $2 "" false
         fi
@@ -248,13 +262,27 @@ elif [[ $1 = "--recent" ]]; then # Show recent (last 40) Bank wallet transaction
     echo "---------  ---------------  ---------  ---------------  ------------------------------------------  ----------------------------------------------------------------"
     awk -F ';' '{printf("%7s    %-15.8f  %-8s  %15s   %s  %s\n", $1, $2, $3, $4, $5, $6)}' <<< ${data%?}
 
+
+
+elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats
+	echo "Size: $(sudo du -h -s /var/lib/bitcoin | tr -d "/var/lib/bitcoin")" # Size of the blockchain
+
+#		Latest Block - number and how long ago was it minted
+#		Avg. time between last 6 blocks
+#		Difficulty/Hashrate
+#		
+#		Blocks 'til halving
+
+
+elif [[ $1 = "--mempool" ]]; then # Show mempool stats
+	echo "mempool"
+	#		Number of transactions
+	#		Size
+	#		Blocks for clearing????
+	#		recommended fee
+
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 0.01"
+    echo "Script Version 0.02"
 fi
-
-#todo
-# make comment about notes use import wallet instead
-# Need some kind of output when we import address or sweep private key with a scan.... gota know it's alive???????
-# Send all the off the to the other
