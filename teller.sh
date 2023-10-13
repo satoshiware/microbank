@@ -55,9 +55,10 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --receive     Create new address to receive funds into the Bank wallet
       --mining      Create new address to receive funds into the Mining wallet
       --recent      Show recent (last 50) Bank wallet transactions
-	  
-	  --blockchain  Show blockchain stats
-	  --mempool     Show mempool stats
+
+      --blockchain  Show blockchain stats
+      --mempool     Show mempool stats
+      --network     Show network stats
 EOF
 elif [[ $1 = "--install" ]]; then # Installing this script (teller) in /usr/local/sbin/teller
     # Installing the payouts script
@@ -74,6 +75,14 @@ elif [[ $1 = "--install" ]]; then # Installing this script (teller) in /usr/loca
     sudo cat $0 | sed '/Install this script (teller)/d' | sudo tee /usr/local/sbin/teller > /dev/null
     sudo sed -i 's/$1 = "--install"/"a" = "b"/' /usr/local/sbin/teller # Make it so this code won't run again in the newly installed script
     sudo chmod +x /usr/local/sbin/teller
+
+    # Create the file with the needed envrionment variables if it has not been done already
+    if [ ! -f /etc/default/teller.env ]; then
+        read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
+        read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
+    else
+        echo "The environment file \"/etc/default/teller.env\" already exits."
+    fi
 
 elif [[ $1 = "--watch" ]]; then # See all (watch) imports and corresponding details. Include an address (optional) to see just the details for that address
     ADDRESS="${2,,}"
@@ -262,27 +271,79 @@ elif [[ $1 = "--recent" ]]; then # Show recent (last 40) Bank wallet transaction
     echo "---------  ---------------  ---------  ---------------  ------------------------------------------  ----------------------------------------------------------------"
     awk -F ';' '{printf("%7s    %-15.8f  %-8s  %15s   %s  %s\n", $1, $2, $3, $4, $5, $6)}' <<< ${data%?}
 
+elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # Load envrionment variables and then verify
+    if [[ -f /etc/default/teller.env ]]; then
+        source /etc/default/teller.env
+        if [[ -z $HALVINGINTERVAL || -z $BLOCKINTERVAL ]]; then
+            echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/teller.env\" file"; exit 1;
+        fi
+    else
+        echo "Error! The \"/etc/default/teller.env\" environment file does not exist!"
+        echo "Run this script with the \"-i\" or \"--install\" parameter."
+        exit 1;
+    fi
 
+    # Generate and print blockchain stats
+    BLOCKCHAIN_INFO=$($BTC getblockchaininfo)
+    echo ""
+    cat << EOF
+    Blockchain Size:        $(awk -v size=$(jq '.size_on_disk' <<< $BLOCKCHAIN_INFO) 'BEGIN {printf("%.0f\n", size / 1000000)}') MB
+    Block Height:           $(jq '.blocks' <<< $BLOCKCHAIN_INFO)
+    Last Block Mint:        $(awk -v time=$(date +%s) -v blk_time=$(jq '.time' <<< $BLOCKCHAIN_INFO) 'BEGIN {printf("%.1f\n", (time - blk_time) / 60)}') Minutes Ago
 
-elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats
-	echo "Size: $(sudo du -h -s /var/lib/bitcoin | tr -d "/var/lib/bitcoin")" # Size of the blockchain
+    Difficulty:             $(jq '.difficulty' <<< $BLOCKCHAIN_INFO)
+    Hashrate:               $(awk -v difficulty=$(jq '.difficulty' <<< $BLOCKCHAIN_INFO) -v blk_interval=$BLOCKINTERVAL 'BEGIN {printf("%.3f\n",  difficulty * 2^32 / blk_interval / 1000000000000)}') TH/s
+    Avg. Mint Time:         ??????????????????????????                      (last 10 blocks)
 
-#		Latest Block - number and how long ago was it minted
-#		Avg. time between last 6 blocks
-#		Difficulty/Hashrate
-#		
-#		Blocks 'til halving
+    Halving Date:           ??????????????????????????
+
+    Block Subisdy:          $(awk -v subsidy=$($BTC getblockstats $($BTC getblockcount) | jq '.subsidy') 'BEGIN {printf("%.8f\n", subsidy / 100000000)}') coins
+EOF
+    echo ""
+	
+	
+
+		
+		
+echo $(date -d @$(awk -v height=$(jq '.blocks' <<< $BLOCKCHAIN_INFO) -v halving_interval=$HALVINGINTERVAL -v blk_interval=$BLOCKINTERVAL -v time=$(date +%s) 'BEGIN {printf("%.0f\n", (halving_interval - (height % halving_interval)) * blk_interval + time)}') '+%y/%m/%d')
+
+	
 
 
 elif [[ $1 = "--mempool" ]]; then # Show mempool stats
-	echo "mempool"
-	#		Number of transactions
-	#		Size
-	#		Blocks for clearing????
-	#		recommended fee
+    echo ""
+    echo -n "    TX Count:      "; $BTC getmempoolinfo | jq '.size'
+    echo -n "    Size (bytes):  "; $BTC getmempoolinfo | jq '.bytes'
+
+    FALL_BACK_FEE=$(sudo cat /etc/bitcoin.conf | grep "fallbackfee" | tr -d "fallbackfee=")
+    echo "    Fee Rates         coins/kB              Average Total Fee (coins)"
+        FEERATE=$($BTC estimatesmartfee 1 conservative | jq '.feerate')
+        if [[ $FEERATE == "null" ]]; then FEERATE=$FALL_BACK_FEE; fi
+        echo "        NOW:          $FEERATE                $(awk -v rate=$FEERATE 'BEGIN {printf("%.8f\n", rate * 0.4)}')"
+
+        FEERATE=$($BTC estimatesmartfee 12 economical | jq '.feerate')
+        if [[ $FEERATE == "null" ]]; then FEERATE=$FALL_BACK_FEE; fi
+        echo "        NORMAL:       $FEERATE                $(awk -v rate=$FEERATE 'BEGIN {printf("%.8f\n", rate * 0.4)}')"
+
+        FEERATE=$($BTC estimatesmartfee 144 economical | jq '.feerate')
+        if [[ $FEERATE == "null" ]]; then FEERATE=$FALL_BACK_FEE; fi
+        echo "        ECONOMICAL:   $FEERATE                $(awk -v rate=$FEERATE 'BEGIN {printf("%.8f\n", rate * 0.4)}')"
+
+        FEERATE=$($BTC estimatesmartfee 1008 economical | jq '.feerate')
+        if [[ $FEERATE == "null" ]]; then FEERATE=$FALL_BACK_FEE; fi
+        echo "        CHEAPSKATE:   $FEERATE                $(awk -v rate=$FEERATE 'BEGIN {printf("%.8f\n", rate * 0.4)}')"
+    echo ""
+
+elif [[ $1 = "--network" ]]; then # Show network stats
+    if [[ $($BTC getaddednodeinfo | jq '.[0] | .connected') == "true" ]]; then
+        echo ""; echo "    YES! You are CONNECTED to the \"Banker\" node"; echo ""
+    else
+        echo ""; echo "    NO! You are NOT connected!"; echo ""
+    fi
 
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 0.02"
+    echo "Script Version 0.04"
 fi
