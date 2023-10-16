@@ -57,6 +57,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
       -m, --email-prep  Prepare all core customer notification emails for the latest epoch
       -n, --send-email  Sends all the prepared emails in the file "/var/tmp/payout.emails"
+      -w, --crawl       Look for opened (previously spent) addresses
 
 ----- Generic Database Queries ----------------------------------------------------------------------------------------------
       -d, --dump        Show all the contents of the database
@@ -277,8 +278,8 @@ elif [[ $1 = "-o" || $1 = "--control" ]]; then # Main control for the regular pa
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
     BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
     if [[ $($BTC getblockcount) -ge $BLOCKEPOCH ]]; then
+        $0 -w # Scan for any opened (spent) addresses
         $0 -e &
-        exit
     fi
 
     # Send out prepared transactions if any (then exit)
@@ -293,7 +294,6 @@ elif [[ $1 = "-o" || $1 = "--control" ]]; then # Main control for the regular pa
     peek=$(sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL"; sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM teller_txs WHERE block_height IS NULL AND txid IS NOT NULL")
     if [[ ! -z $peek ]]; then
         $0 -c &
-        exit
     fi
 
     # Prepare the emails
@@ -755,6 +755,32 @@ elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared email
     while read -r line; do
         eval "$line"
     done < /var/tmp/payout.emails.bak
+
+elif [[ $1 = "-w" || $1 = "--crawl" ]]; then # Look for opened (previously spent) addresses
+    # Load all active (non-opened) addresses from the DB to the Watch wallet
+    ADDRESSES=$(sqlite3 $SQ3DBNAME "SELECT '{\"scriptPubKey\":{\"address\":\"' || micro_address || '\"},\"timestamp\":\"now\",\"label\":\"Searching for opened payouts...\"},' FROM contracts WHERE active = 1")
+    $BTC -rpcwallet=watch importmulti "[${ADDRESSES%?}]"
+
+    # Rescan the Watch wallet
+    echo ""; echo -n "    Scanning the entire blockchain... This could take awhile! "
+    while true; do echo -n .; sleep 1; done & # Show user that progress is being made
+    $BTC -rpcwallet=watch rescanblockchain > /dev/null
+    kill $!; trap 'kill $!' SIGTERM
+    echo "done"; echo ""
+
+    # Crawl through all the addresses in the Watch wallet and see if they have been opened (spent from)
+    echo ""; echo -n "    Finding all UTXOs for all addresses... This could take awhile! "
+    readarray -t RECEIVED < <($BTC -rpcwallet=watch listreceivedbyaddress | jq -r '.[] | .address, (.txids | length)') # Get all the address and the number transactions for each one
+    for ((i = 0; i < ${#RECEIVED[@]}; i = i + 2)); do # Go through each address to find the number of UTXOs
+        echo -n "."
+        utxos=$($BTC -rpcwallet=watch listunspent 0 9999999 "[\"${RECEIVED[i]}\"]" | jq '.[].amount' | awk '{count++} END{printf("%d", count)}')
+        if [[ ${RECEIVED[i + 1]} != $utxos ]]; then # If number of UTXOs does not match the number transactions then this address has been used
+            sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 2 WHERE micro_address = '${RECEIVED[i]}' AND active = 1" # Mark as opended in the database
+            echo "$(date) - Address \"${RECEIVED[i]}\" has been opended (spent from)!" | sudo tee -a $LOG
+        fi
+    done; echo "done"; echo ""
+
+    echo "$(date) - Crawled the blockchain looking at (${#RECEIVED[@]} / 2) addresses to see if any have been spent (opened)." | sudo tee -a $LOG
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Generic Database Queries ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the database
@@ -1460,12 +1486,10 @@ EOF
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
+    echo "Script Version 0.29"
 fi
 
 
 ##################################################################################################
 # Update Teller email - already some new code going on.
 # Make a backup - rsync onto node level 3's.
-# Write a routine that sees if any of the addresses have been opened and mark the DB accordinally.
-    # How much does it compare with the total in the database.
-    # Send adminstrative email.
