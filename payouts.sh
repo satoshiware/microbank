@@ -274,12 +274,12 @@ EOF
     done
 
 elif [[ $1 = "-o" || $1 = "--control" ]]; then # Main control for the regular payouts; Run this in cron every 2 to 4 hours
-    # Process next epoch period if it has arrived (then exit)
+    # Process next epoch period if it has arrived
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
     BLOCKEPOCH=$((NEXTEPOCH * EPOCHBLOCKS))
     if [[ $($BTC getblockcount) -ge $BLOCKEPOCH ]]; then
         $0 -w # Scan for any opened (spent) addresses
-        $0 -e &
+        $0 -e
     fi
 
     # Send out prepared transactions if any (then exit)
@@ -293,7 +293,8 @@ elif [[ $1 = "-o" || $1 = "--control" ]]; then # Main control for the regular pa
     # Verify transactions have been confirmed on the blockchain (then exit)
     peek=$(sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM txs WHERE block_height IS NULL AND txid IS NOT NULL"; sqlite3 $SQ3DBNAME "SELECT DISTINCT txid FROM teller_txs WHERE block_height IS NULL AND txid IS NOT NULL")
     if [[ ! -z $peek ]]; then
-        $0 -c &
+        $0 -c
+        exit
     fi
 
     # Prepare the emails
@@ -1216,26 +1217,28 @@ EOF
 
 
 
+
+#BTC=$(cat /etc/bash.bashrc | grep "alias btc=" | cut -d "\"" -f 2)
+#SQ3DBNAME=/var/lib/payouts.db
+
+#payouts --teller-email
+
 ##################################################################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # Create better (more informative) teller message
 
 #You have 0 GH/s (5 contracts) of remaining (UNSOLD) hash power that is currently directed to for your current and future core customers.
 
+#Hi Jeff,
+
+#	50 coins were mined with mined with your unsold hashrate.....blah blah..az1qjyz6na5v53kud0getxsa5trht6rqrrjtsg59e2
 
 #Stats:
-#       Your personal bulk contract (teller) payout address: az1qjyz6na5v53kud0getxsa5trht6rqrrjtsg59e2
-#   Your Total (Teller) Bulk Hashrate: 500 GH/s (50 contracts worth)
-#   How much youve Sold: 430 GH/s (43 contracts worth)
-#   You still have 70Ghz (potentially 7 Contracts worth)
-#   This unsold hashrate is still generating reventue to this address:  You should have that. HOw to change it.
-#   "There is still an issue, with you account, let's get it settled"?
+#   Payout Address (for Unsold Contracts): 		az1qjyz6na5v53kud0getxsa5trht6rqrrjtsg59e2
+#   Unsold Hashpower:							70 Gh/s (i.e. 7 Contract(s))
+#   Sold Hashpower: 							430 GH/s (i.e. 43 contract(s))
+#   Total Hashpower: 							500 GH/s (i.e. 50 contract(s))
 
-#Your personal bulk contract (teller) payout address: You Need To Set One!!!
-#You currently have 0 GH/s of UNPAID bulk hash power.
-#There is 0 GH/s of UNSOLD hash power for your current and future core customers.
-
-#Note: Any unsold hash power is paid out to your teller address.
-#Also, unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.
+#Note: Unsold hashpower does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.
 
 
 
@@ -1488,7 +1491,6 @@ else
     echo "Run script with \"--help\" flag"
     echo "Script Version 0.29"
 fi
-
 
 ##################################################################################################
 # Update Teller email - already some new code going on.
