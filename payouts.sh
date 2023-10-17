@@ -1203,63 +1203,34 @@ elif [[ $1 = "--email-teller-summary" ]]; then # Send summary to a Teller (Level
 EOF
     )
     ADDRESS=$(sqlite3 $SQ3DBNAME "SELECT micro_address FROM teller_address_book WHERE active = 1 AND account_id = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
-    UNPAID=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND account_id = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
+    PAYOUT_TOTAL=$(sqlite3 $SQ3DBNAME "SELECT (amount * 1.0 / 100000000) FROM teller_txs WHERE account_id = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') ORDER BY tx_id DESC Limit 1")
     TOTAL=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE status != 3 AND account_id = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
     SOLD=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM contracts WHERE active = 1 AND (SELECT contact FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
+    UNSOLD=$(awk -v total=$TOTAL -v sold=$SOLD 'BEGIN {printf "%.f\n", total - sold}')
+    UNPAID=$(sqlite3 $SQ3DBNAME "SELECT (SUM(quantity) * $HASHESPERCONTRACT / 1000000000) FROM teller_sales WHERE (status IS NULL OR status = 0) AND account_id = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}')")
 
-    if [ -z $ADDRESS ]; then ADDRESS="You Need To Set One!!!"; fi
-    if [ -z $UNPAID ]; then UNPAID=0; fi
-    if [ -z $TOTAL ]; then TOTAL=0; SOLD=0; fi
-    if [ -z $SOLD ]; then SOLD=0; fi
-
-
-
-
-
-
-
-#BTC=$(cat /etc/bash.bashrc | grep "alias btc=" | cut -d "\"" -f 2)
-#SQ3DBNAME=/var/lib/payouts.db
-
-#payouts --teller-email
-
-##################################################################################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# Create better (more informative) teller message
-
-#You have 0 GH/s (5 contracts) of remaining (UNSOLD) hash power that is currently directed to for your current and future core customers.
-
-#Hi Jeff,
-
-#	50 coins were mined with mined with your unsold hashrate.....blah blah..az1qjyz6na5v53kud0getxsa5trht6rqrrjtsg59e2
-
-#Stats:
-#   Payout Address (for Unsold Contracts): 		az1qjyz6na5v53kud0getxsa5trht6rqrrjtsg59e2
-#   Unsold Hashpower:							70 Gh/s (i.e. 7 Contract(s))
-#   Sold Hashpower: 							430 GH/s (i.e. 43 contract(s))
-#   Total Hashpower: 							500 GH/s (i.e. 50 contract(s))
-
-#Note: Unsold hashpower does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.
-
-
-
-
-
-
-
-
-
-
-
-
-
+    if [[ -z $ADDRESS ]]; then ADDRESS="You Need To Set One!!!"; fi
+    if [[ -z $PAYOUT_TOTAL ]]; then PAYOUT_TOTAL=0; fi
+    if [[ -z $TOTAL ]]; then TOTAL=0; SOLD=0; UNSOLD=0; fi
+    if [[ -z $SOLD ]]; then SOLD=0; fi
+    if [[ -z $UNSOLD ]]; then UNSOLD=0; fi
 
     MESSAGE="Hi $NAME,<br><br>This email contains a summary of all your contracts!<br><br>"
-    MESSAGE="${MESSAGE}Your personal bulk contract (teller) payout address: <b><u>$ADDRESS</u></b><br>"
-    MESSAGE="${MESSAGE}You currently have <b><u>$UNPAID GH/s of UNPAID</u></b> bulk hash power.<br>"
-    MESSAGE="${MESSAGE}There is <b><u>$((TOTAL - SOLD)) GH/s of UNSOLD</u></b> hash power for your current and future core customers.<br><br>"
-    MESSAGE="${MESSAGE}<i>Note: Any unsold hash power is paid out to your teller address.<br>"
-    MESSAGE="${MESSAGE}Also, unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.</i><br>"
-    MESSAGE="$MESSAGE<br><hr>"
+
+    MESSAGE="${MESSAGE}Your (Teller) Stats:"
+    MESSAGE="${MESSAGE}<ul><li>Payout Address (for Unsold Contracts): <b><u>$ADDRESS</u></b></li>"
+    MESSAGE="${MESSAGE}<li>Latest Payout Amount: <b><u>$PAYOUT_TOTAL coins</u></b></li>"
+    MESSAGE="${MESSAGE}<li>Unsold Hashpower: <b><u>$UNSOLD GH/s</u></b></li>"
+    MESSAGE="${MESSAGE}<li>Sold Hashpower: <b><u>$SOLD GH/s</u></b></li>"
+    MESSAGE="${MESSAGE}<li>Total Hashpower: <b><u>$TOTAL GH/s</u></b></li></ul>"
+
+    if [[ ! -z $UNPAID ]]; then
+        MESSAGE="${MESSAGE}<br><b>Attention!</b> You have some unpaid bulk hashrate. Please contact your backend banker. Thank You!<br>"
+    fi
+
+    MESSAGE="$MESSAGE<br><i>Note: Unutilized customer-purchased hashpower will be paid out to your Teller address.<br>"
+    MESSAGE="${MESSAGE}Also, there are <b><u>$(awk -v hashes_per_contract=$HASHESPERCONTRACT 'BEGIN {printf "%.f\n", hashes_per_contract / 1000000000}') GH/s</u></b> per Contract "
+    MESSAGE="${MESSAGE}and your Teller account will autobuy <b><u>$TELLERBULKPURCHASE</u></b> of these Contracts as soon as you oversell all your current hashpower.<br><br><hr>"
 
     # Accounts
     MESSAGE="$MESSAGE<br><b>Accounts:</b><br><table border="1"><tr><th>Name</th><th>Master</th><th>Email</th><th>Phone</th><th>Total Received</th></tr>"
@@ -1489,9 +1460,8 @@ EOF
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 0.29"
+    echo "Script Version 0.30"
 fi
 
 ##################################################################################################
-# Update Teller email - already some new code going on.
 # Make a backup - rsync onto node level 3's.
