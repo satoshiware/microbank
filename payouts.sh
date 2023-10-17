@@ -1111,31 +1111,42 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
+
+
+    MESSAGE="$MESSAGE<br><i>Note: <br>"
+    MESSAGE="${MESSAGE}Also, there are <b><u>$(awk -v hashes_per_contract=$HASHESPERCONTRACT 'BEGIN {printf "%.f\n", hashes_per_contract / 1000000000}') GH/s</u></b> per Contract "
+    MESSAGE="${MESSAGE}and your Teller account will autobuy <b><u>$TELLERBULKPURCHASE</u></b> of these Contracts as soon as you oversell all your current hashpower.<br><br><hr>"
+
+
+
     MESSAGE="Hi Satoshi,<br><br>Here is a summary about each teller.<br><br>"
-    MESSAGE="${MESSAGE}<i>Note: Any unsold hash power by your tellers is paid out to their addresses.<br>"
-    MESSAGE="${MESSAGE}Also, this unsold hash power does not account for any (underutilized) customer-purchased hash power that has not been assigned to contract.</i><br>"
-    MESSAGE="$MESSAGE<br><hr><br><b>Unpaid:</b><br><table border="1"><tr><th>Name</th><th>Mining Power (GH/s)</th><th>Time (Established)</th></tr>"
+    MESSAGE="${MESSAGE}<i>Note: Any unsold hashpower by the Teller(s) is paid out to their Payout Address(es).<br>"
+    MESSAGE="${MESSAGE}Unutilized core-customer-purchased hashpower is counted as unsold and will also be paid out to their respective Tellers' address(es).</i><br>"
+    MESSAGE="$MESSAGE<br><hr><br><b>Unpaid:</b><br><table border="1"><tr><th>Name</th><th>Email</th><th>Sale ID</th><th>Mining Power (GH/s)</th><th>Time (Established)</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
         SELECT
             '<tr>',
             '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
+            '<td>' || (SELECT email FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
+            '<td>' || sale_id || '</td>',
             '<td>' || (quantity * $HASHESPERCONTRACT / 1000000000)  || '</td>',
             '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
             '</tr>'
         FROM teller_sales
         WHERE status IS NULL OR status = 0
 EOF
-);  MESSAGE="$MESSAGE</table>"
+    );  MESSAGE="$MESSAGE</table>"
 
     # Some details about each teller
     MESSAGE="$MESSAGE<br><br><b>Basic Information:</b>"
-    MESSAGE="$MESSAGE<table border="1"><tr><th>Name</th><th>TOTAL Mining Power (GH/s)</th><th>SOLD Mining Power (GH/s)</th><th>Total Customers</th><th>Payout Address</th></tr>"
+    MESSAGE="$MESSAGE<table border="1"><tr><th>Name</th><th>Email</th><th>TOTAL Mining Power (GH/s)</th><th>SOLD Mining Power (GH/s)</th><th>Total Customers</th><th>Payout Address</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
         SELECT
             '<tr>',
             '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '')) || '</td>',
+            '<td>' || email || '</td>',
             '<td>' || COALESCE(((SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
             '<td>' || ((SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = accounts.account_id)) * $HASHESPERCONTRACT / 1000000000)  || '</td>',
             '<td>' || (SELECT COUNT(*) FROM accounts sub WHERE contact = accounts.account_id) || '</td>',
@@ -1460,7 +1471,7 @@ EOF
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 0.30"
+    echo "Script Version 0.31"
 fi
 
 ##################################################################################################
