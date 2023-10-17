@@ -1121,7 +1121,7 @@ elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the
 
     MESSAGE="Hi Satoshi,<br><br>Here is a summary about each teller.<br><br>"
     MESSAGE="${MESSAGE}<i>Note: Any unsold hashpower by the Teller(s) is paid out to their Payout Address(es).<br>"
-    MESSAGE="${MESSAGE}Unutilized core-customer-purchased hashpower is counted as unsold and will also be paid out to their respective Tellers' address(es).</i><br>"
+    MESSAGE="${MESSAGE}Unutilized core-customer-purchased hashpower is counted as unsold and will also be paid out to the(se) same address(es).</i><br>"
     MESSAGE="$MESSAGE<br><hr><br><b>Unpaid:</b><br><table border="1"><tr><th>Name</th><th>Email</th><th>Sale ID</th><th>Mining Power (GH/s)</th><th>Time (Established)</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
