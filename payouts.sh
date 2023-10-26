@@ -1307,7 +1307,7 @@ EOF
             '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = sales.account_id) || '</td>',
             '<td>' || (SELECT email FROM accounts WHERE account_id = sales.account_id) || '</td>',
             '<td>' || sale_id || '</td>',
-            '<td>' || (SELECT SUM(quantity) FROM contracts WHERE sale_id = sales.sale_id AND active != 0) || '\' || quantity || '</td>',
+            '<td>' || (SELECT SUM(quantity) FROM contracts WHERE sale_id = sales.sale_id AND active != 0) || '/' || quantity || '</td>',
             '<td>' || quantity - (SELECT SUM(quantity) FROM contracts WHERE sale_id = sales.sale_id AND active != 0) || '</td>',
             '<td>' || DATETIME(sales.time, 'unixepoch', 'localtime') || '</td>',
             '</tr>'
