@@ -1463,7 +1463,7 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
-        /usr/local/sbin/send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins!" "$MESSAGE"
+        /usr/local/sbin/send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
     else
         /usr/local/sbin/send_email "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
     fi
