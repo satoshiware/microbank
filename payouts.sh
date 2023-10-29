@@ -1423,6 +1423,14 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
                     <td></td><td></td><td></td><td></td><td></td>
                     <td>($(awk -v coinvaluesats=${COINVALUESATS} 'BEGIN {printf "%'"'"'.8f\n", coinvaluesats / 100000000}') bitcoins)</td>
                 </tr>
+                    </tr><tr>
+                    <td></td>
+                    <td>${NETWORKPREFIX} Market Cap</sup></td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                    <td>$(awk -v coinvaluesats=${COINVALUESATS} -v total=$(sqlite3 $SQ3DBNAME "SELECT SUM(subsidy) * $EPOCHBLOCKS / 100000000 FROM payouts") 'BEGIN {printf "%'"'"'.2f\n", coinvaluesats * total / 100000000}') bitcoins</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                    <td>($(awk -v usdvaluesats=${USDVALUESATS} -v coinvaluesats=${COINVALUESATS} -v total=$(sqlite3 $SQ3DBNAME "SELECT SUM(subsidy) * $EPOCHBLOCKS / 100000000 FROM payouts") 'BEGIN {printf "%'"'"'.2f\n", coinvaluesats * total / usdvaluesats / 1000000}') Million USD)</td>
+                </tr>
             </table><br>
 
             <b><u>Key Terms</u></b>
