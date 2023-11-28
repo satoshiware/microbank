@@ -21,10 +21,10 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --help        Display this help message and exit
       --install     Install this script (teller) in /usr/local/sbin/teller
 
-      --watch       See all (watch) imports and corresponding details
+      --watch       See all addresses being "watched" with corresponding details
                     Parameters: (ADDRESS)
                         Note: Include an address (optional) to see just the details for that address
-      --import      Import watch wallet (can also be used to update the NAME and DESCRIPTION)
+      --record      Record or laod a public address into the watch wallet (can also be used to update the NAME and DESCRIPTION)
                     Parameters: ADDRESS  NAME  DESCRIPTION  (NOSCAN)
                         Note: Prevent the blockchain from being rescanned by including "NOSCAN" (optional)
                         Note: To rescan the blockchain manually enter "btc -rpcwallet=watch rescanblockchain"
@@ -35,7 +35,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --sweep       Sweep or import private keys into the Import wallet. It's good practice to transfer all monies from the Import wallet each session.
                     This is an overloaded routine:
                         Show Balance                Paramters:  None
-                        Import Private Key          Paramters:  PRIVATE_KEY  (NOSCAN)          Same notes under --import routine
+                        Import Private Key          Paramters:  PRIVATE_KEY  (NOSCAN)          Same notes under --record routine
                         Transfer to Bank Wallet     Paramters:  AMOUNT  (PRIORITY)             Same notes under --transfer routine
                         Send                        Paramters:  ADDRESS  AMOUNT  (PRIORITY)    Same notes under --send routine
       --balances    Show balances for the Mining and Bank wallets
@@ -84,7 +84,7 @@ elif [[ $1 = "--install" ]]; then # Installing this script (teller) in /usr/loca
         echo "The environment file \"/etc/default/teller.env\" already exits."
     fi
 
-elif [[ $1 = "--watch" ]]; then # See all (watch) imports and corresponding details. Include an address (optional) to see just the details for that address
+elif [[ $1 = "--watch" ]]; then # See all addresses being "watched" with corresponding details. Include an address (optional) to see just the details for that address
     ADDRESS="${2,,}"
     if [[ ! -z $ADDRESS ]]; then
         if ! [[ $($BTC validateaddress $ADDRESS | jq '.isvalid') == "true" ]]; then
@@ -110,7 +110,7 @@ elif [[ $1 = "--watch" ]]; then # See all (watch) imports and corresponding deta
     awk -F ';' '{printf("%s %15.8f %15.8f %15.8f %6d %6d %5d     %-30s %-s\n", $1, $2, $2 - $3, $3, $4, $5, $5 - $4, $6, $7)}' <<< ${data%?}
     echo ""
 
-elif [[ $1 = "--import" ]]; then # Import watch wallet (can also be used to update the NAME and DESCRIPTION)
+elif [[ $1 = "--record" ]]; then # Record or laod a public address into the watch wallet (can also be used to update the NAME and DESCRIPTION)
     ADDRESS="${2,,}"; NAME=$3; DESCRIPTION=$4
     if [[ -z $ADDRESS || -z $NAME || -z $DESCRIPTION ]]; then echo "Error! Insufficient Parameters!"; exit 1; fi
     if ! [[ $($BTC validateaddress $ADDRESS | jq '.isvalid') == "true" ]]; then
@@ -129,7 +129,7 @@ elif [[ $1 = "--import" ]]; then # Import watch wallet (can also be used to upda
     fi
 
 elif [[ $1 = "--remove" ]]; then # Remove watch wallet
-    $0 --import $2 "REMOVED" "REMOVED" NOSCAN
+    $0 --record $2 "REMOVED" "REMOVED" NOSCAN
 
 elif [[ $1 = "--sweep" ]]; then # Sweep or import private keys into the Import wallet. This is an overloaded routine!
     if [[ -z $2 ]]; then # Show Balance - Paramters: None
