@@ -1,5 +1,17 @@
 #!/bin/bash
 
+
+
+
+##################################################################################################
+# Make a backup - rsync onto node level 3's.
+# This script is the interface.
+# Check Marks for Bitcoin subscribed, Bought Sold AZ Money, and receive Text updates.
+# Add text messaging. What about the ability to see market rates asap! This would be cool.
+
+
+
+
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -9,10 +21,10 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    exit 1
 fi
 
-# Make sure the send_email routine is installed
-if ! command -v /usr/local/sbin/send_email &> /dev/null; then
-    echo "Error! The \"send_email\" routine could not be found!" | sudo tee -a $LOG
-    echo "Download the script and execute \"./send_email.sh --install\" to install this routine."
+# Make sure the send_messages routine is installed
+if ! command -v /usr/local/sbin/send_messages &> /dev/null; then
+    echo "Error! The \"send_messages\" routine could not be found!" | sudo tee -a $LOG
+    echo "Download the script and execute \"./send_messages.sh --install\" to install this routine."
     read -p "Press any enter to continue ..."
 fi
 
@@ -109,7 +121,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 
     Locations:
       This:                     /usr/local/sbin/payouts
-      Email Script:             /usr/local/sbin/send_email
+      Email Script:             /usr/local/sbin/send_messages
       Market Script:            /usr/local/sbin/market
       Log:                      /var/log/payout.log (~/log.payout.development)
       Data Base:                /var/lib/payouts.db (~/tmp_payouts.db.development)
@@ -443,7 +455,7 @@ EOF
             <b>Wallet (bank) Balance:</b> $bank_balance
 EOF
         )
-        /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "New Epoch Has Been Delivered" "$MESSAGE"
+        /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "New Epoch Has Been Delivered" "$MESSAGE"
 
     else
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
@@ -479,7 +491,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     if [ $((total_payment + 100000000)) -gt $bank_balance ]; then
         message="$(date) - Not enough money in the bank to send payouts! The bank has $bank_balance $DENOMINATION, but it needs $((total_payment + 100000000)) $DENOMINATION before any payouts will be sent."
         echo $message | sudo tee -a $LOG
-        /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Not Enough Money in The Bank" "$message"
+        /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Not Enough Money in The Bank" "$message"
     fi
 
     # Query db for tx_id, address, and amount - preparation to send out first set of payments
@@ -513,7 +525,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" conf_target=10 estimate_mode="economical" | jq '.txid')
         if [[ ! ${TXID//\"/} =~ ^[0-9a-f]{64}$ ]]; then
             echo "$(date) - Serious Error!!! Invalid TXID: $TXID" | sudo tee -a $LOG
-            /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
+            /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
             sudo touch /etc/send_payments_error_flag
             exit 1
         fi
@@ -527,7 +539,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         # Make sure the "count" of utxos to be generated is going down
         if [ $count -le $(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) ]; then
             echo "$(date) - Serious Error!!! Infinite loop while sending out payments!" | sudo tee -a $LOG
-            /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
+            /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
             sudo touch /etc/send_payments_error_flag
             exit 1
         fi
@@ -546,7 +558,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     # Make sure all payments have been sent!
     if [ 0 -lt $(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) ]; then
         echo "$(date) - Serious Error!!! Unfulfilled TXs in the DB after sending payments!" | sudo tee -a $LOG
-        /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
+        /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
         sudo touch /etc/send_payments_error_flag
         exit 1
     fi
@@ -585,7 +597,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         $t_txids
 EOF
     )
-    /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "All Payments have been completed successfully" "$MESSAGE"
+    /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "All Payments have been completed successfully" "$MESSAGE"
 
 elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are confirmed in the blockchain; update the DB
     # Get all the txs (including teller_txs) that have a valid TXID without a block height
@@ -628,7 +640,7 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
         message="$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations.<br><br>"
         message="${message} $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations."
 
-        /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Confirming Transaction(s) on The Blockchain" "$message"
+        /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Confirming Transaction(s) on The Blockchain" "$message"
     fi
 
 elif [[ $1 = "-m" || $1 = "--email-prep" ]]; then # Prepare all core customer notification emails for the latest epoch
@@ -729,7 +741,7 @@ EOF
     echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)." | sudo tee -a $LOG
 
     # Send Email
-    /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)."
+    /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)."
 
 elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared emails in the file "/var/tmp/payout.emails"
      # Check if file "payout.emails" exists or if it is empty
@@ -750,7 +762,7 @@ elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared email
 
     # Sending Emails NOW!!
     echo "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!" | sudo tee -a $LOG
-    /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
+    /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
     sudo mv /var/tmp/payout.emails /var/tmp/payout.emails.bak
     sudo touch /var/tmp/payout.emails
     while read -r line; do
@@ -1037,7 +1049,7 @@ EOF
         done
 
         # Send email
-        /usr/local/sbin/send_email "$NAME" "$EMAIL" "Bulk Hash Rate Purchase" "Hi $NAME,<br><br>Congratulations!!! You have purchased (automatically) some more hash rate (in bulk) to cover all your core customers!<br><br>At your convienence, negotiate payment (in SATS please) with your Lvl2 (Banker) Hub"
+        /usr/local/sbin/send_messages "$NAME" "$EMAIL" "Bulk Hash Rate Purchase" "Hi $NAME,<br><br>Congratulations!!! You have purchased (automatically) some more hash rate (in bulk) to cover all your core customers!<br><br>At your convienence, negotiate payment (in SATS please) with your Lvl2 (Banker) Hub"
     fi
 
 elif [[ $1 = "--deliver-contr" ]]; then # Mark a contract as delivered
@@ -1157,8 +1169,8 @@ EOF
 EOF
     ); MESSAGE="$MESSAGE</table>"
 
-    /usr/local/sbin/send_email "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
-    /usr/local/sbin/send_email "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
+    /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
+    /usr/local/sbin/send_messages "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
 
 elif [[ $1 = "--email-master-summary" ]]; then # Send sub account summary to a master
     MASTER_EMAIL=$2; EMAIL_ADMIN_IF_SET=$3
@@ -1195,9 +1207,9 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
-        /usr/local/sbin/send_email "$NAME" "${MASTER_EMAIL,,}" "Sub Account(s) Summary" "$MESSAGE"
+        /usr/local/sbin/send_messages "$NAME" "${MASTER_EMAIL,,}" "Sub Account(s) Summary" "$MESSAGE"
     else
-        /usr/local/sbin/send_email "$NAME" "$ADMINISTRATOREMAIL" "Sub Account(s) Summary" "$MESSAGE"
+        /usr/local/sbin/send_messages "$NAME" "$ADMINISTRATOREMAIL" "Sub Account(s) Summary" "$MESSAGE"
     fi
 
 elif [[ $1 = "--email-teller-summary" ]]; then # Send summary to a Teller (Level 1) Hub/Node
@@ -1354,12 +1366,12 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_EXECUTIVE ]]; then
-        /usr/local/sbin/send_email "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+        /usr/local/sbin/send_messages "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
     else
         if [[ "$EMAIL_EXECUTIVE" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then # See if there is a valid email passed
-            /usr/local/sbin/send_email "$NAME" "$EMAIL_EXECUTIVE" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Send email to passed email
+            /usr/local/sbin/send_messages "$NAME" "$EMAIL_EXECUTIVE" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Send email to passed email
         else
-            /usr/local/sbin/send_email "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Otherwise, send email to administrator
+            /usr/local/sbin/send_messages "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Otherwise, send email to administrator
         fi
     fi
 
@@ -1471,9 +1483,9 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
-        /usr/local/sbin/send_email "$NAME" "$EMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
+        /usr/local/sbin/send_messages "$NAME" "$EMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
     else
-        /usr/local/sbin/send_email "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
+        /usr/local/sbin/send_messages "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
     fi
 
 else
@@ -1481,6 +1493,3 @@ else
     echo "Run script with \"--help\" flag"
     echo "Script Version 0.31"
 fi
-
-##################################################################################################
-# Make a backup - rsync onto node level 3's.
