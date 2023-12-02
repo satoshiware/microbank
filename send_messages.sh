@@ -95,7 +95,7 @@ RESPONSE=$(curl --request POST --url $API_EMAIL --header 'accept: application/js
 # Log entry
 echo "$(date) - $RESPONSE; Name=\"$NAME\"; Email=\"$EMAIL\"; Subject=\"$SUBJECT\"; Message=\"${MESSAGE:0:100}...\"" | sudo tee -a $LOG
 
-
+exit
 
 
 
@@ -116,9 +116,7 @@ curl --request POST \
 }
 '
 
-
-
-generate_post_data()
+generate_post_sms_data()
 {
     cat <<EOF
     {
@@ -130,7 +128,7 @@ EOF
 }
 
 # Sending sms
-RESPONSE=$(curl --request POST --url $API_SMS --header 'accept: application/json' --header "api-key: ${KEY_SMS}" --header 'content-type: application/json' --data "$(generate_post_data)")
+RESPONSE=$(curl --request POST --url $API_SMS --header 'accept: application/json' --header "api-key: ${KEY_SMS}" --header 'content-type: application/json' --data "$(generate_post_sms_data)")
 
 
 
