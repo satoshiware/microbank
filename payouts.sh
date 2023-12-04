@@ -6,7 +6,6 @@
 ##################################################################################################
 # Make a backup - rsync onto node level 3's.
 # This script is the interface.
-# Check Marks for Bitcoin subscribed, Bought Sold AZ Money, and receive Text updates.
 # Add text messaging. What about the ability to see market rates asap! This would be cool.
 
 
@@ -183,7 +182,10 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
         preferred_name TEXT,
         email TEXT NOT NULL UNIQUE,
         phone TEXT,
-        disabled INTEGER); /* FALSE = 0 or NULL; TRUE = 1 */
+        disabled INTEGER, /* FALSE = 0 or NULL; TRUE = 1 */
+		bitcoin INTEGER, /* FALSE = 0 or NULL; TRUE = 1; Mark true if the user has adopted Bitcoin (is migrating capital to Bitcoin) */
+		exchange INTEGER, /* FALSE = 0 or NULL; TRUE = 1; Mark true if the user has exchanged satoshis for microcurrency or is aware of the service */
+		text INTEGER); /* FALSE = 0 or NULL; TRUE = 1; Mark true if user has accepted and is willing to receive frequent text message updates */
     CREATE TABLE sales (
         sale_id INTEGER PRIMARY KEY,
         account_id INTEGER NOT NULL, /* This is who is/was accountable for the payment; it may vary from the account_id on the corresponding contracts. */
@@ -1256,7 +1258,7 @@ EOF
     MESSAGE="${MESSAGE}and your Teller account will autobuy <b><u>$TELLERBULKPURCHASE</u></b> of these Contracts as soon as you oversell all your current hashpower.<br><br><hr>"
 
     # Accounts
-    MESSAGE="$MESSAGE<br><b>Accounts:</b><br><table border="1"><tr><th>Name</th><th>Master</th><th>Email</th><th>Phone</th><th>Total Received</th></tr>"
+    MESSAGE="$MESSAGE<br><b>Accounts:</b><br><table border="1"><tr><th>Name</th><th>Master</th><th>Email</th><th>Phone</th><th>Total Received</th><th>Bitcoin</th><th>Exchange</th><th>Text</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
         SELECT
@@ -1266,6 +1268,9 @@ EOF
             '<td>' || email || '</td>',
             '<td>' || COALESCE(phone, '') || '</td>',
             '<td>' || (SELECT CAST(SUM(amount) AS REAL) / 100000000 FROM txs, contracts WHERE txs.contract_id = contracts.contract_id AND accounts.account_id = contracts.account_id) || '</td>',
+			'<td>' || CASE WHEN bitcoin IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
+			'<td>' || CASE WHEN exchange IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
+			'<td>' || CASE WHEN text_messaging IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
             '</tr>'
         FROM accounts
         WHERE contact = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') AND disabled = 0
