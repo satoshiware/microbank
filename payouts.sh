@@ -1,16 +1,5 @@
 #!/bin/bash
 
-
-
-
-##################################################################################################
-# Make a backup - rsync onto node level 3's.
-# This script is the interface.
-# Add text messaging. What about the ability to see market rates asap! This would be cool.
-
-
-
-
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -61,8 +50,10 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     Options:
       -h, --help        Display this help message and exit
       -i, --install     Install this script (payouts) in /usr/local/sbin, sqlite3, the DB if it hasn't been already, and loads available epochs from the blockchain
-      -o, --control     Main control for the regular payouts; Run this in cron every 2 to 4 hours
-                        Install Example (Every Two Hours): Run "crontab -e" and insert the following line: "0 */2 * * * /usr/local/sbin/payouts -o"
+						Cron Install Example (Every Two Hours): Run "crontab -e" and insert the following line: "0 */2 * * * /usr/local/sbin/payouts -o"
+
+----- Payout controls -------------------------------------------------------------------------------------------------------
+	  -o, --control     Main control for the regular payouts (runs this with -e, -s, -c, -m, -n, and -w listed below); Run this in cron every 2 to 4 hours
       -e, --epoch       Look for next difficulty epoch and prepare the DB for next round of payouts
       -s, --send        Send the Money
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
@@ -72,13 +63,14 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 
 ----- Generic Database Queries ----------------------------------------------------------------------------------------------
       -d, --dump        Show all the contents of the database
-      -a, --accounts    Show all accounts
+      -a, --accounts    Show all accounts; Optional Parameter: TELLER
       -l, --sales       Show all sales; Optional Parameter: TELLER
       -r, --contracts   Show all contracts
       -x, --txs         Show all the transactions associated with the latest payout; Optional Parameter: TELLER
       -p, --payouts     Show all payouts thus far
       -t, --totals      Show total amounts for each contract (identical addresses are combinded)
       -z, --tel-addr    Show all Teller Addresses followed by just the active ones
+	  -u, --structure   Show database structure (each table with its volumes)
 
 ----- Admin/Root Interface --------------------------------------------------------------------------------------------------
       --add-user        Add a new account
@@ -86,7 +78,13 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                             Note*: LAST_NAME, PREFERRED_NAME, and MASTER_EMAIL are options
                             Note**: USER_PHONE is optional if MASTER_EMAIL was provided
       --disable-user    Disable an account (also disables associated contracts, but not the sales)
-                        Parameters: USER_EMAIL
+                        Parameter: USER_EMAIL
+	  --bitcoin			Mark user as having adopted Bitcoin
+						Parameter: USER_EMAIL
+	  --exchange		Mark user as activley exchanging bitcoins for their local microcurrency
+						Parameter: USER_EMAIL
+	  --text		    Mark user as willing and wanting to receive text updates and solicitations
+						Parameter: USER_EMAIL
       --add-sale        Add a sale
                         Parameters: USER_EMAIL  QTY  (TELLER)
                             Note: The USER_EMAIL is the one paying, but the resulting contracts can be assigned to anyone (i.e. Sales don't have to match Contracts).
@@ -105,8 +103,10 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       --add-teller-addr Add (new) address to teller address book
                         Parameters: EMAIL  MICRO_ADDRESS
                             Note: There can only be one active address at a time per account_id. The active old address (if any) is automatically deprecated.
-
------ Email -----------------------------------------------------------------------------------------------------------------
+	  --modify          Modify a value in the DB. Use with extreme care!
+                        Parameters: TABLE  COLUMN  REFERENCE_COLUMN  UNIQUE_REFERENCE_ROW  VALUE
+	
+----- Messaging -------------------------------------------------------------------------------------------------------------
       --email-banker-summary    Send summary of tellers to the administrator (Satoshi) and manager (Bitcoin CEO)
       --email-core-customer     Send payout email to "core customer"
                                 Parameters: NAME; EMAIL; AMOUNT; TOTAL; HASHRATE; CONTACTPHONE; CONTACTEMAIL; COINVALUESATS;
@@ -118,12 +118,31 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       --email-master-summary    Send sub account(s) summary to a master
                                 Parameters: EMAIL  (EMAIL_ADMIN_IF_SET)
 
-    Locations:
+----- Locations -------------------------------------------------------------------------------------------------------------
       This:                     /usr/local/sbin/payouts
       Email Script:             /usr/local/sbin/send_messages
       Market Script:            /usr/local/sbin/market
       Log:                      /var/log/payout.log (~/log.payout.development)
       Data Base:                /var/lib/payouts.db (~/tmp_payouts.db.development)
+	  Prepared Emails:			/var/tmp/payout.emails
+	  Previously Sent Emails:	/var/tmp/payout.emails.bak
+	  
+----- Interface -------------------------------------------------------------------------------------------------------------
+	#Add account --> Add sale????????????
+	
+	
+
+add sms controls
+
+##################################################################################################
+# Make a backup - rsync onto node level 3's.
+# This script is the interface.
+# Add text messaging. What about the ability to see market rates asap! This would be cool.
+
+
+
+
+
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
     # Installing the payouts script
@@ -287,6 +306,7 @@ EOF
         echo "Epoch period number $NEXTEPOCH has been loaded into the payout table"
     done
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Payout controls ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "-o" || $1 = "--control" ]]; then # Main control for the regular payouts; Run this in cron every 2 to 4 hours
     # Process next epoch period if it has arrived
     NEXTEPOCH=$((1 + $(sqlite3 $SQ3DBNAME "SELECT epoch_period FROM payouts ORDER BY epoch_period DESC LIMIT 1;")))
@@ -802,7 +822,13 @@ elif [[ $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the datab
     sqlite3 $SQ3DBNAME ".dump"
 
 elif [[ $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
-    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
+	TELLER=$2
+
+    if [[ -z $TELLER ]]; then
+		sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
+    else
+		sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE account_id IN(SELECT DISTINCT contact FROM accounts)"
+    fi
 
 elif [[ $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
     TELLER=$2
@@ -848,8 +874,18 @@ elif [[ $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each cont
 EOF
     echo ""
 
-elif [[ $1 = "--tel-addr" ]]; then # Show all Teller Addresses followed by just the active ones
+elif [[ $1 = "-z" || $1 = "--tel-addr" ]]; then # Show all Teller Addresses followed by just the active ones
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_address_book ORDER BY active"
+
+elif [[ $1 = "-u" || $1 = "--structure" ]]; then # Show database structure (each table with its volumes)
+	echo ""; echo "accounts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(accounts);"
+	echo ""; echo "sales:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(sales);"
+	echo ""; echo "teller_txs:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_txs);"
+	echo ""; echo "contracts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(contracts);"
+	echo ""; echo "teller_address_book:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_address_book);"
+	echo ""; echo "txs:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(txs);"
+	echo ""; echo "payouts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(payouts);"
+	echo ""; echo "teller_sales:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_sales);"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--add-user" ]]; then # Add a new account
@@ -920,6 +956,55 @@ elif [[ $1 = "--disable-user" ]]; then # Disable an account (i.e. marks an accou
     # Query the DB
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}'"
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE account_id = $account_id"
+
+elif [[ $1 = "--bitcoin" ]]; then # Mark user as having adopted Bitcoin
+    USER_EMAIL=$2
+
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
+    if [[ $exists == "0" ]]; then
+        echo "Error! Email does not exist in the database!"
+        exit 1
+    fi
+    account_id=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'") # Get the account_id
+
+    # Update the DB
+    sudo sqlite3 $SQ3DBNAME "UPDATE accounts SET bitcoin = 1 WHERE email = '${USER_EMAIL,,}'"
+
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}'"
+
+
+elif [[ $1 = "--exchange" ]]; then # Mark user as activley exchanging bitcoins for their local microcurrency
+    USER_EMAIL=$2
+
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
+    if [[ $exists == "0" ]]; then
+        echo "Error! Email does not exist in the database!"
+        exit 1
+    fi
+    account_id=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'") # Get the account_id
+
+    # Update the DB
+    sudo sqlite3 $SQ3DBNAME "UPDATE accounts SET exchange = 1 WHERE email = '${USER_EMAIL,,}'"
+
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}'"
+
+elif [[ $1 = "--text" ]]; then # Mark user as willing and wanting to receive text updates and solicitations
+    USER_EMAIL=$2
+
+    exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}')")
+    if [[ $exists == "0" ]]; then
+        echo "Error! Email does not exist in the database!"
+        exit 1
+    fi
+    account_id=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'") # Get the account_id
+
+    # Update the DB
+    sudo sqlite3 $SQ3DBNAME "UPDATE accounts SET exchange = 1 WHERE email = '${USER_EMAIL,,}'"
+
+    # Query the DB
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}'"
 
 elif [[ $1 = "--add-sale" ]]; then # Add a sale - Note: The User_Email is the one paying, but the resulting contracts can be assigned to anyone
     USER_EMAIL=$2; QTY=$3; TELLER=$4
@@ -1122,6 +1207,10 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
 
     # DB Query
     sqlite3 $SQ3DBNAME "SELECT * FROM teller_address_book WHERE account_id = $act_id"
+
+elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme care!
+	TABLE=$2; COLUMN=$3; REFERENCE_COLUMN=$4; UNIQUE_REFERENCE_ROW=$5; VALUE=$6
+	sudo sqlite3 $SQ3DBNAME "UPDATE $TABLE SET $COLUMN = $VALUE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
