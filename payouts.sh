@@ -9,10 +9,10 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    exit 1
 fi
 
-# Make sure the send_messages routine is installed
-if ! command -v /usr/local/sbin/send_messages &> /dev/null; then
-    echo "Error! The \"send_messages\" routine could not be found!" | sudo tee -a $LOG
-    echo "Download the script and execute \"./send_messages.sh --install\" to install this routine."
+# Make sure the send_messages -m routine is installed
+if ! command -v /usr/local/sbin/send_messages -m &> /dev/null; then
+    echo "Error! The \"send_messages -m\" routine could not be found!" | sudo tee -a $LOG
+    echo "Download the script and execute \"./send_messages -m.sh --install\" to install this routine."
     read -p "Press any enter to continue ..."
 fi
 
@@ -50,10 +50,10 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     Options:
       -h, --help        Display this help message and exit
       -i, --install     Install this script (payouts) in /usr/local/sbin, sqlite3, the DB if it hasn't been already, and loads available epochs from the blockchain
-						Cron Install Example (Every Two Hours): Run "crontab -e" and insert the following line: "0 */2 * * * /usr/local/sbin/payouts -o"
+                        Cron Install Example (Every Two Hours): Run "crontab -e" and insert the following line: "0 */2 * * * /usr/local/sbin/payouts -o"
 
 ----- Payout controls -------------------------------------------------------------------------------------------------------
-	  -o, --control     Main control for the regular payouts (runs this with -e, -s, -c, -m, -n, and -w listed below); Run this in cron every 2 to 4 hours
+      -o, --control     Main control for the regular payouts (runs this with -e, -s, -c, -m, -n, and -w listed below); Run this in cron every 2 to 4 hours
       -e, --epoch       Look for next difficulty epoch and prepare the DB for next round of payouts
       -s, --send        Send the Money
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
@@ -70,7 +70,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -p, --payouts     Show all payouts thus far
       -t, --totals      Show total amounts for each contract (identical addresses are combinded)
       -z, --tel-addr    Show all Teller Addresses followed by just the active ones
-	  -u, --structure   Show database structure (each table with its volumes)
+      -u, --structure   Show database structure (each table with its volumes)
 
 ----- Admin/Root Interface --------------------------------------------------------------------------------------------------
       --add-user        Add a new account
@@ -79,12 +79,12 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                             Note**: USER_PHONE is optional if MASTER_EMAIL was provided
       --disable-user    Disable an account (also disables associated contracts, but not the sales)
                         Parameter: USER_EMAIL
-	  --bitcoin			Mark user as having adopted Bitcoin
-						Parameter: USER_EMAIL
-	  --exchange		Mark user as activley exchanging bitcoins for their local microcurrency
-						Parameter: USER_EMAIL
-	  --text		    Mark user as willing and wanting to receive text updates and solicitations
-						Parameter: USER_EMAIL
+      --bitcoin         Mark user as having adopted Bitcoin
+                        Parameter: USER_EMAIL
+      --exchange        Mark user as activley exchanging bitcoins for their local microcurrency
+                        Parameter: USER_EMAIL
+      --text            Mark user as willing and wanting to receive text updates and solicitations
+                        Parameter: USER_EMAIL
       --add-sale        Add a sale
                         Parameters: USER_EMAIL  QTY  (TELLER)
                             Note: The USER_EMAIL is the one paying, but the resulting contracts can be assigned to anyone (i.e. Sales don't have to match Contracts).
@@ -103,9 +103,9 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       --add-teller-addr Add (new) address to teller address book
                         Parameters: EMAIL  MICRO_ADDRESS
                             Note: There can only be one active address at a time per account_id. The active old address (if any) is automatically deprecated.
-	  --modify          Modify a value in the DB. Use with extreme care!
+      --modify          Modify a value in the DB. Use with extreme care!
                         Parameters: TABLE  COLUMN  REFERENCE_COLUMN  UNIQUE_REFERENCE_ROW  VALUE
-	
+
 ----- Messaging -------------------------------------------------------------------------------------------------------------
       --email-banker-summary    Send summary of tellers to the administrator (Satoshi) and manager (Bitcoin CEO)
       --email-core-customer     Send payout email to "core customer"
@@ -120,17 +120,18 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 
 ----- Locations -------------------------------------------------------------------------------------------------------------
       This:                     /usr/local/sbin/payouts
+      Source Variables          /etc/default/payouts.env
       Email Script:             /usr/local/sbin/send_messages
       Market Script:            /usr/local/sbin/market
       Log:                      /var/log/payout.log (~/log.payout.development)
       Data Base:                /var/lib/payouts.db (~/tmp_payouts.db.development)
-	  Prepared Emails:			/var/tmp/payout.emails
-	  Previously Sent Emails:	/var/tmp/payout.emails.bak
-	  
+      Prepared Emails:          /var/tmp/payout.emails
+      Previously Sent Emails:   /var/tmp/payout.emails.bak
+
 ----- Interface -------------------------------------------------------------------------------------------------------------
-	#Add account --> Add sale????????????
-	
-	
+    #Add account --> Add sale????????????
+
+
 
 add sms controls
 
@@ -138,6 +139,7 @@ add sms controls
 # Make a backup - rsync onto node level 3's.
 # This script is the interface.
 # Add text messaging. What about the ability to see market rates asap! This would be cool.
+# The modify routine; should verify. then show before and after
 
 
 
@@ -202,9 +204,9 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/loc
         email TEXT NOT NULL UNIQUE,
         phone TEXT,
         disabled INTEGER, /* FALSE = 0 or NULL; TRUE = 1 */
-		bitcoin INTEGER, /* FALSE = 0 or NULL; TRUE = 1; Mark true if the user has adopted Bitcoin (is migrating capital to Bitcoin) */
-		exchange INTEGER, /* FALSE = 0 or NULL; TRUE = 1; Mark true if the user has exchanged satoshis for microcurrency or is aware of the service */
-		text INTEGER); /* FALSE = 0 or NULL; TRUE = 1; Mark true if user has accepted and is willing to receive frequent text message updates */
+        bitcoin INTEGER, /* FALSE = 0 or NULL; TRUE = 1; Mark true if the user has adopted Bitcoin (is migrating capital to Bitcoin) */
+        exchange INTEGER, /* FALSE = 0 or NULL; TRUE = 1; Mark true if the user has exchanged satoshis for microcurrency or is aware of the service */
+        text INTEGER); /* FALSE = 0 or NULL; TRUE = 1; Mark true if user has accepted and is willing to receive frequent text message updates */
     CREATE TABLE sales (
         sale_id INTEGER PRIMARY KEY,
         account_id INTEGER NOT NULL, /* This is who is/was accountable for the payment; it may vary from the account_id on the corresponding contracts. */
@@ -477,7 +479,7 @@ EOF
             <b>Wallet (bank) Balance:</b> $bank_balance
 EOF
         )
-        /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "New Epoch Has Been Delivered" "$MESSAGE"
+        /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "New Epoch Has Been Delivered" "$MESSAGE"
 
     else
         echo "$(date) - You have $(($BLOCKEPOCH - $($BTC getblockcount))) blocks to go for the next epoch (Number $NEXTEPOCH)" | sudo tee -a $LOG
@@ -513,7 +515,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     if [ $((total_payment + 100000000)) -gt $bank_balance ]; then
         message="$(date) - Not enough money in the bank to send payouts! The bank has $bank_balance $DENOMINATION, but it needs $((total_payment + 100000000)) $DENOMINATION before any payouts will be sent."
         echo $message | sudo tee -a $LOG
-        /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Not Enough Money in The Bank" "$message"
+        /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "Not Enough Money in The Bank" "$message"
     fi
 
     # Query db for tx_id, address, and amount - preparation to send out first set of payments
@@ -547,7 +549,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         TXID=$($BTC -rpcwallet=bank -named send outputs="{$utxos}" conf_target=10 estimate_mode="economical" | jq '.txid')
         if [[ ! ${TXID//\"/} =~ ^[0-9a-f]{64}$ ]]; then
             echo "$(date) - Serious Error!!! Invalid TXID: $TXID" | sudo tee -a $LOG
-            /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
+            /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Invalid TXID" "An invalid TXID was encountered while sending out payments"
             sudo touch /etc/send_payments_error_flag
             exit 1
         fi
@@ -561,7 +563,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         # Make sure the "count" of utxos to be generated is going down
         if [ $count -le $(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) ]; then
             echo "$(date) - Serious Error!!! Infinite loop while sending out payments!" | sudo tee -a $LOG
-            /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
+            /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Sending Payments Indefinitely" "Infinite loop while sending out payments."
             sudo touch /etc/send_payments_error_flag
             exit 1
         fi
@@ -580,7 +582,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     # Make sure all payments have been sent!
     if [ 0 -lt $(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) ]; then
         echo "$(date) - Serious Error!!! Unfulfilled TXs in the DB after sending payments!" | sudo tee -a $LOG
-        /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
+        /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "Serious Error - Unfulfilled TXs" "Unfulfilled TXs in the DB after sending payments."
         sudo touch /etc/send_payments_error_flag
         exit 1
     fi
@@ -619,7 +621,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         $t_txids
 EOF
     )
-    /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "All Payments have been completed successfully" "$MESSAGE"
+    /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "All Payments have been completed successfully" "$MESSAGE"
 
 elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are confirmed in the blockchain; update the DB
     # Get all the txs (including teller_txs) that have a valid TXID without a block height
@@ -662,7 +664,7 @@ elif [[ $1 = "-c" || $1 = "--confirm" ]]; then # Confirm the sent payouts are co
         message="$(date) - ${confirmed} transaction(s) was/were confirmed on the blockchain with 6 or more confirmations.<br><br>"
         message="${message} $((${#query[@]} - confirmed)) transaction(s) is/are still waiting to be confirmed on the blockchain with 6 or more confirmations."
 
-        /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Confirming Transaction(s) on The Blockchain" "$message"
+        /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "Confirming Transaction(s) on The Blockchain" "$message"
     fi
 
 elif [[ $1 = "-m" || $1 = "--email-prep" ]]; then # Prepare all core customer notification emails for the latest epoch
@@ -763,7 +765,7 @@ EOF
     echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)." | sudo tee -a $LOG
 
     # Send Email
-    /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)."
+    /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "Customer Emails Are Ready to Send" "$(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)."
 
 elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared emails in the file "/var/tmp/payout.emails"
      # Check if file "payout.emails" exists or if it is empty
@@ -784,7 +786,7 @@ elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared email
 
     # Sending Emails NOW!!
     echo "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!" | sudo tee -a $LOG
-    /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
+    /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
     sudo mv /var/tmp/payout.emails /var/tmp/payout.emails.bak
     sudo touch /var/tmp/payout.emails
     while read -r line; do
@@ -822,12 +824,12 @@ elif [[ $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the datab
     sqlite3 $SQ3DBNAME ".dump"
 
 elif [[ $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
-	TELLER=$2
+    TELLER=$2
 
     if [[ -z $TELLER ]]; then
-		sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
     else
-		sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE account_id IN(SELECT DISTINCT contact FROM accounts)"
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE account_id IN(SELECT DISTINCT contact FROM accounts)"
     fi
 
 elif [[ $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
@@ -878,14 +880,14 @@ elif [[ $1 = "-z" || $1 = "--tel-addr" ]]; then # Show all Teller Addresses foll
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_address_book ORDER BY active"
 
 elif [[ $1 = "-u" || $1 = "--structure" ]]; then # Show database structure (each table with its volumes)
-	echo ""; echo "accounts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(accounts);"
-	echo ""; echo "sales:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(sales);"
-	echo ""; echo "teller_txs:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_txs);"
-	echo ""; echo "contracts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(contracts);"
-	echo ""; echo "teller_address_book:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_address_book);"
-	echo ""; echo "txs:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(txs);"
-	echo ""; echo "payouts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(payouts);"
-	echo ""; echo "teller_sales:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_sales);"
+    echo ""; echo "accounts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(accounts);"
+    echo ""; echo "sales:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(sales);"
+    echo ""; echo "teller_txs:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_txs);"
+    echo ""; echo "contracts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(contracts);"
+    echo ""; echo "teller_address_book:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_address_book);"
+    echo ""; echo "txs:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(txs);"
+    echo ""; echo "payouts:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(payouts);"
+    echo ""; echo "teller_sales:"; sqlite3 $SQ3DBNAME ".mode column" "PRAGMA table_info(teller_sales);"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Admin/Root Interface ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--add-user" ]]; then # Add a new account
@@ -1136,7 +1138,7 @@ EOF
         done
 
         # Send email
-        /usr/local/sbin/send_messages "$NAME" "$EMAIL" "Bulk Hash Rate Purchase" "Hi $NAME,<br><br>Congratulations!!! You have purchased (automatically) some more hash rate (in bulk) to cover all your core customers!<br><br>At your convienence, negotiate payment (in SATS please) with your Lvl2 (Banker) Hub"
+        /usr/local/sbin/send_messages -m "$NAME" "$EMAIL" "Bulk Hash Rate Purchase" "Hi $NAME,<br><br>Congratulations!!! You have purchased (automatically) some more hash rate (in bulk) to cover all your core customers!<br><br>At your convienence, negotiate payment (in SATS please) with your Lvl2 (Banker) Hub"
     fi
 
 elif [[ $1 = "--deliver-contr" ]]; then # Mark a contract as delivered
@@ -1209,8 +1211,8 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
     sqlite3 $SQ3DBNAME "SELECT * FROM teller_address_book WHERE account_id = $act_id"
 
 elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme care!
-	TABLE=$2; COLUMN=$3; REFERENCE_COLUMN=$4; UNIQUE_REFERENCE_ROW=$5; VALUE=$6
-	sudo sqlite3 $SQ3DBNAME "UPDATE $TABLE SET $COLUMN = $VALUE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
+    TABLE=$2; COLUMN=$3; REFERENCE_COLUMN=$4; UNIQUE_REFERENCE_ROW=$5; VALUE=$6
+    sudo sqlite3 $SQ3DBNAME "UPDATE $TABLE SET $COLUMN = $VALUE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
@@ -1260,8 +1262,8 @@ EOF
 EOF
     ); MESSAGE="$MESSAGE</table>"
 
-    /usr/local/sbin/send_messages "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
-    /usr/local/sbin/send_messages "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
+    /usr/local/sbin/send_messages -m "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
+    /usr/local/sbin/send_messages -m "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
 
 elif [[ $1 = "--email-master-summary" ]]; then # Send sub account summary to a master
     MASTER_EMAIL=$2; EMAIL_ADMIN_IF_SET=$3
@@ -1298,9 +1300,9 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
-        /usr/local/sbin/send_messages "$NAME" "${MASTER_EMAIL,,}" "Sub Account(s) Summary" "$MESSAGE"
+        /usr/local/sbin/send_messages -m "$NAME" "${MASTER_EMAIL,,}" "Sub Account(s) Summary" "$MESSAGE"
     else
-        /usr/local/sbin/send_messages "$NAME" "$ADMINISTRATOREMAIL" "Sub Account(s) Summary" "$MESSAGE"
+        /usr/local/sbin/send_messages -m "$NAME" "$ADMINISTRATOREMAIL" "Sub Account(s) Summary" "$MESSAGE"
     fi
 
 elif [[ $1 = "--email-teller-summary" ]]; then # Send summary to a Teller (Level 1) Hub/Node
@@ -1357,9 +1359,9 @@ EOF
             '<td>' || email || '</td>',
             '<td>' || COALESCE(phone, '') || '</td>',
             '<td>' || (SELECT CAST(SUM(amount) AS REAL) / 100000000 FROM txs, contracts WHERE txs.contract_id = contracts.contract_id AND accounts.account_id = contracts.account_id) || '</td>',
-			'<td>' || CASE WHEN bitcoin IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
-			'<td>' || CASE WHEN exchange IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
-			'<td>' || CASE WHEN text_messaging IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
+            '<td>' || CASE WHEN bitcoin IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
+            '<td>' || CASE WHEN exchange IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
+            '<td>' || CASE WHEN text_messaging IS NULL OR '0' THEN 'NO' ELSE 'YES' END || '</td>',
             '</tr>'
         FROM accounts
         WHERE contact = (SELECT account_id FROM accounts WHERE email = '${CONTACT_EMAIL,,}') AND disabled = 0
@@ -1460,12 +1462,12 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_EXECUTIVE ]]; then
-        /usr/local/sbin/send_messages "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
+        /usr/local/sbin/send_messages -m "$NAME" "${CONTACT_EMAIL,,}" "Teller (Lvl 1) Contract Summary" "$MESSAGE"
     else
         if [[ "$EMAIL_EXECUTIVE" =~ ^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$ ]]; then # See if there is a valid email passed
-            /usr/local/sbin/send_messages "$NAME" "$EMAIL_EXECUTIVE" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Send email to passed email
+            /usr/local/sbin/send_messages -m "$NAME" "$EMAIL_EXECUTIVE" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Send email to passed email
         else
-            /usr/local/sbin/send_messages "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Otherwise, send email to administrator
+            /usr/local/sbin/send_messages -m "$NAME" "$ADMINISTRATOREMAIL" "Teller (Lvl 1) Contract Summary" "$MESSAGE" # Otherwise, send email to administrator
         fi
     fi
 
@@ -1577,13 +1579,13 @@ EOF
 
     # Send Email
     if [[ -z $EMAIL_ADMIN_IF_SET ]]; then
-        /usr/local/sbin/send_messages "$NAME" "$EMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
+        /usr/local/sbin/send_messages -m "$NAME" "$EMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
     else
-        /usr/local/sbin/send_messages "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
+        /usr/local/sbin/send_messages -m "$NAME" "$ADMINISTRATOREMAIL" "You mined $AMOUNT coins! (Payout $LATEST_EPOCH_PERIOD/$MAX_EPOCH_PERIOD)" "$MESSAGE"
     fi
 
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 0.31"
+    echo "Script Version 0.33"
 fi
