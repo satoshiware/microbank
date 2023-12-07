@@ -13,7 +13,7 @@ fi
 if ! command -v /usr/local/sbin/send_messages -m &> /dev/null; then
     echo "Error! The \"send_messages -m\" routine could not be found!" | sudo tee -a $LOG
     echo "Download the script and execute \"./send_messages -m.sh --install\" to install this routine."
-    read -p "Press any enter to continue ..."
+    read -p "Press enter to continue ..."
 fi
 
 # Load envrionment variables and then verify
@@ -41,7 +41,7 @@ SQ3DBNAME=~/tmp_payouts.db.development # This line is automatically commented ou
 if [[ $SQ3DBNAME == *"development"* && ! ($1 == "-i" || $1 == "--install") ]]; then
     LOG=~/log.payout.development
     if [ ! -f ~/tmp_payouts.db.development ]; then sudo cp /var/lib/payouts.db ~/tmp_payouts.db.development; fi
-    echo ""; read -p "You are in development mode! Press any enter to continue ..."; echo ""
+    echo ""; read -p "You are in development mode! Press enter to continue ..."; echo ""
 fi
 
 # See which payouts parameter was passed and execute accordingly
@@ -139,7 +139,6 @@ add sms controls
 # Make a backup - rsync onto node level 3's.
 # This script is the interface.
 # Add text messaging. What about the ability to see market rates asap! This would be cool.
-# The modify routine; should verify. then show before and after
 
 
 
@@ -1208,11 +1207,15 @@ elif [[ $1 = "--add-teller-addr" ]]; then # Add (new) address to teller address 
     sudo sqlite3 $SQ3DBNAME "INSERT INTO teller_address_book (account_id, time, active, micro_address) VALUES ($act_id, $(date +%s), 1, '${MICRO_ADDRESS,,}');"
 
     # DB Query
-    sqlite3 $SQ3DBNAME "SELECT * FROM teller_address_book WHERE account_id = $act_id"
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM teller_address_book WHERE account_id = $act_id"
 
 elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme care!
     TABLE=$2; COLUMN=$3; REFERENCE_COLUMN=$4; UNIQUE_REFERENCE_ROW=$5; VALUE=$6
-    sudo sqlite3 $SQ3DBNAME "UPDATE $TABLE SET $COLUMN = $VALUE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
+
+    echo "Rows to be modified:"; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
+    read -p "Press enter to continue ..."
+    sudo sqlite3 $SQ3DBNAME "UPDATE $TABLE SET $COLUMN = '$VALUE' WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
+    echo ""; echo "After modification:"; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
