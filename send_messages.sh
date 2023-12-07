@@ -4,7 +4,7 @@
 LOG=/var/log/send_messages.log
 if [[ -f /etc/default/send_messages.env && ! ($1 == "-i" || $1 == "--install") ]]; then
     source /etc/default/send_messages.env
-    if [[ -z $API_EMAIL || -z $API_SMS || -z $KEY_EMAIL || -z $KEY_SMS || -z $SENDER_EMAIL_NAME || -z $SENDER_EMAIL || -z $SENDER_SMS_NAME ]]; then
+    if [[ -z $API_EMAIL || -z $API_SMS || -z $KEY_EMAIL || -z $KEY_SMS || -z $SENDER_EMAIL_NAME || -z $SENDER_EMAIL || -z $SENDER_SMS_PHONE ]]; then
         echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/send_messages.env\" file"
         exit 1;
     fi
@@ -72,12 +72,13 @@ EOF
         read -p "SMS API key to send sms (e.g. \"xkeysib-05...76-9...1\"): "; echo "KEY_SMS=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
         read -p "Sender email name (e.g. \"AZ Money\"): "; echo "SENDER_EMAIL_NAME=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
         read -p "Sender email (e.g. satoshi@somemicrocurrency.com): "; echo "SENDER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
-        read -p "Sender SMS name (Limit name to 11 alphanumeric characters with no spaces) (e.g. \"BTCofAZ\"): "; echo "SENDER_SMS_NAME=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
+        read -p "Sender SMS phone (add country prefix; no spaces) (e.g. \"14809198257\"): "; echo "SENDER_SMS_PHONE=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
     else
         echo "The environment file \"/etc/default/send_messages.env\" already exits."
     fi
 
 elif [[ $1 = "-s" || $1 = "--sms" ]]; then # Send SMS (160 Characters Max)
+    # Tested with telnyx.com phone service
     PHONE=$2; MESSAGE=$3
 
     # Verify phone number is good for the U.S.
@@ -93,24 +94,23 @@ elif [[ $1 = "-s" || $1 = "--sms" ]]; then # Send SMS (160 Characters Max)
     {
         cat <<EOF
         {
-            "sender": "$SENDER_SMS_NAME",
-            "recipient": "${PHONE}",
-            "content":"${MESSAGE}",
-            "type": "transactional",
-            "tag": "information",
-            "unicodeEnabled": true
+            "type": "MMS",
+            "from": "+${SENDER_SMS_PHONE}",
+            "to": "+${PHONE}",
+            "text": "${MESSAGE}"
         }
 EOF
     }
 
-    # Sending sms
-    RESPONSE=$(curl --request POST --url $API_SMS --header 'accept: application/json' --header "api-key: ${KEY_SMS}" --header 'content-type: application/json' --data "$(generate_post_sms_data)")
+    # Sending MMS ~1500 characters (~500 w\ unicode)
+    RESPONSE=$(curl --request POST --url $API_SMS --header 'Content-Type: application/json' --header "Accept: application/json" --header "Authorization: Bearer ${KEY_SMS}" --data "$(generate_post_sms_data)")
     echo $RESPONSE
 
     # Log entry
-    echo "$(date) - $RESPONSE; Phone=\"$2\"; Message=\"${MESSAGE:0:100}...\"" | sudo tee -a $LOG
+    echo "$(date) - $RESPONSE" | sudo tee -a $LOG
 
 elif [[ $1 = "-m" || $1 = "--email" ]]; then # Send Email
+    # Tested with brevo.com email service
     NAME=$2; EMAIL=$3; SUBJECT=$4; MESSAGE=$5
 
     if [[ -z $NAME || -z $EMAIL || -z $SUBJECT || -z $MESSAGE ]]; then
@@ -151,5 +151,5 @@ EOF
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 0.08"
+    echo "Script Version 0.10"
 fi
