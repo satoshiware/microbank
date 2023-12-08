@@ -69,7 +69,7 @@ EOF
         read -p "EMAIL API address (e.g. \"https://api.brevo.com/v3/smtp/email\"): "; echo "API_EMAIL=\"$REPLY\"" | sudo tee /etc/default/send_messages.env > /dev/null
         read -p "SMS API address (e.g. \"https://api.brevo.com/v3/transactionalSMS/sms\"): "; echo "API_SMS=\"$REPLY\"" | sudo tee /etc/default/send_messages.env > /dev/null
         read -p "EMAIL API key to send email (e.g. \"xkeysib-05...76-9...1\"): "; echo "KEY_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
-        read -p "SMS API key to send sms (e.g. \"xkeysib-05...76-9...1\"): "; echo "KEY_SMS=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
+        read -p "SMS API key to send sms (e.g. \"KEY017D...b3_5z...cJ\"): "; echo "KEY_SMS=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
         read -p "Sender email name (e.g. \"AZ Money\"): "; echo "SENDER_EMAIL_NAME=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
         read -p "Sender email (e.g. satoshi@somemicrocurrency.com): "; echo "SENDER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
         read -p "Sender SMS phone (add country prefix; no spaces) (e.g. \"14809198257\"): "; echo "SENDER_SMS_PHONE=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
