@@ -133,11 +133,10 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 
 
 
-add sms controls
-
 ##################################################################################################
 # Make a backup - rsync onto node level 3's.
 # This script is the interface.
+#sms env file has keys and not secure.
 # Add text messaging. What about the ability to see market rates asap! This would be cool.
 
 
