@@ -517,11 +517,16 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
     fi
 
     # Query db for tx_id, address, and amount - preparation to send out first set of payments
+    start_time=$(date +%s)
     tmp=$(sqlite3 $SQ3DBNAME "SELECT txs.tx_id, contracts.micro_address, txs.amount FROM contracts, txs WHERE contracts.contract_id = txs.contract_id AND txs.txid IS NULL LIMIT $TX_BATCH_SZ")
+    table="txs"
+    if [ -z "${tmp}" ]; then
+        tmp=$(sqlite3 $SQ3DBNAME "SELECT tx_id, (SELECT micro_address FROM teller_address_book sub WHERE active = 1 AND account_id = teller_txs.account_id), amount FROM teller_txs WHERE txid IS NULL LIMIT $TX_BATCH_SZ")
+        table="teller_txs" # Now working on the teller txs
+    fi
     eol=$'\n'; read -a query <<< ${tmp//$eol/ }
     total_sending=0
-    start_time=$(date +%s)
-    table="txs" # Will be working on the "txs" table initially then the "teller_txs" afterwards
+
     while [ ! -z "${tmp}" ]; do
         count=$(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE txid IS NULL") + $(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM teller_txs WHERE txid IS NULL"))) # Get the total count of utxos to be generated
         echo "There are $count UTXOs left to be generated and submitted. (Batch Size: $TX_BATCH_SZ UTXOs/TX)"
