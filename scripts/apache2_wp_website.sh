@@ -196,7 +196,7 @@ sudo -u www-data wp plugin install salt-shaker --force --activate # Salt Shaker
 sudo -u www-data wp plugin install updraftplus --force --activate # UpdraftPlus
 sudo -u www-data wp plugin install wp-mail-smtp --force --activate # WP Mail SMTP
 
-########## Configure the EFF (Electronic Frontier Foundation) certbot for SSL certificates ##############
+########## Configure the "Let's Encrypt" certbot for SSL certificates ##############
 # If there is no subdomain (only a single '.'), add a second (identical) DNS with the "www." prefix
 if [[ ${DNS//[^.]} == "." ]]; then DNS=$DNS,www.$DNS; fi
 # Get new certificate and have certbot edit the apache configurations automatically
