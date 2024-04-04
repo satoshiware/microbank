@@ -1,9 +1,5 @@
 #!/bin/bash
 
-################ Add backup ssh login ######### Can you backup all the connectivity and restore that???? in case of complete failure??? !!!!!!!!!!!!!!!!!!!!!!!!!!!
-##############!!!!!!!!!!!!!!!! Add a bunch of information here for the user !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-###!!!!!!!!!!!!!!! Let em know they gotaa find out of the file is legit with the signature and all.
-
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -18,9 +14,28 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if not already.
 
+# Give the user pertinent information about this script and how to use it.
+echo "This script installs a p2p micronode (within a cluster) used to manage connections with all other internal and external nodes."
+echo "You will need the micronode download URL (tar.gz file) with its SHA 256 Checksum to continue."
+echo "To execute this script, login as a sudo user (that is not root) and execute the following commands:"
+echo "    sudo apt-get -y install git"
+echo "    cd ~; git clone https://github.com/satoshiware/microbank"
+echo "    cd microbank/scripts"
+echo "    sudo chmod +x micronode_cluster_p2p.sh"
+echo "    ./micronode_cluster_p2p.sh"
+echo ""
+echo "Don't forget to install the connection utility:"
+echo "    ./p2pconnect.sh --install "
+echo ""
+echo "FYI:"
+echo "    Use the p2pconnect utility (just type \"p2pconnect\" at the prompt) to create, view, and delete connections."
+echo "    The \"$USER/.ssh/authorized_keys\" file contains administrator login keys."
+echo "    The \"/var/lib/bitcoin/micro\" directory contains debug logs, blockchain, etc."
+read -p "Press the enter key to continue..."
+
 # Create .ssh folder and authorized_keys file if it does not exist
 if ! [ -f ~/.ssh/authorized_keys ]; then
-	sudo mkdir -p ~/.ssh
+    sudo mkdir -p ~/.ssh
     sudo touch ~/.ssh/authorized_keys
     sudo chown -R $USER:$USER ~/.ssh
     sudo chmod 700 ~/.ssh
@@ -43,7 +58,7 @@ wget $SOURCE
 if ! [ -f ~/${SOURCE##*/} ]; then echo "Error: Could not download source!"; exit 1; fi
 if [[ ! "$(sha256sum ~/${SOURCE##*/})" == *"$CHECKSUM"* ]]; then
     echo "Error: SHA 256 Checksum for file \"~/${SOURCE##*/}\" was not what was expected!"
-	exit 1
+    exit 1
 fi
 tar -xzf $SOURCE
 rm $SOURCE
