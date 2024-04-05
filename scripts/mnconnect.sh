@@ -2,8 +2,7 @@
 
 ###todo:
       # finish "--view"
-	  # about section in the --help
-	  
+
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -154,7 +153,7 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information
 
     echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info
     echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info
-    
+
     sudo chmod 400 /etc/micronode.info
 else
     $0 --help
