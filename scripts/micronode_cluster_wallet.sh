@@ -215,10 +215,11 @@ sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc
 # Backup Wallets
 sudo mkdir -p /media/usb
 sudo mount /dev/sda1 /media/usb
-sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/mining/wallet.dat ~/backup/mining.dat
-sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/bank/wallet.dat ~/backup/bank.dat
-#sudo unmount /dev/sda1
-#sudo rm -rf /media/usb
+sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/mining/wallet.dat /media/usb/mining.dat
+sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/bank/wallet.dat /media/usb/bank.dat
+sudo install -C -m 400 /root/passphrase /media/usb/passphrase
+sudo umount /dev/sda1
+sudo rm -rf /media/usb
 
 # Create Aliases to lock and unlocks (24 Hours) wallets
 echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \\\$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \\\$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
