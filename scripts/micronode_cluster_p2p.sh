@@ -22,16 +22,22 @@ To run this script, you'll need the micronode download URL (tar.gz file) with it
 To execute this script, login as a sudo user (that is not root) and execute the following commands:
     sudo apt-get -y install git
     cd ~; git clone https://github.com/satoshiware/microbank
-    cd microbank/scripts
-    sudo chmod +x micronode_cluster_p2p.sh
-    ./micronode_cluster_p2p.sh
+    bash ./microbank/scripts/micronode_cluster_p2p.sh
+    rm -rf microbank
 
 FYI:
     Use the p2pconnect utility (just type "p2pconnect" at the prompt) to create, view, and delete connections.
+
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
+    The bitcoind's log files can be view with this file: "/var/log/bitcoin/micro/debug.log" (links to /var/lib/bitcoin/micro/debug.log)
 
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
+
+Update/Upgrade "wallet" micronode utilities
+    cd ~; git clone https://github.com/satoshiware/microbank
+    bash ~/microbank/scripts/p2pconnect.sh -i
+    rm -rf microbank
 EOF
 read -p "Press the enter key to continue..."
 
