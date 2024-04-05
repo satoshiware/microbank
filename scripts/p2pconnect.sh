@@ -1,7 +1,8 @@
 #!/bin/bash
 
 ###todo:
-      # Add script to inform when a connections go down.
+      # finish "--view"
+	  # about section in the --help
 	  
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
@@ -201,7 +202,7 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
     fi
 
     # Delete outbound connections
-    LOCAL_PORT=$(grep -o 'LOCAL_PORT=[0-9]*' /etc/default/p2pssh@${2}*{p2p,lvl3} 2> /dev/null | cut -d '=' -f 2) # Get the "Local Port" that corresponds with the time stamp
+    LOCAL_PORT=$(grep -o 'LOCAL_PORT=[0-9]*' /etc/default/p2pssh@${2}* 2> /dev/null | cut -d '=' -f 2) # Get the "Local Port" that corresponds with the time stamp
 
     sudo rm /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
 
@@ -213,20 +214,15 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
 
     sudo sed -i "/${2}/d" /root/.ssh/known_hosts 2> /dev/null # Remove the known host containing the time stamp
 
-    sudo systemctl disable p2pssh@${2}-p2p --now 2> /dev/null # Disable/remove systemd services related to the time stamp
-    sudo systemctl reset-failed p2pssh@${2}-p2p 2> /dev/null
-    sudo systemctl disable p2pssh@${2}-stratum --now 2> /dev/null
-    sudo systemctl reset-failed p2pssh@${2}-stratum 2> /dev/null
-    sudo systemctl disable p2pssh@${2}-lvl3 --now 2> /dev/null
-    sudo systemctl reset-failed p2pssh@${2}-lvl3 2> /dev/null
+    sudo systemctl disable p2pssh@${2} --now 2> /dev/null # Disable/remove systemd services related to the time stamp
+    sudo systemctl reset-failed p2pssh@${2} 2> /dev/null
 
-    # Delete inbound connections @Level 1, 2, and 3
-    sudo sed -i "/${2}/d" /home/p2p/.ssh/authorized_keys 2> /dev/null # Remove key with comment containing the time stamp
-    sudo sed -i "/${2}/d" /home/stratum/.ssh/authorized_keys 2> /dev/null # Remove key with comment containing the time stamp
+    # Delete inbound connections
+    sudo sed -i "/${2}/d" /home/p2p/.ssh/authorized_keys 2> /dev/null # Remove the key with a comment containing the passed "time stamp"
 
-    # Force disconnect all p2p and stratum users
-    P2PSTRATUMPIDS=$(ps -u p2p 2> /dev/null | grep sshd)$(ps -u stratum 2> /dev/null | grep sshd)
-    while IFS= read -r line ; do sudo kill -9 $(echo $line | cut -d ' ' -f 1) 2> /dev/null; done <<< "$P2PSTRATUMPIDS"
+    # Force disconnect all users
+    P2P_PIDS=$(ps -u p2p 2> /dev/null | grep sshd)
+    while IFS= read -r line ; do sudo kill -9 $(echo $line | cut -d ' ' -f 1) 2> /dev/null; done <<< "$P2P_PIDS"
 
 elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for this node
     if [ -f "/etc/micronode.info" ]; then
