@@ -28,7 +28,7 @@ To execute this script, login as a sudo user (that is not root) and execute the 
 
 FYI:
     Use the p2pconnect utility (just type "p2pconnect" at the prompt) to create, view, and delete connections.
-    The "\$USER/.ssh/authorized_keys" file contains administrator login keys.
+    The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
 
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
@@ -206,7 +206,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable ssh
 sudo systemctl enable bitcoind
 
-# Install the micronode connect utility (mnconnect.sh)
+# Install the p2p micronode connect utility (p2pconnect.sh)
 bash ~/microbank/scripts/p2pconnect.sh -i
 
 # Restart the machine
