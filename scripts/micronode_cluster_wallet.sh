@@ -37,14 +37,6 @@ FYI:
 EOF
 read -p "Press the enter key to continue..."
 
-# Backup Wallets
-sudo mkdir -p /media/usb
-sudo mount /dev/sda1 /media/usb
-sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/mining/wallet.dat ~/backup/mining.dat
-sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/bank/wallet.dat ~/backup/bank.dat
-sudo unmount /dev/sda1
-sudo rm -rf /media/usb
-
 # Create .ssh folder and authorized_keys file if it does not exist
 if ! [ -f ~/.ssh/authorized_keys ]; then
     sudo mkdir -p ~/.ssh
@@ -219,6 +211,14 @@ sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="import" descriptors=false load_on_startup=true
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="mining" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
+
+# Backup Wallets
+sudo mkdir -p /media/usb
+sudo mount /dev/sda1 /media/usb
+sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/mining/wallet.dat ~/backup/mining.dat
+sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/bank/wallet.dat ~/backup/bank.dat
+#sudo unmount /dev/sda1
+#sudo rm -rf /media/usb
 
 # Create Aliases to lock and unlocks (24 Hours) wallets
 echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \\\$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \\\$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
