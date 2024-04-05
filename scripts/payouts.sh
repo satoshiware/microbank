@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Todo: Don't create the environment file during install
+
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
