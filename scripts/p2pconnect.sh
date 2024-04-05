@@ -2,8 +2,7 @@
 
 ###todo:
       # finish "--view"
-	  # about section in the --help
-	  
+
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -53,7 +52,7 @@ EOF
 
 elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
     echo "Let's configure an inbound connection from a wallet, stratum, or electrum node!"
-	read -p "What would you like to call this connection? (e.g. \"wallet\", \"stratum\", or \"electrum\"): " CONNNAME
+    read -p "What would you like to call this connection? (e.g. \"wallet\", \"stratum\", or \"electrum\"): " CONNNAME
     read -p "What is the node's public key: " PUBLICKEY
     read -p "What's the nodes UID? (Unique ID): " TMSTAMP # Node UIDs are based on unix time stamps
 
@@ -72,7 +71,7 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
     fi
 
     echo "Let's configure a (two-way) connection with another bank!"
-	read -p "What would you like to call this connection: " CONNNAME
+    read -p "What would you like to call this connection: " CONNNAME
     read -p "What is the banks's p2p public key: " P2PKEY
     read -p "What's the bank's p2p UID? (Unique ID): " TMSTAMP # Node UIDs are based on unix time stamps
 
@@ -81,7 +80,7 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
         exit 1
     fi
 
-	# With the parameters collected, set the inboud configuration
+    # With the parameters collected, set the inboud configuration
     echo "${P2PKEY} # ${CONNNAME}, ${TMSTAMP}, P2P" | sudo tee -a /home/p2p/.ssh/authorized_keys
 
     echo "Now, let's configure the outbound parameters!"
@@ -244,7 +243,7 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information
 
     echo "Hostname: $(hostname)" | sudo tee -a /etc/micronode.info
     echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info
-	read -p "What is the Domain Address of this micronode? (e.g. p2p.mymicrobank.com): "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info
+    read -p "What is the Domain Address of this micronode? (e.g. p2p.mymicrobank.com): "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info
     read -p "What is the External SSH port for this micronode? (default 22): "; if [ -z $REPLY ]; then REPLY="22"; fi; echo "SSH Port: $REPLY" | sudo tee -a /etc/micronode.info
 
     echo "Local IP: $(hostname -I)" | sudo tee -a /etc/micronode.info
@@ -254,7 +253,7 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information
 
     if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
     echo "Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info
-    
+
     # Remove unwanted/unused host keys
     sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
     sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
@@ -262,7 +261,7 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information
 
     echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info
     echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info
-    
+
     sudo chmod 400 /etc/micronode.info
 
 else
