@@ -4,6 +4,12 @@
 ### Need to make the update routine so it can run with as root. This script stops if is run as root.
 ### Did the log rotate work for the stratum log files?????????????????? micronode level 3
 
+
+#Update/Upgrade "stratum" micronode utilities
+#    cd ~; git clone https://github.com/satoshiware/microbank
+#    bash ~/microbank/scripts/stmutility.sh -i
+#    rm -rf microbank
+
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -46,9 +52,25 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -r, --remote      Configure inbound connection for a remote mining operation
       -u, --update      Load a new mining address if the previous one has been used
       -s, --status      View the current status of the pool
-      -m, --miners       # Show miners and hashrates
+      -m, --miners      Show miners and hashrates
       -b, --blocks      List the latest (40) blocks solved
       -t, --tail        Display the tail end of the debug log
+
+    With this tool, you can view all the pertinent information to ensure a healthy mining operation.
+    Also, with this tool and the help of the mnconnect utility, you can set up an incoming connection for a remote mining operation.
+        Run the "~/microbank/micronode_stratum_remote.sh" on a SBC (e.g. Raspberry Pi Zero 2) to set it up for the "Remote Access Point"
+
+Pertinent file locations:
+    /usr/local/sbin/stmutility
+    /var/log/ckpool/ckpool.log
+    /var/log/ckpool/users/*     # There's a file for each miner
+    /var/log/ckpool/pool/pool.status
+    /home/p2p/.ssh/authorized_keys
+
+Notes:
+    Once configured, just point the miner(s) to this node (or the "Remote Access Point") via its private network static ip on port 3333.
+        Example: stratum+tcp://$IP_ADDRESS:3333
+    Run the "usb_miner.sh" on a SBC (e.g. Raspberry Pi Zero 2W [WIRELESS]) to setup and run a USB miner (e.g. R909)
 EOF
 
 elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for a remote mining operation
