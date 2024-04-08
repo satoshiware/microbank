@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Todo: Don't create the environment file during install
+# When do we install the send_messages routing?
+# We don't have anything the checks for the database being installed.
 
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
@@ -12,11 +13,11 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 
 # Make sure the send_messages -m routine is installed
-if ! command -v /usr/local/sbin/send_messages -m &> /dev/null; then
-    echo "Error! The \"send_messages -m\" routine could not be found!" | sudo tee -a $LOG
-    echo "Download the script and execute \"./send_messages -m.sh --install\" to install this routine."
-    read -p "Press enter to continue ..."
-fi
+#if ! command -v /usr/local/sbin/send_messages -m &> /dev/null; then
+#    echo "Error! The \"send_messages -m\" routine could not be found!" | sudo tee -a $LOG
+#    echo "Download the script and execute \"./send_messages -m.sh --install\" to install this routine."
+#    read -p "Press enter to continue ..."
+#fi
 
 # Load envrionment variables and then verify
 if [[ -f /etc/default/payouts.env && ! ($1 == "-i" || $1 == "--install") ]]; then
@@ -28,7 +29,7 @@ if [[ -f /etc/default/payouts.env && ! ($1 == "-i" || $1 == "--install") ]]; the
 elif [[ $1 == "-i" || $1 == "--install" ]]; then echo ""
 else
     echo "Error! The \"/etc/default/payouts.env\" environment file does not exist!"
-    echo "Run this script with the \"-i\" or \"--install\" parameter."
+    echo "Run this script with the \"-g\" or \"--generate\" parameter."
     exit 1;
 fi
 
@@ -51,8 +52,9 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       -h, --help        Display this help message and exit
-      -i, --install     Install this script (payouts) in /usr/local/sbin, sqlite3, the DB if it hasn't been already, and loads available epochs from the blockchain
-                        Cron Install Example (Every Two Hours): Run "crontab -e" and insert the following line: "0 */2 * * * /usr/local/sbin/payouts -o"
+      -i, --install     Installs or updates this script (payouts) /w a "payouts -o" cron job (Run "crontab -e" as $USER to see all ${USER}'s cron jobs)
+      -g, --generate    (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/payouts.env
+      -b, --database    Creates an sqlite3 DB and then loads all available epochs from the blockchain
 
 ----- Payout controls -------------------------------------------------------------------------------------------------------
       -o, --control     Main control for the regular payouts (runs this with -e, -s, -c, -m, -n, and -w listed below); Run this in cron every 2 to 4 hours
@@ -122,7 +124,8 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 
 ----- Locations -------------------------------------------------------------------------------------------------------------
       This:                     /usr/local/sbin/payouts
-      Source Variables          /etc/default/payouts.env
+      Install location:         https://github.com/satoshiware/microbank/scripts/payouts.sh
+      Source Variables:         /etc/default/payouts.env
       Email Script:             /usr/local/sbin/send_messages
       Market Script:            /usr/local/sbin/market
       Log:                      /var/log/payout.log (~/log.payout.development)
@@ -141,53 +144,68 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 #sms env file has keys and not secure.
 # Add text messaging. What about the ability to see market rates asap! This would be cool.
 
-
-
-
-
 EOF
-elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script in /usr/local/sbin, the DB if it hasn't been already, and load available epochs from the blockchain
-    # Installing the payouts script
+
+elif [[ $1 = "-i" || $1 = "--install" ]]; then # Installs or updates this script (payouts) /w a "payouts -o" cron job (Run "crontab -e" as $USER to see all ${USER}'s cron jobs)
     echo "Installing this script (payouts) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/payouts ]; then
         echo "This script (payouts) already exists in /usr/local/sbin!"
         read -p "Would you like to reinstall it? (y|n): "
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/payouts
+            cd ~; git clone https://github.com/satoshiware/microbank
+            bash ~/microbank/scripts/payouts.sh -i
+            rm -rf microbank
+            exit 0
         else
             exit 0
         fi
     fi
-    sudo cat $0 | sed '/Install this script (payouts)/d' | sed '/SQ3DBNAME=~\/tmp_payouts.db.development/d' | sudo tee /usr/local/sbin/payouts > /dev/null
-    sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/payouts # Make it so this code won't run again in the newly installed script.
+
+    sudo cat $0 | sed '/SQ3DBNAME=~\/tmp_payouts.db.development/d' | sudo tee /usr/local/sbin/payouts > /dev/null
     sudo chmod +x /usr/local/sbin/payouts
 
-    # Create the file with the needed envrionment variables if it has not been done already
+    # Add Cron Job (Every Two Hours) that will execute the "payouts -o" command as $USER. Run "crontab -e" as $USER to see all its cron jobs.
+    (crontab -l | grep -v -F "/usr/local/sbin/payouts -o" ; echo "0 */2 * * * /usr/local/sbin/payouts -o" ) | crontab -
+
+elif [[ $1 = "-g" || $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/payouts.env
+    echo "Generating the environment file /etc/default/payouts.env"
     if [ ! -f /etc/default/payouts.env ]; then
-        read -p "Network Name (e.g. AZ Money): "; echo "NETWORK=\"$REPLY\"" | sudo tee /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+        echo "The environment file already exists!"
 
-        read -p "Clarifying comment to highlight the commonality between the \"network name\" and the \"microcurrency name\" (e.g. Deseret Money and UT Money): "; echo "CLARIFY=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Network Prefix (e.g. AZ): "; echo "NETWORKPREFIX=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Denomination (e.g. SAGZ): "; echo "DENOMINATION=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Denomination Name (e.g. saguaros): "; echo "DENOMINATIONNAME=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Microcurrency Block Explorer (e.g. <a href=https://somemicrocurrency.com/explorer><u>Some microcurrency Explorer</u></a>): "; echo "EXPLORER=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+        read -p "Would you like to edit the file? (y|n): "
+        if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then sudo nano /etc/default/payouts.env; exit 0; fi
 
-        read -p "Initial block subsidy (e.g. 1500000000): "; echo "INITIALREWARD=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; INITIALREWARD=$REPLY
-        read -p "Number of blocks before each difficulty adjustment (e.g. 1440): "; echo "EPOCHBLOCKS=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Hashes per second for each contract (e.g. 10000000000): "; echo "HASHESPERCONTRACT=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Teller's bulk purchase size (e.g. 10): "; echo "TELLERBULKPURCHASE=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Max number of payout periods for this microcurrency (e.g. 910): "; echo "MAX_EPOCH_PERIOD=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
-
-        read -p "Number of outputs for each send transaction (e.g. 10): "; echo "TX_BATCH_SZ=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
-
-        read -p "Administrator email (e.g. your_email@somedomain.com): "; echo "ADMINISTRATOREMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
-        read -p "Manager email (e.g. friends_email@somedomain.com): "; echo "MANAGER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
-    else
-        echo "The environment file \"/etc/default/payouts.env\" already exits."
+        read -p "Would you like to replace it with a new one? (y|n): "
+        if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
+            sudo rm /etc/default/payouts.env
+        else
+            exit 0
+        fi
     fi
 
+    read -p "Network Name (e.g. AZ Money): "; echo "NETWORK=\"$REPLY\"" | sudo tee /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+    read -p "Clarifying comment to highlight the commonality between the \"network name\" and the \"microcurrency name\" (e.g. Deseret Money and UT Money): "; echo "CLARIFY=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Network Prefix (e.g. AZ): "; echo "NETWORKPREFIX=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Denomination (e.g. SAGZ): "; echo "DENOMINATION=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Denomination Name (e.g. saguaros): "; echo "DENOMINATIONNAME=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Microcurrency Block Explorer (e.g. <a href=https://somemicrocurrency.com/explorer><u>Some microcurrency Explorer</u></a>): "; echo "EXPLORER=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+    read -p "Initial block subsidy (e.g. 1500000000): "; echo "INITIALREWARD=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; INITIALREWARD=$REPLY
+    read -p "Number of blocks before each difficulty adjustment (e.g. 1440): "; echo "EPOCHBLOCKS=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Hashes per second for each contract (e.g. 10000000000): "; echo "HASHESPERCONTRACT=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Teller's bulk purchase size (e.g. 10): "; echo "TELLERBULKPURCHASE=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Max number of payout periods for this microcurrency (e.g. 910): "; echo "MAX_EPOCH_PERIOD=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+    read -p "Number of outputs for each send transaction (e.g. 10): "; echo "TX_BATCH_SZ=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+    read -p "Administrator email (e.g. your_email@somedomain.com): "; echo "ADMINISTRATOREMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Manager email (e.g. friends_email@somedomain.com): "; echo "MANAGER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+elif [[ $1 = "-b" || $1 = "--database" ]]; then # Creates an sqlite3 DB and then loads all available epochs from the blockchain
     SQ3DBNAME=/var/lib/payouts.db # Make sure it using the production (not the development) database
     if [ -f "$SQ3DBNAME" ]; then echo "The database \"$SQ3DBNAME\" already exits."; exit 0; fi # Exit! As we do not want to accidentally overwrite our database!
 
