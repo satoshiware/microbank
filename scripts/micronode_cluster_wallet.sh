@@ -30,7 +30,7 @@ To execute this script, login as a sudo user (that is not root) and execute the 
 
 FYI:
     Use the mnconnect utility (just type "mnconnect" at the prompt) to create, view, or delete the connection with the p2p node.
-    Use the wallet utility (just type "wallet" at the prompt) to send, receive, and mange the bank's funds.
+    Use the teller utility (just type "teller" at the prompt) to send, receive, and mange the bank's funds.
     Use the payout utility (just type "payout" at the prompt) to view, configure, and execute payouts (mining contracts).
 
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
