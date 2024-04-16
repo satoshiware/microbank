@@ -34,6 +34,12 @@ Once setup and running, miners on the same local network can be directed to the 
 FYI:
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     sudo systemctl status p2pssh@remote # View the status of the connection
+
+Hardware:
+    Rasperry Pi Zero 2 W
+    Aluminum Passive Case
+    OTG Micro USB Ethernet Adapter
+    USB Power Supply
 EOF
 read -p "Press the enter key to continue..."
 
