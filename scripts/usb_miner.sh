@@ -26,14 +26,14 @@ To execute this script, login as a sudo user (that is not root) and execute the 
     sudo apt-get -y install git
     cd ~; git clone https://github.com/satoshiware/microbank
     bash ./microbank/scripts/micronode_cluster_wallet.sh
-	rm -rf microbank
+    rm -rf microbank
 
 FYI:
     Use the mnconnect utility (just type "mnconnect" at the prompt) to create, view, and delete connections.
-	Use the wallet utility (just type "wallet" at the prompt) to send, receive, and mange the bank's funds.
-	Use the payout utility (just type "payout" at the prompt) to view, configure, and execute payouts (mining contracts).
-   
-	The "$USER/.ssh/authorized_keys" file contains administrator login keys.
+    Use the wallet utility (just type "wallet" at the prompt) to send, receive, and mange the bank's funds.
+    Use the payout utility (just type "payout" at the prompt) to view, configure, and execute payouts (mining contracts).
+
+    The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
     The "/var/lib/bitcoin/micro/wallets" directory contains the various wallet directories.
 
@@ -42,9 +42,16 @@ FYI:
 Update/Upgrade "wallet" micronode utilities
     cd ~; git clone https://github.com/satoshiware/microbank
     bash ~/microbank/scripts/mnconnect.sh -i
-	bash ~/microbank/scripts/wallet.sh --install
-	bash ~/microbank/scripts/payouts.sh -i
-	rm -rf microbank
+    bash ~/microbank/scripts/wallet.sh --install
+    bash ~/microbank/scripts/payouts.sh -i
+    rm -rf microbank
+
+Hardware:
+    Rasperry Pi Zero 2 W
+    Aluminum Passive Case
+    OTG Micro USB Ethernet Adapter (Optional)
+    OTG Male Micro USB to Female USB Type A Adapter
+    USB Power Supply
 EOF
 read -p "Press the enter key to continue..."
 
