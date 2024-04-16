@@ -33,6 +33,12 @@ FYI:
     The bitcoind's log files can be view with this file: "/var/log/bitcoin/micro/debug.log" (links to /var/lib/bitcoin/micro/debug.log)
 
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
+
+Hardware:
+    Rasperry Pi Compute Module 4: CM4004000 (w/ Compute Blade)
+    4GB RAM
+    M.2 PCI SSD 500MB
+    Netgear 5 Port Switch (PoE+ @ 120W)
 EOF
 read -p "Press the enter key to continue..."
 
