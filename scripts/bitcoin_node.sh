@@ -28,15 +28,18 @@ To execute this script, login as a sudo user (that is not root) and execute the 
     rm -rf microbank
 
 FYI:
-    Use the ldcoins (Load Satoshi Coins) utility to load a batch of Satoshi Coins with bitcoins from the "bank" wallet.
+    Use the bitnode utility to see & manage blockchain, wallet, mempool, and mining information as well as make & bump TXs (including importing and loading Satoshi Coins) etc.
 
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "ext_rpc/.ssh/authorized_keys" file contains login keys for external services (lightning, electurm, stratum, and btcpay servers).
+
     The "/var/lib/bitcoin" directory contains debug logs, blockchain, etc.
     The bitcoind's log files can be view with this file: "/var/log/bitcoin/debug.log" (links to /var/lib/bitcoin/debug.log)
     The "/var/lib/bitcoin/wallets" directory contains the various wallet directories.
-    Passwords: /root/extrpcpasswd (External RPC Password), /root/lclrpcpasswd (Internal RPC Password), and /root/passphrase (Wallet Passphrase)
+
+    Passwords: /root/extrpcpasswd (External; user=ext_rpc), /root/lclrpcpasswd (Localhost; user=local_rpc), /root/strrpcpasswd (Stratum; user=stratum_rpc), and /root/passphrase (Wallet Passphrase)
     External RPC Ports: localhost:8332 (Bitcoin RPC), localhost:8433 (Bitcoin ZMQ)
+
     Bitcoin configuratijon: /etc/bitcoin.conf
 
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
@@ -141,8 +144,8 @@ sudo useradd --system --shell=/sbin/nologin bitcoin
 echo "alias btc=\"sudo -u bitcoin /usr/bin/bitcoin-cli -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf\"" | sudo tee -a /etc/bash.bashrc # Reestablish alias @ boot
 
 # Generate Strong Bitcoin RPC Passwords. Replace '/' characters with '0', Replace '+' characters with '1', and Replace '=' characters with ''
-EXTRPCPASSWD=$(openssl rand -base64 16); EXTRPCPASSWD=${EXTRPCPASSWD//\//0}; EXTRPCPASSWD=${EXTRPCPASSWD//+/1}; EXTRPCPASSWD=${EXTRPCPASSWD//=/}
-LCLRPCPASSWD=$(openssl rand -base64 16); LCLRPCPASSWD=${LCLRPCPASSWD//\//0}; LCLRPCPASSWD=${LCLRPCPASSWD//+/1}; LCLRPCPASSWD=${LCLRPCPASSWD//=/}
+EXTRPCPASSWD=$(openssl rand -base64 16); EXTRPCPASSWD=${EXTRPCPASSWD//\//0}; EXTRPCPASSWD=${EXTRPCPASSWD//+/1}; EXTRPCPASSWD=${EXTRPCPASSWD//=/} # External RPC
+LCLRPCPASSWD=$(openssl rand -base64 16); LCLRPCPASSWD=${LCLRPCPASSWD//\//0}; LCLRPCPASSWD=${LCLRPCPASSWD//+/1}; LCLRPCPASSWD=${LCLRPCPASSWD//=/} # Localhost RPC
 echo $EXTRPCPASSWD | sudo tee /root/extrpcpasswd
 echo $LCLRPCPASSWD | sudo tee /root/lclrpcpasswd
 sudo chmod 400 /root/extrpcpasswd
@@ -181,6 +184,9 @@ rpcwhitelist=ext_rpc:analyzepsbt,combinepsbt,combinerawtransaction,converttopsbt
 rpcwhitelist=ext_rpc:createmultisig,deriveaddresses,estimatesmartfee,getdescriptorinfo,getindexinfo,signmessagewithprivkey,validateaddress,verifymessage
 # White List Wallet RPCs
 #rpcwhitelist=ext_rpc:abandontransaction,abortrescan,addmultisigaddress,backupwallet,bumpfee,createwallet,dumpprivkey,dumpwallet,encryptwallet,getaddressesbylabel,getaddressinfo,getbalance,getbalances,getnewaddress,getrawchangeaddress,getreceivedbyaddress,getreceivedbylabel,gettransaction,getunconfirmedbalance,getwalletinfo,importaddress,importdescriptors,importmulti,importprivkey,importprunedfunds,importpubkey,importwallet,keypoolrefill,listaddressgroupings,listlabels,listlockunspent,listreceivedbyaddress,listreceivedbylabel,listsinceblock,listtransactions,listunspent,listwalletdir,listwallets,loadwallet,lockunspent,psbtbumpfee,removeprunedfunds,rescanblockchain,send,sendmany,sendtoaddress,sethdseed,setlabel,settxfee,setwalletflag,signmessage,signrawtransactionwithwallet,unloadwallet,upgradewallet,walletcreatefundedpsbt,walletlock,walletpassphrase,walletpassphrasechange,walletprocesspsbt
+
+# Set the number of threads to service RPC calls (default = 4)
+rpcthreads=16
 
 # [zeromq]
 # Enable publishing of block hashes to <address>.
@@ -222,6 +228,7 @@ sudo chmod 660 -R /var/log/bitcoin
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow ssh # Open Default SSH Port
+sudo ufw allow 8333 # Open port for p2p Bitcoin mainnet
 sudo ufw --force enable # Enable Firewall @ Boot and Start it now!
 
 # Install/Setup/Enable SSH(D)
@@ -239,10 +246,10 @@ echo -e "\nMatch User ext_rpc" | sudo tee -a /etc/ssh/sshd_config
 echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
 echo -e "\tPermitOpen localhost:8332 localhost:8433" | sudo tee -a /etc/ssh/sshd_config # Denies any request of local forwarding besides localhost:8332 (Bitcoin RPC), and localhost:8433 (Bitcoin ZMQ)
 
-# Setup a "no login" user called "ext_rpc"
+# Setup a "no login" users called "ext_rpc"
 sudo useradd -s /bin/false -m -d /home/ext_rpc ext_rpc
 
-# Create (ext_rpc) .ssh folder; Set ownership and permissions
+# Create .ssh folder (ext_rpc); Set ownership and permissions
 sudo mkdir -p /home/ext_rpc/.ssh
 sudo touch /home/ext_rpc/.ssh/authorized_keys
 sudo chown -R ext_rpc:ext_rpc /home/ext_rpc/.ssh
@@ -265,8 +272,7 @@ sudo systemctl enable ssh
 sudo systemctl enable bitcoind --now
 echo "waiting a few seconds for bitcoind to start"; sleep 15
 
-# Generate Wallets
-sudo -u bitcoin /usr/bin/bitcoin-cli -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="import" descriptors=false passphrase=$(sudo cat /root/passphrase) load_on_startup=true
+# Generate "bank" Wallet
 sudo -u bitcoin /usr/bin/bitcoin-cli -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
 # Backup Wallets
@@ -278,11 +284,11 @@ sudo umount /dev/sda1
 sudo rm -rf /media/usb
 
 # Create Aliases to lock and unlocks (24 Hours) wallets
-echo "alias unlockwallets=\"btc -rpcwallet=import walletpassphrase \\\$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \\\$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
-echo "alias lockwallets=\"btc -rpcwallet=import walletlock; btc -rpcwallet=bank walletlock\"" | sudo tee -a /etc/bash.bashrc
+echo "alias unlockwallets=\"btc -rpcwallet=bank walletpassphrase \\\$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
+echo "alias lockwallets=\"btc -rpcwallet=bank walletlock\"" | sudo tee -a /etc/bash.bashrc
 
-# Install the "Satoshi Coins" utility (ldcoins.sh)
-bash ~/microbank/scripts/ldcoins.sh -i
+# Install the "bitnode" utility (bitnode.sh)
+bash ~/microbank/scripts/bitnode.sh -i
 
 # Restart the machine
 sudo reboot now
