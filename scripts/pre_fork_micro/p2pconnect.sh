@@ -5,7 +5,7 @@
 
 #Update/Upgrade "P2P" micronode utilities
 #    cd ~; git clone https://github.com/satoshiware/microbank
-#    bash ~/microbank/scripts/p2pconnect.sh -i
+#    bash ~/microbank/scripts/pre_fork_micro/p2pconnect.sh -i
 #    rm -rf microbank
 
 # Make sure we are not running as root, but that we have sudo privileges.

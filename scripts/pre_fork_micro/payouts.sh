@@ -124,7 +124,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 
 ----- Locations -------------------------------------------------------------------------------------------------------------
       This:                     /usr/local/sbin/payouts
-      Install location:         https://github.com/satoshiware/microbank/scripts/payouts.sh
+      Install location:         https://github.com/satoshiware/microbank/scripts/pre_fork_micro/payouts.sh
       Source Variables:         /etc/default/payouts.env
       Email Script:             /usr/local/sbin/send_messages
       Market Script:            /usr/local/sbin/market
@@ -154,7 +154,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Installs or updates this script
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/payouts
             cd ~; git clone https://github.com/satoshiware/microbank
-            bash ~/microbank/scripts/payouts.sh -i
+            bash ~/microbank/scripts/pre_fork_micro/payouts.sh -i
             rm -rf microbank
             exit 0
         else

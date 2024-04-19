@@ -5,7 +5,7 @@
 
 #Update/Upgrade micronode utilities
 #    cd ~; git clone https://github.com/satoshiware/microbank
-#    bash ~/microbank/scripts/mnconnect.sh -i
+#    bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh -i
 #    rm -rf microbank
 
 # Make sure we are not running as root, but that we have sudo privileges.

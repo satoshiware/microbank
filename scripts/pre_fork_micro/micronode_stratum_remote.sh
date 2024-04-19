@@ -23,7 +23,7 @@ To run this script successfully, you'll need the following information from the 
 To execute this script, login as a sudo user (that is not root) and execute the following commands:
     sudo apt-get -y install git
     cd ~; git clone https://github.com/satoshiware/microbank
-    bash ./microbank/scripts/micronode_stratum_remote.sh
+    bash ./microbank/scripts/pre_fork_micro/micronode_stratum_remote.sh
     rm -rf microbank
 
 Note: Make sure to assign a static IP to this remote access point on the router!

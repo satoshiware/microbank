@@ -19,7 +19,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       --help        Display this help message and exit
-      --install -i  Installs or updates this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/teller.sh)
+      --install -i  Installs or updates this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
       --generate    (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/teller.env
 
       --watch       See all addresses being "watched" with corresponding details
@@ -61,7 +61,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --mempool     Show mempool stats
       --network     Show network stats
 EOF
-elif [[ $1 = "-i" || $1 == "--install" ]]; then # Installs or updates this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/teller.sh)
+elif [[ $1 = "-i" || $1 == "--install" ]]; then # Installs or updates this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
     echo "Installing this script (teller) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/teller ]; then
         echo "This script (teller) already exists in /usr/local/sbin!"
@@ -69,7 +69,7 @@ elif [[ $1 = "-i" || $1 == "--install" ]]; then # Installs or updates this scrip
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/teller
             cd ~; git clone https://github.com/satoshiware/microbank
-            bash ~/microbank/scripts/wallet.sh -i
+            bash ~/microbank/scripts/pre_fork_micro/wallet.sh -i
             rm -rf microbank
             exit 0
         else
