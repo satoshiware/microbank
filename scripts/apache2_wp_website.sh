@@ -225,4 +225,5 @@ echo "systemctl reload apache2" | sudo tee -a /etc/cron.weekly/ssl-renewal
 sudo chmod -R 755 /etc/cron.weekly/ssl-renewal
 
 ########## Installations Complete... Reboot Now ##############
+read -p "Installation Complete. Let's Reboot... Press the enter key to continue..."
 sudo shutdown -r now 'Installs and upgrades requires reboot'
