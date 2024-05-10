@@ -2,7 +2,10 @@
 ####################################################################################################
 # This file generates the binanries (and sha 256 checksums) for bitcoin core (microcurrency edition)
 # from the https://github.com/satoshiware/bitcoin repository. This script was made for linux
-# x86 64 bit and has been tested on Debian 11/12.
+# x86 64 bit and has been tested on Debian 11/12 (w/ WSL).
+# Compilation Supported Processors:
+#   x86 64 bit (x86_64)
+#   ARM 64 bit (aarch64-linux-gnu)
 ####################################################################################################
 
 # Make sure we are not running as root, but that we have sudo privileges.
@@ -15,12 +18,46 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if not already.
 
+###Download Bitcoin; select desired branch and desired tag
+sudo apt-get -y install git
+sudo rm -rf ./bitcoin
+git clone https://github.com/satoshiware/bitcoin ./bitcoin
+rm ~/bitcoin/src/micro.h
+
+cd bitcoin
+echo ""; echo "List of branches:"; echo ""
+git branch -r
+echo ""; read -p "Target Branch (default = \"master\"): " BRANCH; if [ -z $BRANCH ]; then BRANCH="master"; fi
+git switch $BRANCH
+
+echo ""; echo "List of Tags:"; echo ""
+git tag -l | sort -V | tail -n 15
+echo ""; read -p "Desired TAG (default = \"last commit\"): " TAG
+if ! [ -z $TAG ]; then
+    git checkout tags/$TAG
+fi
+cd ..
+
+###Infrom User & Check micro' Parameter
 echo "Generated binaries and related files are transfered to the \"./bitcoin/bin\" directory."
-echo "Binaries are created from the latest master branch commit @ https://github.com/satoshiware/bitcoin."
+echo "Binaries are created from the latest master branch commit @ https://github.com/satoshiware/bitcoin"
+if [ -z "${1}" ]; then
+    echo "Error! Execute this script followed with a parameter to indicate which microcurrency will be compiled!"
+    echo "Example \"$0 azmoney\""
+    echo ""; echo "List of micro's:"
+    ls -all ~/bitcoin/src/micros; echo ""
+    exit 1
+elif ! [ -f ~/bitcoin/src/micros/micro_${1}.h ]; then
+    echo "Error! The microcurrency micro_${1}.h doesn't exist!"
+    echo ""; echo "List of micro's:"; echo ""
+    ls -all ~/bitcoin/src/micros; echo ""
+    exit 1
+fi
 read -p "Press [Enter] key to continue..."
 
 ###Update/Upgrade
 sudo apt-get -y update
+sudo DEBIAN_FRONTEND=noninteractive apt-get -y install --only-upgrade openssh-server # Upgrade seperatly to ensure non-interactive mode
 sudo apt-get -y upgrade
 
 ###Install Essential Tools
@@ -29,12 +66,6 @@ sudo apt-get -y install pkg-config # Helper tool used when compiling application
 
 ###Install SQLite (Required For The Descriptor Wallet)
 sudo apt-get -y install libsqlite3-dev
-
-###Download Bitcoin
-sudo apt-get -y install git
-git clone https://github.com/satoshiware/bitcoin ./bitcoin
-rm ~/bitcoin/src/micro.h
-mv ~/bitcoin/src/micros/micro_${1}.h ~/bitcoin/src/micro.h
 
 ###Install Cross Compilation Dependencies
 #Linux x86 64-bit are already installed
