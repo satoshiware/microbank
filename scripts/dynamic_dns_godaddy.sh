@@ -69,7 +69,15 @@ elif [[ $1 = "--generate" ]]; then # Generate a (new) environment file with the 
 	read -p "What is the GoDaddy developer API key: "; echo "KEY=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
 	read -p "What is the GoDaddy developer API secret: "; echo "SECRET=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
 
-	read -p "What is the name of the record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "Name of record to be updated: "; echo "RECORD=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "Name of record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "What is the name of 3rd record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "What is the name of the main record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "What is the name of the main record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "What is the name of the main record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "What is the name of the main record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "What is the name of the main record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
+	read -p "What is the name of the main record to be updated: "; echo "RECORD1=\"$REPLY\"" | sudo tee /etc/default/dynamic_dns_godaddy.env > /dev/null
     ########################################### What if there are more records ################################################
     
 # Check for an IP address change and update accordingly. After this script is installed, this routine is run hourly.
@@ -97,15 +105,16 @@ elif [[ $1 = "--update" ]]; then
 	currentIp=$(echo $ret | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")
 	
 	# Here's a list of more external sources to aquire your external IP address
-	# curl ifconfig.me
-	# curl icanhazip.com
-	# curl ipinfo.io/ip
-	# curl api.ipify.org
-	# curl ident.me
-	# curl checkip.amazonaws.com
-	# curl ipecho.net/plain
-	# curl ifconfig.co
-	# wget -qO- ifconfig.me | xargs echo
+	# currentIp=$(echo $(curl -s GET "http://ipinfo.io/json") | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"))
+	# currentIp=$(curl ifconfig.me)
+	# currentIp=$(curl icanhazip.com)
+	# currentIp=$(curl ipinfo.io/ip)
+	# currentIp=$(curl api.ipify.org)
+	# currentIp=$(curl ident.me)
+	# currentIp=$(curl checkip.amazonaws.com)
+	# currentIp=$(curl ipecho.net/plain)
+	# currentIp=$(curl ifconfig.co)
+	# currentIp=$(wget -qO- ifconfig.me | xargs echo)
 
 	# Change GoDaddy DNS records with new IP address if necessary ########################################### What if there are more records ################################################
 	if [ $dnsIp != $currentIp ]; then
