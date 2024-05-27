@@ -39,23 +39,18 @@ read -p "Press the enter key to continue..."
 
 ########## Get Setup Parameters from The User ##############
 read -p "Web site/server title? (e.g. BTCofAZ): " TITLE
-read -p "Domain name address? (e.g. btcofaz.com): " DNS; DNS=${DNS,,}; DNS=${DNS#http://}; DNS=${DNS#https://}; DNS=${DNS#www.} # Make lowercase and remove http and www if they exist.
+read -p "Domain name address? (e.g. btcofaz.com): " DNS; DNS=${DNS,,}; DNS=${DNS#http://}; DNS=${DNS#https://}; DNS=${DNS#www.} # Make lowercase and remove http(s) and www if they exist.
 read -p "Administrator email? (e.g. satoshi@btcofaz.com): " EMAIL; EMAIL=${EMAIL,,} # Make lowercase
 read -p "Install \"Let's Encrypt\" SSL Certificate? (Y|y): " LETSENC; LETSENC=${LETSENC:0:1}; LETSENC=${LETSENC,,} # Get first letter of response and make lowercase
 
 # Add additional information about the "Let's Encrypt" SSL Certificate install (or lack thereof).
 if [[ $LETSENC == "y" ]]; then
     cat << EOF | sudo tee -a ~/readme.txt
-SSL Certificate (Let's Encrypt) was installed
+Note: SSL Certificate (Let's Encrypt) was installed and port 443 (HTTPS) was opened.
 
 The command to update the administrator email for "Let's Encrypt" certbot:
     "sudo certbot update_account --no-eff-email --email \$EMAIL"
 The "Administration Email Address" for Wordpress can be changed in "wp-admin" Settings.
-EOF
-else
-    cat << EOF | sudo tee -a ~/readme.txt
-No SSL Certificate (Let's Encrypt) was installed
-Port 443 (HTTPS) is firewalled (blocked)
 EOF
 fi
 
@@ -119,9 +114,7 @@ sudo mv wp-cli.phar /usr/local/bin/wp # Install it so only need to call 'wp'
 
 ########## Configure Ports & Enable Uncomplicated Firewall ##############
 sudo ufw allow 80/tcp
-if [[ $LETSENC == "y" ]]; then
-    sudo ufw allow 443/tcp
-fi
+if [[ $LETSENC == "y" ]]; then sudo ufw allow 443/tcp; fi
 sudo ufw allow 22/tcp
 sudo ufw --force enable
 
@@ -140,7 +133,7 @@ echo "ServerName Apache2_$(hostname)" | sudo tee /etc/apache2/conf-available/ser
 sudo a2enconf servername
 
 # Create site folders, files, and websites with correct permissions
-echo "<meta http-equiv=\"refresh\" content=\"3;url=https://$DNS/\" />" | sudo tee /var/www/html/index.html # Redirect default page to $DNS
+echo "<meta http-equiv=\"refresh\" content=\"0; url=https://$DNS\"/>" | sudo tee /var/www/html/index.html # Redirect default page to $DNS
 sudo mkdir -p /var/www/$DNS
 echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/php_info.php # Create php info page
 sudo chown -R www-data:www-data /var/www
@@ -164,7 +157,11 @@ cat << EOF | sudo tee /etc/apache2/sites-available/$DNS.conf
 <VirtualHost *:80>
     ServerAdmin webmaster@localhost
     ServerName $DNS
-    ServerAlias www.$DNS
+EOF
+if [[ ${DNS//[^.]} == "." ]]; then
+    echo "    ServerAlias www.$DNS" | sudo tee -a /etc/apache2/sites-available/$DNS.conf
+fi
+cat << EOF | sudo tee -a /etc/apache2/sites-available/$DNS.conf
     DocumentRoot /var/www/$DNS
     ErrorLog \${APACHE_LOG_DIR}/$DNS.error.log
     CustomLog \${APACHE_LOG_DIR}/$DNS.access.log combined
@@ -173,7 +170,6 @@ cat << EOF | sudo tee /etc/apache2/sites-available/$DNS.conf
     </Directory>
 </VirtualHost>
 EOF
-
 sudo a2ensite $DNS
 sudo a2enmod rewrite
 sudo systemctl restart apache2 # Restart apache server
@@ -216,8 +212,8 @@ sudo -u www-data wp plugin install salt-shaker --force --activate # Salt Shaker
 sudo -u www-data wp plugin install updraftplus --force --activate # UpdraftPlus
 sudo -u www-data wp plugin install wp-mail-smtp --force --activate # WP Mail SMTP
 
-########## Configure the "Let's Encrypt" certbot for SSL certificates ##############
-if [[ $LETSENC == "y" ]]; then
+########## Configure SSL certificates ##############
+if [[ $LETSENC == "y" ]]; then # Use "Let's Encrypt" certbot
     # If there is no subdomain (only a single '.'), add a second (identical) DNS with the "www." prefix
     if [[ ${DNS//[^.]} == "." ]]; then DNS=$DNS,www.$DNS; fi
     # Get new certificate and have certbot edit the apache configurations automatically
