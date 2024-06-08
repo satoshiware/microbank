@@ -27,6 +27,12 @@ To edit, configure, and design the wordpress website, goto "$DNS/wp-admin".
     user: satoshi
     passwd: \$(sudo cat /root/wp_satoshi_passwd.txt)
 
+To change the (satoshi) password, execute the following commands:
+    WP_PASSWD=\$(openssl rand -base64 14); WP_PASSWD=\${WP_PASSWD//\//0}; WP_PASSWD=\${WP_PASSWD//+/1}; WP_PASSWD=\${WP_PASSWD//=/}
+    echo "\${WP_PASSWD}" | sudo tee /root/wp_satoshi_passwd.txt
+    cd /var/www/$DNS
+    wp user update 1 --user_pass=\${WP_PASSWD}
+
 Plugins that are installed with the script:
     "Limit Login Attempts Reloaded"
     "Salt Shaker"
@@ -224,6 +230,9 @@ if [[ $LETSENC == "y" ]]; then # Use "Let's Encrypt" certbot
     echo "certbot renew --quiet" | sudo tee -a /etc/cron.weekly/ssl-renewal
     echo "systemctl reload apache2" | sudo tee -a /etc/cron.weekly/ssl-renewal
     sudo chmod -R 755 /etc/cron.weekly/ssl-renewal
+else
+    # Assumming this web sever will be used with a secured reverse proxy, add the following line to wp-config.php
+    sudo sed -i "/require_once ABSPATH . 'wp-settings.php';/i if (\$_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') \$_SERVER['HTTPS']='on'; // Force HTTPS when behind a secured reverse proxy." /var/www/$DNS/wp-config.php
 fi
 
 ########## Installations Complete... Reboot Now ##############
