@@ -231,7 +231,7 @@ if [[ $LETSENC == "y" ]]; then # Use "Let's Encrypt" certbot
     echo "systemctl reload apache2" | sudo tee -a /etc/cron.weekly/ssl-renewal
     sudo chmod -R 755 /etc/cron.weekly/ssl-renewal
 else
-    # Assumming this web sever will be used with a secured reverse proxy, add the following line to wp-config.php
+    # Assumming this web sever will be used with a secured reverse proxy, add the following line to wp-config.php before the line "require_once ABSPATH . 'wp-settings.php';"
     sudo sed -i "/require_once ABSPATH . 'wp-settings.php';/i if (\$_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') \$_SERVER['HTTPS']='on'; // Force HTTPS when behind a secured reverse proxy." /var/www/$DNS/wp-config.php
 fi
 
