@@ -26,10 +26,16 @@ FYI:
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
     The bitcoind's log files can be view with this file: "/var/log/bitcoin/micro/debug.log" (links to /var/lib/bitcoin/micro/debug.log)
-    The "/var/lib/bitcoin/micro/wallets/mining" directory contains the (encrypted) mining wallet.
+    The "/var/lib/bitcoin/micro/wallets/mining" directory contains the (encrypted) mining wallet copied from the Wallet Node.
 
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
 EOF
+
+echo ""; echo ""; echo ""; echo "To run this script, you'll need the Bitcoin Core micronode download URL (tar.gz file) with its SHA 256 Checksum."
+echo "Also, you will need the USB drive containg the backup of the \"mining\" wallet created during the \"Wallet Node\" installation."
+echo "Note: No modifications to the USB drive will be made. It simply needs the encrypted \"mining\" wallet (passphrase not needed)."
+echo "    STORE USB IN SAFE & SECURE PLACE WHEN FINISHED!!!"; echo "";
+
 read -p "Press the enter key to continue..."
 
 # Create .ssh folder and authorized_keys file if it does not exist
@@ -293,6 +299,7 @@ echo "waiting a few seconds for bitcoind to start"; sleep 15
 # Copy (via USB) & load the (encrypted) mining wallet (generated on the "Wallet" micronode)
 sudo mkdir -p /media/usb
 sudo mount /dev/sda1 /media/usb
+sudo systemctl daemon-reload # Take changed configurations from filesystem and regenerate dependency trees
 
 sudo -u bitcoin mkdir -p /var/lib/bitcoin/micro/wallets/mining
 sudo chmod 700 /var/lib/bitcoin/micro/wallets/mining
