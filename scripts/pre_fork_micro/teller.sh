@@ -82,10 +82,10 @@ elif [[ $1 = "-i" || $1 == "--install" ]]; then # Installs or updates this scrip
 
 elif [[ $1 = "--generate" ]]; then # (Re)Generate the environment file (w/ needed constants) for this utility in /etc/default/teller.env
     echo "Generating the environment file /etc/default/teller.env"
-    if [ ! -f /etc/default/teller.env ]; then
+    if [ -f /etc/default/teller.env ]; then
         echo "The environment file already exists!"
 
-        read -p "Would you like to edit the file? (y|n): "
+		read -p "You can edit or replace the file. Would you like to edit the file? (y|n): "
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then sudo nano /etc/default/teller.env; exit 0; fi
 
         read -p "Would you like to replace it with a new one? (y|n): "
@@ -352,5 +352,5 @@ elif [[ $1 = "--network" ]]; then # Show network stats
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 0.05"
+    echo "Script Version 0.06"
 fi
