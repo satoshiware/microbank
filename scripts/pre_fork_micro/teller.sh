@@ -69,7 +69,7 @@ elif [[ $1 = "-i" || $1 == "--install" ]]; then # Installs or updates this scrip
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/teller
             cd ~; git clone https://github.com/satoshiware/microbank
-            bash ~/microbank/scripts/pre_fork_micro/wallet.sh -i
+            bash ~/microbank/scripts/pre_fork_micro/teller.sh -i
             rm -rf microbank
             exit 0
         else
