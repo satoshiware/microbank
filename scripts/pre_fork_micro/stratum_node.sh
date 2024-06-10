@@ -25,7 +25,7 @@ FYI:
 
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
-    The bitcoind's log files can be view with this file: "/var/log/bitcoin/micro/debug.log" (links to /var/lib/bitcoin/micro/debug.log)
+    The bitcoind's log files can be viewed with this file: "/var/log/bitcoin/micro/debug.log" (links to /var/lib/bitcoin/micro/debug.log)
     The "/var/lib/bitcoin/micro/wallets/mining" directory contains the (encrypted) mining wallet copied from the Wallet Node.
 
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
@@ -183,9 +183,9 @@ if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
     if [[ ${PNETWORK} = "192" ]]; then
         sudo ufw allow from 192.168.0.0/16 to any port 3333
     elif [[ ${PNETWORK} = "172" ]]; then
-        sudo ufw allow from 192.168.0.0/16 to any port 3333
+        sudo ufw allow from 172.16.0.0/12 to any port 3333
     elif [[ ${PNETWORK} = "10" ]]; then
-        sudo ufw allow from 192.168.0.0/16 to any port 3333
+        sudo ufw allow from 10.0.0.0/8 to any port 3333
     fi
 fi
 
