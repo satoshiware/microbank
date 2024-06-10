@@ -32,9 +32,9 @@ FYI:
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
 EOF
 
-echo ""; echo "To run this script, you'll need the Bitcoin Core micronode download URL (tar.gz file) with its SHA 256 Checksum."
+echo ""; echo ""; echo ""; echo "To run this script, you'll need the Bitcoin Core micronode download URL (tar.gz file) with its SHA 256 Checksum."
 echo "Also, you will need to plug in a USB drive that will be used to backup the \"bank\" and \"mining\" wallets along with the \"passphrase\""
-echo "    STORE IN SAFE & SECURE PLACE WHEN FINISHED!!!"
+echo "    STORE IN SAFE & SECURE PLACE WHEN FINISHED!!!"; echo "";
 
 read -p "Press the enter key to continue..."
 
