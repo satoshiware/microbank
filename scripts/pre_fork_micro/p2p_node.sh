@@ -28,6 +28,9 @@ FYI:
 
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
 EOF
+
+echo ""; echo ""; echo ""; echo "To run this script, you'll need the Bitcoin Core micronode download URL (tar.gz file) with its SHA 256 Checksum."; echo ""
+
 read -p "Press the enter key to continue..."
 
 # Create .ssh folder and authorized_keys file if it does not exist
