@@ -19,9 +19,9 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -h, --help        Display this help message and exit
       -i, --install     Install this script (mnconnect) in /usr/local/sbin/
       -o, --out         Make an outbound outbound connection to the P2P Node
-      -v, --view         # See configured connection and status
+      -v, --view        See configured connection and status
       -d, --delete      Delete a connection
-      -k  --key"        Show hostname and public key for this node
+      -k  --key         Show hostname and public key for this node
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script (mnconnect) in /usr/local/sbin
     echo "Installing this script (mnconnect) in /usr/local/sbin/"
