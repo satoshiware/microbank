@@ -1,13 +1,5 @@
 #!/bin/bash
 
-###todo:
-      # finish "--view"
-
-#Update/Upgrade "P2P" micronode utilities
-#    cd ~; git clone https://github.com/satoshiware/microbank
-#    bash ~/microbank/scripts/pre_fork_micro/p2pconnect.sh -i
-#    rm -rf microbank
-
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -17,56 +9,53 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    exit 1
 fi
 
-# Install this script (p2pconnect) in /usr/local/sbin
-if [[ $1 = "-i" || $1 = "--install" ]]; then
-    echo "Installing this script (p2pconnect) in /usr/local/sbin/"
-    if [ ! -f /usr/local/sbin/p2pconnect ]; then
-        sudo cat $0 | sed '/Install this script/d' | sudo tee /usr/local/sbin/p2pconnect > /dev/null
-        sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/p2pconnect # Make it so this code won't run again in the newly installed script.
-        sudo chmod +x /usr/local/sbin/p2pconnect
-    else
-        echo "\"p2pconnect\" already exists in /usr/local/sbin!"
-        read -p "Would you like to uninstall it? (y|n): "
-        if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
-            sudo rm /usr/local/sbin/p2pconnect
-        fi
-    fi
-    exit 0
-fi
-
-# Make sure this script is installed
-if [ ! -f /usr/local/sbin/p2pconnect ]; then
-    echo "Error: this script is not yet installed to \"/usr/local/sbin/p2pconnect\"!"
-    echo "Rerun this script with the \"-i\" or \"--install\" parameter!"
-    exit 1
-fi
+# Universal envrionment variables
+BTC=$(cat /etc/bash.bashrc | grep "alias btc=" | cut -d "\"" -f 2)
 
 # See which p2pconnect parameter was passed and execute accordingly
 if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
-      -i, --install     Install this script (p2pconnect) in /usr/local/sbin/
       -h, --help        Display this help message and exit
+      -i, --install     Install this script (p2pconnect) in /usr/local/sbin/
       -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
       -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)
       -v, --view        See all configured connections and view status
       -d, --delete      Delete a connection
       -f, --info        Get the connection parameters for this node
-      -g, --generate    Generate micronode information file (/etc/micronode.info) with connection parameters for this node
 EOF
+
+elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script (p2pconnect) in /usr/local/sbin
+    echo "Installing this script (p2pconnect) in /usr/local/sbin/"
+    if [ -f /usr/local/sbin/p2pconnect ]; then
+        echo "This script (p2pconnect) already exists in /usr/local/sbin!"
+        read -p "Would you like to upgrade it? (y|n): "
+        if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
+            sudo rm /usr/local/sbin/p2pconnect
+            cd ~; git clone https://github.com/satoshiware/microbank
+            bash ~/microbank/scripts/pre_fork_micro/p2pconnect.sh -i
+            rm -rf microbank
+            exit 0
+        else
+            exit 0
+        fi
+    fi
+
+    # Remove unwanted/unused host keys
+    sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
+    sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
+    sudo rm /etc/ssh/ssh_host_rsa_key* 2> /dev/null
+
+    sudo cat $0 | sudo tee /usr/local/sbin/p2pconnect > /dev/null
+    sudo chmod +x /usr/local/sbin/p2pconnect
 
 elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
     echo "Let's configure an inbound connection from a wallet, stratum, or electrum node!"
-    read -p "What would you like to call this connection? (e.g. \"wallet\", \"stratum\", or \"electrum\"): " CONNNAME
-    read -p "What is the node's public key: " PUBLICKEY
-    read -p "What's the nodes UID? (Unique ID): " TMSTAMP # Node UIDs are based on unix time stamps
-
-    if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
-        echo "Error! Not a valid time stamp!"
-        exit 1
-    fi
-
-    echo "${PUBLICKEY} # ${CONNNAME}, ${TMSTAMP}, Cluster Connection" | sudo tee -a /home/p2p/.ssh/authorized_keys
+	read -p "Connection Name? (e.g. \"wallet\", \"stratum\", or \"electrum\"): " CONNNAME
+    read -p "What is the connecting node's public key: " PUBLICKEY
+    TMSTAMP=$(date +%s)
+	
+    echo "${PUBLICKEY} # ${CONNNAME}, CONN_ID: ${TMSTAMP}, Cluster Connection" | sudo tee -a /home/p2p/.ssh/authorized_keys
 
 elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connections (p2p <--> p2p)
     if [[ $(ls /etc/default/p2pssh*  2> /dev/null | wc -l) -ge "8" ]]; then
@@ -200,11 +189,6 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
         exit 0
     fi
 
-    if ! [[ $2 -gt 1690000000 ]]; then
-        echo "Error! Not a valid time stamp!"
-        exit 1
-    fi
-
     # Delete outbound connections
     LOCAL_PORT=$(grep -o 'LOCAL_PORT=[0-9]*' /etc/default/p2pssh@${2}* 2> /dev/null | cut -d '=' -f 2) # Get the "Local Port" that corresponds with the time stamp
 
@@ -229,46 +213,13 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
     while IFS= read -r line ; do sudo kill -9 $(echo $line | cut -d ' ' -f 1) 2> /dev/null; done <<< "$P2P_PIDS"
 
 elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for this node
-    if [ -f "/etc/micronode.info" ]; then
-        echo ""
-        sudo cat /etc/micronode.info
-    else
-        echo "Connection parameters have not been generated. Rerun with the -g (--generate) flag."
-    fi
-
-elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information file (/etc/micronode.info) with connection parameters for this node
-    if [ -f "/etc/micronode.info" ]; then
-        echo "/etc/micronode.info file already exists"
-        exit 0
-    fi
-
-    echo "Here's important information about your micronode." | sudo tee /etc/micronode.info > /dev/null
-    echo "It can be used to establish secure micronode connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
-    echo "" | sudo tee -a /etc/micronode.info
-
     echo "Hostname: $(hostname)" | sudo tee -a /etc/micronode.info
-    echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info
-    read -p "What is the Domain Address of this micronode? (e.g. p2p.mymicrobank.com): "; echo "Address: $REPLY" | sudo tee -a /etc/micronode.info
-    read -p "What is the External SSH port for this micronode? (default 22): "; if [ -z $REPLY ]; then REPLY="22"; fi; echo "SSH Port: $REPLY" | sudo tee -a /etc/micronode.info
-
     echo "Local IP: $(hostname -I)" | sudo tee -a /etc/micronode.info
 
-    if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
-    echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info
-
-    if [ -z ${MICROPORT+x} ]; then MICROPORT="19333"; fi
-    echo "Micro Port: ${MICROPORT}" | sudo tee -a /etc/micronode.info
-
-    # Remove unwanted/unused host keys
-    sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
-    sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
-    sudo rm /etc/ssh/ssh_host_rsa_key* 2> /dev/null
-
-    echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info
-    echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info
-
-    sudo chmod 400 /etc/micronode.info
+    echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')"
+    echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)"
 
 else
     $0 --help
+	echo "Script Version 0.08"
 fi
