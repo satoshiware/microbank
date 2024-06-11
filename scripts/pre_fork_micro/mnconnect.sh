@@ -90,7 +90,7 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See configured outbound connection
         echo "There is no outbound connection!"
         exit 1
     fi
-	
+
     echo ""; echo "Connection Name (p2pssh@$CONN_ID):"
     ls /etc/default/p2pssh* -all
 
@@ -103,6 +103,9 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See configured outbound connection
 
     echo ""; echo "AutoSSH Status:"
     systemctl status p2pssh@$(ls /etc/default/p2pssh* | cut -d '@' -f 2 | head -n 1)
+
+    echo ""; echo "Bitcoin Configuration File:"
+    sudo cat /etc/bitcoin.conf
 
 elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
     if [[ ! ${#} = "2" ]]; then
