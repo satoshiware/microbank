@@ -96,16 +96,16 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See configured outbound connection
 
     echo ""; echo "This Node Status:"
     if [[ $($BTC getaddednodeinfo | jq '.[0] | .connected') == "true" ]]; then
-        echo ""; echo "    YES! You are CONNECTED!"; echo ""
+        echo "    YES! You are CONNECTED!"
     else
-        echo ""; echo "    NO! You are NOT connected!"; echo ""
+        echo "    NO! You are NOT connected!"
     fi
 
     echo ""; echo "AutoSSH Status:"
     systemctl status p2pssh@$(ls /etc/default/p2pssh* | cut -d '@' -f 2 | head -n 1)
 
     echo ""; echo "Bitcoin Configuration File:"
-    sudo cat /etc/bitcoin.conf
+    sudo cat /etc/bitcoin.conf; echo ""
 
 elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
     if [[ ! ${#} = "2" ]]; then
