@@ -24,12 +24,12 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
 
       --watch       See all addresses being "watched" with corresponding details
                     Parameters: (ADDRESS)
-                        Note: Include an address (optional) to see just the details for that address
+                    Note: Include an address (optional) to see just the details for that address
       --record      Record or laod a public address into the watch wallet (can also be used to update the NAME and DESCRIPTION)
                     Parameters: ADDRESS  NAME  DESCRIPTION  (NOSCAN)
-                        Note: Prevent the blockchain from being rescanned by including "NOSCAN" (optional)
-                        Note: To rescan the blockchain manually enter "btc -rpcwallet=watch rescanblockchain"
-                              To rescan the Import wallet on the blockchain manually enter "btc -rpcwallet=import rescanblockchain"
+                    Note: Prevent the blockchain from being rescanned by including "NOSCAN" (optional)
+                          To rescan the blockchain manually enter "btc -rpcwallet=watch rescanblockchain"
+                          To rescan the Import wallet on the blockchain manually enter "btc -rpcwallet=import rescanblockchain"
       --remove      Remove watch wallet
                     Parameters: ADDRESS
 
@@ -57,7 +57,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --mining      Create new address to receive funds into the Mining wallet
       --recent      Show recent (last 50) Bank wallet transactions
 
-      --blockchain  Show blockchain stats
+      --blockchain  Show blockchain stats (requires the environment file to be generated)
       --mempool     Show mempool stats
 EOF
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
@@ -286,7 +286,7 @@ elif [[ $1 = "--recent" ]]; then # Show recent (last 40) Bank wallet transaction
     echo "---------  ---------------  ---------  ---------------  ------------------------------------------  ----------------------------------------------------------------"
     awk -F ';' '{printf("%7s    %-15.8f  %-8s  %15s   %s  %s\n", $1, $2, $3, $4, $5, $6)}' <<< ${data%?}
 
-elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats
+elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats (requires the environment file to be generated)
     # Load envrionment variables and then verify
     if [[ -f /etc/default/teller.env ]]; then
         source /etc/default/teller.env
