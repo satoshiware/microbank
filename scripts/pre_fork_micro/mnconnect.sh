@@ -1,13 +1,5 @@
 #!/bin/bash
 
-###todo:
-      # finish "--view"
-
-#Update/Upgrade micronode utilities
-#    cd ~; git clone https://github.com/satoshiware/microbank
-#    bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh -i
-#    rm -rf microbank
-
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -17,42 +9,40 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    exit 1
 fi
 
-# Install this script (mnconnect) in /usr/local/sbin
-if [[ $1 = "-i" || $1 = "--install" ]]; then
-    echo "Installing this script (mnconnect) in /usr/local/sbin/"
-    if [ ! -f /usr/local/sbin/mnconnect ]; then
-        sudo cat $0 | sed '/Install this script/d' | sudo tee /usr/local/sbin/mnconnect > /dev/null
-        sudo sed -i 's/$1 = "-i" || $1 = "--install"/"a" = "b"/' /usr/local/sbin/mnconnect # Make it so this code won't run again in the newly installed script.
-        sudo chmod +x /usr/local/sbin/mnconnect
-    else
-        echo "\"mnconnect\" already exists in /usr/local/sbin!"
-        read -p "Would you like to uninstall it? (y|n): "
-        if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
-            sudo rm /usr/local/sbin/mnconnect
-        fi
-    fi
-    exit 0
-fi
-
-# Make sure this script is installed
-if [ ! -f /usr/local/sbin/mnconnect ]; then
-    echo "Error: this script is not yet installed to \"/usr/local/sbin/mnconnect\"!"
-    echo "Rerun this script with the \"-i\" or \"--install\" parameter!"
-    exit 1
-fi
-
 # See which mnconnect parameter was passed and execute accordingly
 if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       -i, --install     Install this script (mnconnect) in /usr/local/sbin/
       -h, --help        Display this help message and exit
-      -o, --out         Make an outbound connection to the p2p node
+      -o, --out         Make an outbound connection to the P2P Node
       -v, --view        See all configured connections and view status
       -d, --delete      Delete a connection
-      -f, --info        Get the connection parameters for this node
-      -g, --generate    Generate micronode information file (/etc/micronode.info) with connection parameters for this node
+      -k  --key"        Show hostname and public key for this node
 EOF
+elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script (mnconnect) in /usr/local/sbin
+    echo "Installing this script (mnconnect) in /usr/local/sbin/"
+    if [ -f /usr/local/sbin/mnconnect ]; then
+        echo "This script (mnconnect) already exists in /usr/local/sbin!"
+        read -p "Would you like to upgrade it? (y|n): "
+        if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
+            sudo rm /usr/local/sbin/mnconnect
+            cd ~; git clone https://github.com/satoshiware/microbank
+            bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh -i
+            rm -rf microbank
+            exit 0
+        else
+            exit 0
+        fi
+    fi
+
+    # Remove unwanted/unused host keys
+    sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
+    sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
+    sudo rm /etc/ssh/ssh_host_rsa_key* 2> /dev/null
+
+    sudo cat $0 | sudo tee /usr/local/sbin/mnconnect > /dev/null
+    sudo chmod +x /usr/local/sbin/mnconnect
 
 elif [[ $1 = "-o" || $1 = "--out" ]]; then # Make an outbound connection to the p2p node
     if [[ $(ls /etc/default/p2pssh* 2> /dev/null | wc -l) -gt "0" ]]; then
@@ -125,41 +115,20 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
     sudo systemctl disable p2pssh@${2} --now 2> /dev/null # Disable/remove systemd services related to the time stamp
     sudo systemctl reset-failed p2pssh@${2} 2> /dev/null
 
-elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for this node
-    if [ -f "/etc/micronode.info" ]; then
-        echo ""
-        sudo cat /etc/micronode.info
-    else
-        echo "Connection parameters have not been generated. Rerun with the -g (--generate) flag."
-    fi
+elif [[ $1 = "-k" || $1 = "--key" ]]; then # Show hostname and public key for this node
+    echo "Hostname: $(hostname)"
+    echo "$(hostname) (Public) Key: $(sudo cat /root/.ssh/p2pkey.pub)"
 
-elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information file (/etc/micronode.info) with connection parameters for this node
-    if [ -f "/etc/micronode.info" ]; then
-        echo "/etc/micronode.info file already exists"
-        exit 0
-    fi
-
-    echo "Here's important information about your micronode." | sudo tee /etc/micronode.info > /dev/null
-    echo "It can be used to establish secure micronode connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
-    echo "" | sudo tee -a /etc/micronode.info
-
-    echo "Hostname: $(hostname)" | sudo tee -a /etc/micronode.info
-    echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info
-
-    echo "Local IP: $(hostname -I)" | sudo tee -a /etc/micronode.info
-
-    if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
-    echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info
-
-    # Remove unwanted/unused host keys
-    sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
-    sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
-    sudo rm /etc/ssh/ssh_host_rsa_key* 2> /dev/null
-
-    echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info
-    echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info
-
-    sudo chmod 400 /etc/micronode.info
 else
+    echo "Script Version 0.03"
     $0 --help
 fi
+
+
+###todo:
+      # finish "--view"
+
+#Update/Upgrade micronode utilities
+#    cd ~; git clone https://github.com/satoshiware/microbank
+#    bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh -i
+#    rm -rf microbank
