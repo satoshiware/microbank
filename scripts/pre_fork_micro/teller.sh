@@ -350,7 +350,6 @@ elif [[ $1 = "--network" ]]; then # Show network stats
     fi
 
 else
-    echo "Method not found"
-    echo "Run script with \"--help\" flag"
     echo "Script Version 0.061"
+    $0 --help
 fi
