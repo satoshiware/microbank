@@ -68,7 +68,7 @@ elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (teller) i
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/teller
             cd ~; git clone https://github.com/satoshiware/microbank
-            bash ~/microbank/scripts/pre_fork_micro/teller.sh -i
+            bash ~/microbank/scripts/pre_fork_micro/teller.sh --install
             rm -rf microbank
             exit 0
         else
@@ -305,7 +305,7 @@ elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats
     cat << EOF
     Blockchain Size:        $(awk -v size=$(jq '.size_on_disk' <<< $BLOCKCHAIN_INFO) 'BEGIN {printf("%.0f\n", size / 1000000)}') MB
     Block Height:           $BLOCK_HEIGHT
-    Next Epoch:             $(awk -v height=$BLOCK_HEIGHT 'BEGIN {printf("%.0f\n", height % 1440)}') MB 
+    Next Epoch:             $(awk -v height=$BLOCK_HEIGHT 'BEGIN {printf("%.0f\n", height % 1440)}') MB
     Last Block Minted:      $(awk -v time=$(date +%s) -v blk_time=$(jq '.time' <<< $BLOCKCHAIN_INFO) 'BEGIN {printf("%.2f\n", (time - blk_time) / 60)}') Minutes Ago
 
     Difficulty:             $(jq '.difficulty' <<< $BLOCKCHAIN_INFO)
