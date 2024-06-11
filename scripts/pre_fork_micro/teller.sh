@@ -350,6 +350,6 @@ elif [[ $1 = "--network" ]]; then # Show network stats
     fi
 
 else
-    echo "Script Version 0.061"
     $0 --help
+    echo "Script Version 0.061"
 fi
