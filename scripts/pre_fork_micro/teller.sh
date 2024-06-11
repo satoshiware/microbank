@@ -19,7 +19,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       --help        Display this help message and exit
-      --install -i  Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
+      --install     Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
       --generate    (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/teller.env
 
       --watch       See all addresses being "watched" with corresponding details
@@ -59,9 +59,8 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
 
       --blockchain  Show blockchain stats
       --mempool     Show mempool stats
-      --network     Show network stats
 EOF
-elif [[ $1 = "-i" || $1 == "--install" ]]; then # Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
+elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
     echo "Installing this script (teller) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/teller ]; then
         echo "This script (teller) already exists in /usr/local/sbin!"
@@ -306,6 +305,7 @@ elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats
     cat << EOF
     Blockchain Size:        $(awk -v size=$(jq '.size_on_disk' <<< $BLOCKCHAIN_INFO) 'BEGIN {printf("%.0f\n", size / 1000000)}') MB
     Block Height:           $BLOCK_HEIGHT
+    Next Epoch:             $(awk -v height=$BLOCK_HEIGHT 'BEGIN {printf("%.0f\n", height % 1440)}') MB 
     Last Block Minted:      $(awk -v time=$(date +%s) -v blk_time=$(jq '.time' <<< $BLOCKCHAIN_INFO) 'BEGIN {printf("%.2f\n", (time - blk_time) / 60)}') Minutes Ago
 
     Difficulty:             $(jq '.difficulty' <<< $BLOCKCHAIN_INFO)
@@ -342,14 +342,7 @@ elif [[ $1 = "--mempool" ]]; then # Show mempool stats
         echo "        CHEAPSKATE:   $FEERATE                $(awk -v rate=$FEERATE 'BEGIN {printf("%.8f\n", rate * 0.4)}')"
     echo ""
 
-elif [[ $1 = "--network" ]]; then # Show network stats
-    if [[ $($BTC getaddednodeinfo | jq '.[0] | .connected') == "true" ]]; then
-        echo ""; echo "    YES! You are CONNECTED!"; echo ""
-    else
-        echo ""; echo "    NO! You are NOT connected!"; echo ""
-    fi
-
 else
     $0 --help
-    echo "Script Version 0.061"
+    echo "Script Version 0.07"
 fi
