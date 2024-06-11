@@ -51,10 +51,10 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script (p2pconnect
 
 elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
     echo "Let's configure an inbound connection from a wallet, stratum, or electrum node!"
-	read -p "Connection Name? (e.g. \"wallet\", \"stratum\", or \"electrum\"): " CONNNAME
+    read -p "Connection Name? (e.g. \"wallet\", \"stratum\", or \"electrum\"): " CONNNAME
     read -p "What is the connecting node's public key: " PUBLICKEY
     TMSTAMP=$(date +%s)
-	
+
     echo "${PUBLICKEY} # ${CONNNAME}, CONN_ID: ${TMSTAMP}, Cluster Connection" | sudo tee -a /home/p2p/.ssh/authorized_keys
 
 elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connections (p2p <--> p2p)
@@ -221,5 +221,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-	echo "Script Version 0.08"
+    echo "Script Version 0.08"
 fi
