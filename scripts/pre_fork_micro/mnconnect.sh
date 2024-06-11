@@ -17,13 +17,13 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       -h, --help        Display this help message and exit
-      -i, --install     Install this script (mnconnect) in /usr/local/sbin/
+      -i, --install     Install (or upgrade) this script (mnconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/mnconnect.sh)
       -o, --out         Make an outbound outbound connection to the P2P Node
       -v, --view        See configured connection and status
       -d, --delete      Delete a connection
       -k  --key         Show hostname and public key for this node
 EOF
-elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script (mnconnect) in /usr/local/sbin
+elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install (or upgrade) this script (mnconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/mnconnect.sh)
     echo "Installing this script (mnconnect) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/mnconnect ]; then
         echo "This script (mnconnect) already exists in /usr/local/sbin!"
@@ -86,6 +86,11 @@ EOF
     echo "addnode=localhost:${LOCALMICROPORT}" | sudo tee -a /etc/bitcoin.conf
 
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # See configured outbound connection and status
+    if [[ $(ls /etc/default/p2pssh* 2> /dev/null | wc -l) -eq "0" ]]; then
+        echo "There is no outbound connection!"
+        exit 1
+    fi
+	
     echo ""; echo "Connection Name (p2pssh@$CONN_ID):"
     ls /etc/default/p2pssh* -all
 
