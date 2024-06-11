@@ -19,7 +19,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       --help        Display this help message and exit
-      --install -i  Installs or updates this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
+      --install -i  Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
       --generate    (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/teller.env
 
       --watch       See all addresses being "watched" with corresponding details
@@ -61,7 +61,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --mempool     Show mempool stats
       --network     Show network stats
 EOF
-elif [[ $1 = "-i" || $1 == "--install" ]]; then # Installs or updates this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
+elif [[ $1 = "-i" || $1 == "--install" ]]; then # Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
     echo "Installing this script (teller) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/teller ]; then
         echo "This script (teller) already exists in /usr/local/sbin!"
@@ -344,7 +344,7 @@ elif [[ $1 = "--mempool" ]]; then # Show mempool stats
 
 elif [[ $1 = "--network" ]]; then # Show network stats
     if [[ $($BTC getaddednodeinfo | jq '.[0] | .connected') == "true" ]]; then
-        echo ""; echo "    YES! You are CONNECTED to the \"Banker\" node"; echo ""
+        echo ""; echo "    YES! You are CONNECTED!"; echo ""
     else
         echo ""; echo "    NO! You are NOT connected!"; echo ""
     fi
