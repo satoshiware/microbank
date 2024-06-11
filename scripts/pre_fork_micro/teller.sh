@@ -95,7 +95,8 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate the environment file (w/ neede
         fi
     fi
 
-    read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
+    read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee /etc/default/teller.env > /dev/null
+    read -p "Number of blocks in each Difficulty Epoch (e.g. 1440): "; echo "EPOCHINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
     read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
 
 elif [[ $1 = "--watch" ]]; then # See all addresses being "watched" with corresponding details. Include an address (optional) to see just the details for that address
@@ -289,7 +290,7 @@ elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats
     # Load envrionment variables and then verify
     if [[ -f /etc/default/teller.env ]]; then
         source /etc/default/teller.env
-        if [[ -z $HALVINGINTERVAL || -z $BLOCKINTERVAL ]]; then
+        if [[ -z $HALVINGINTERVAL || -z $EPOCHINTERVAL || -z $BLOCKINTERVAL ]]; then
             echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/teller.env\" file"; exit 1;
         fi
     else
@@ -305,7 +306,7 @@ elif [[ $1 = "--blockchain" ]]; then # Show blockchain stats
     cat << EOF
     Blockchain Size:        $(awk -v size=$(jq '.size_on_disk' <<< $BLOCKCHAIN_INFO) 'BEGIN {printf("%.0f\n", size / 1000000)}') MB
     Block Height:           $BLOCK_HEIGHT
-    Next Epoch:             $(awk -v height=$BLOCK_HEIGHT 'BEGIN {printf("%.0f\n", height % 1440)}') MB
+    Next Epoch:             $(awk -v height=$BLOCK_HEIGHT -v epoch_interval=$EPOCHINTERVAL 'BEGIN {printf("%.0f\n", epoch_interval - (height % epoch_interval))}') Blocks Left
     Last Block Minted:      $(awk -v time=$(date +%s) -v blk_time=$(jq '.time' <<< $BLOCKCHAIN_INFO) 'BEGIN {printf("%.2f\n", (time - blk_time) / 60)}') Minutes Ago
 
     Difficulty:             $(jq '.difficulty' <<< $BLOCKCHAIN_INFO)
