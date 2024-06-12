@@ -17,7 +17,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       -h, --help        Display this help message and exit
-      -i, --install     Install (or upgrade) this script (mnconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/mnconnect.sh)
+      -i, --install     Install (or upgrade) this script (mnconnect) in /usr/local/sbin/ (Repository: /satoshiware/microbank/scripts/pre_fork_micro/mnconnect.sh)
       -o, --out         Make an outbound outbound connection to the P2P Node
       -v, --view        See configured connection and status
       -d, --delete      Delete a connection
@@ -132,5 +132,5 @@ elif [[ $1 = "-k" || $1 = "--key" ]]; then # Show hostname and public key for th
 
 else
     $0 --help
-    echo "Script Version 0.03"
+    echo "Script Version 0.031"
 fi
