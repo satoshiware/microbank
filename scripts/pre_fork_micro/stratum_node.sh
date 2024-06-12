@@ -357,8 +357,9 @@ EOF
 (sudo crontab -l; echo "*/15 * * * * stmutility --update") | sudo crontab -
 
 # Install the micronode connection and stratum utilities
-bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh -i
-bash ~/microbank/scripts/pre_fork_micro/stmutility.sh -i
+bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh --install
+bash ~/microbank/scripts/pre_fork_micro/stmutility.sh --install
+bash ~/microbank/scripts/send_messages.sh --install
 
 # Restart the machine
 sudo reboot now
