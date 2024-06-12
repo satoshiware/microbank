@@ -211,7 +211,7 @@ sudo systemctl enable bitcoind --now
 echo "waiting a few seconds for bitcoind to start"; sleep 15
 
 # Install the micronode connect utility (mnconnect.sh)
-bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh -i
+bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh --install
 
 # Restart the machine
 sudo reboot now
