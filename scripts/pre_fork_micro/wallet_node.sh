@@ -228,9 +228,10 @@ echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \\\$(sudo cat
 echo "alias lockwallets=\"btc -rpcwallet=mining walletlock; btc -rpcwallet=bank walletlock\"" | sudo tee -a /etc/bash.bashrc
 
 # Install the "Wallet" micronode utilities
-bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh -i
-bash ~/microbank/scripts/pre_fork_micro/teller.sh -i
-bash ~/microbank/scripts/pre_fork_micro/payouts.sh -i
+bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh --install
+bash ~/microbank/scripts/pre_fork_micro/teller.sh --install
+bash ~/microbank/scripts/pre_fork_micro/payouts.sh --install
+bash ~/microbank/scripts/send_messages.sh --install
 
 # Restart the machine
 sudo reboot now
