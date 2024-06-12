@@ -17,7 +17,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       -h, --help        Display this help message and exit
-      -i, --install     Install this script (p2pconnect) in /usr/local/sbin/
+      -i, --install     Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
       -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
       -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)
       -v, --view        See all configured connections and view status
@@ -25,7 +25,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -f, --info        Get the connection parameters for this node
 EOF
 
-elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install this script (p2pconnect) in /usr/local/sbin
+elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
     echo "Installing this script (p2pconnect) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/p2pconnect ]; then
         echo "This script (p2pconnect) already exists in /usr/local/sbin!"
