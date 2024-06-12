@@ -32,6 +32,8 @@ elif [[ $1 = "--install" ]]; then # Install this script (send_messages) in /usr/
         read -p "Would you like to upgrade it? (y|n): "
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/send_messages
+            sudo rm /usr/local/sbin/send_messages
+
             cd ~; git clone https://github.com/satoshiware/microbank
             bash ~/microbank/scripts/send_messages.sh --install
             rm -rf microbank
@@ -49,7 +51,9 @@ elif [[ $1 = "--install" ]]; then # Install this script (send_messages) in /usr/
         sudo touch /var/log/send_messages.log
         sudo chown root:root /var/log/send_messages.log
         sudo chmod 644 /var/log/send_messages.log
-        cat << EOF | sudo tee /etc/logrotate.d/send_messages
+    fi
+
+    cat << EOF | sudo tee /etc/logrotate.d/send_messages
 /var/log/send_messages.log {
 $(printf '\t')create 644 root root
 $(printf '\t')monthly
@@ -60,7 +64,6 @@ $(printf '\t')postrotate
 $(printf '\t')endscript
 }
 EOF
-    fi
 
 elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/send_messages.env
     echo "Generating the environment file /etc/default/send_messages.env"
@@ -79,7 +82,7 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
     fi
 
     read -p "EMAIL API address (e.g. \"https://api.brevo.com/v3/smtp/email\"): "; echo "API_EMAIL=\"$REPLY\"" | sudo tee /etc/default/send_messages.env > /dev/null
-    read -p "SMS API address (e.g. \"https://api.telnyx.com/v2/messages\"): "; echo "API_SMS=\"$REPLY\"" | sudo tee /etc/default/send_messages.env > /dev/null
+    read -p "SMS API address (e.g. \"https://api.telnyx.com/v2/messages\"): "; echo "API_SMS=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
     read -p "EMAIL API key to send email (e.g. \"xkeysib-05...76-9...1\"): "; echo "KEY_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
     read -p "SMS API key to send sms (e.g. \"KEY017D...b3_5z...cJ\"): "; echo "KEY_SMS=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
     read -p "Sender email name (e.g. \"AZ Money\"): "; echo "SENDER_EMAIL_NAME=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
@@ -184,5 +187,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 0.11"
+    echo "Script Version 0.12"
 fi
