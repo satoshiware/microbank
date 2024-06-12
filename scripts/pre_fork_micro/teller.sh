@@ -60,7 +60,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --blockchain  Show blockchain stats (requires the environment file to be generated)
       --mempool     Show mempool stats
 EOF
-elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
+elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (teller) in /usr/local/sbin (Repository: /satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
     echo "Installing this script (teller) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/teller ]; then
         echo "This script (teller) already exists in /usr/local/sbin!"
