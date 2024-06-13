@@ -21,6 +21,8 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --help        Display this help message and exit
       --install     Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
       --generate    (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/teller.env
+      --cron        (Re)Create a weekly cronjob to send a wallet email update at 6:30 AM on Monday: RECIPIENTS_NAME  EMAIL
+      --email       Email (send out) the wallet update (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
 
       --watch       See all addresses being "watched" with corresponding details
                     Parameters: (ADDRESS)
@@ -98,6 +100,30 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate the environment file (w/ neede
     read -p "Number of blocks in each halving (e.g. 262800): "; echo "HALVINGINTERVAL=$REPLY" | sudo tee /etc/default/teller.env > /dev/null
     read -p "Number of blocks in each Difficulty Epoch (e.g. 1440): "; echo "EPOCHINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
     read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
+
+
+elif [[ $1 = "--cron" ]]; then # (Re)Create a weekly cronjob to send a wallet email update at 6:30 AM on Monday: RECIPIENTS_NAME  EMAIL
+    NAME=$2; EMAIL=$3
+    if [[ -z $NAME || -z $EMAIL ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    # Add Weekly Cron Job to send out an email. Run "crontab -e" as $USER to see all its cron jobs.
+    (crontab -l | grep -v -F "/usr/local/sbin/teller --email" ; echo "30 6 * * 1 /usr/local/sbin/teller --email $NAME $EMAIL" ) | crontab -
+
+elif [[ $1 = "--email" ]]; then # Email (send out) the wallet update (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
+    NAME=$2; EMAIL=$3
+    if [[ -z $NAME || -z $EMAIL ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    MESSAGE="<b>---- Blances ----</b>$(teller --balances)<br><br><b>---- Memory Pool ----</b>$(teller --mempool)<br><br><b>---- Blockchain ----</b>$(teller --blockchain)"
+    MESSAGE=${MESSAGE//$'\n'/'<br>'}
+    MESSAGE=${MESSAGE// /\&nbsp;}
+
+    send_messages --email $NAME $EMAIL "Wallet Node Snapshot" $MESSAGE
 
 elif [[ $1 = "--watch" ]]; then # See all addresses being "watched" with corresponding details. Include an address (optional) to see just the details for that address
     ADDRESS="${2,,}"
