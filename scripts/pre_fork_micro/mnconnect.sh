@@ -117,7 +117,8 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
 
     sudo rm /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
 
-    sudo sed -i "/${2}/d" /etc/bitcoin.conf 2> /dev/null # Remove the comment line containing the time stamp
+    sudo sed -i "/${2}/d" /root/.ssh/known_hosts 2> /dev/null # Remove the comment line containing the time stamp from the known_hosts
+    sudo sed -i "/${2}/d" /etc/bitcoin.conf 2> /dev/null # Remove the comment line containing the time stamp from the bitcoin.conf
     sudo sed -i "/${LOCAL_PORT}/d" /etc/bitcoin.conf 2> /dev/null # Remove the "addnode=" line containing the "LOCAL_PORT"
 
     sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf addnode "localhost:${LOCAL_PORT}" "remove" 2> /dev/null # Remove the node containing the "LOCAL_PORT" connection
@@ -132,5 +133,5 @@ elif [[ $1 = "-k" || $1 = "--key" ]]; then # Show hostname and public key for th
 
 else
     $0 --help
-    echo "Script Version 0.031"
+    echo "Script Version 0.032"
 fi
