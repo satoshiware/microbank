@@ -29,8 +29,6 @@ elif [[ $1 = "--install" ]]; then # Install this script (send_messages) in /usr/
         read -p "Would you like to upgrade it? (y|n): "
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/send_messages
-            sudo rm /usr/local/sbin/send_messages
-
             cd ~; git clone https://github.com/satoshiware/microbank
             bash ~/microbank/scripts/send_messages.sh --install
             rm -rf microbank
@@ -184,5 +182,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 0.13"
+    echo "Script Version 0.131"
 fi
