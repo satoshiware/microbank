@@ -9,9 +9,6 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    exit 1
 fi
 
-# Universal envrionment variables
-LOG=/var/log/send_messages.log
-
 # See which send_messages parameter was passed and execute accordingly
 if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
@@ -133,7 +130,7 @@ EOF
     echo $RESPONSE
 
     # Log entry
-    echo "$(date) - $RESPONSE" | sudo tee -a $LOG
+    echo "$(date) - $RESPONSE" | sudo tee -a /var/log/send_messages.log
 
 elif [[ $1 = "--email" ]]; then # Send Email: RECIPIENTS_NAME  EMAIL  SUBJECT  MESSAGE
     NAME=$2; EMAIL=$3; SUBJECT=$4; MESSAGE=$5
@@ -183,9 +180,9 @@ EOF
     echo $RESPONSE
 
     # Log entry
-    echo "$(date) - $RESPONSE; Name=\"$NAME\"; Email=\"$EMAIL\"; Subject=\"$SUBJECT\"; Message=\"${MESSAGE:0:100}...\"" | sudo tee -a $LOG
+    echo "$(date) - $RESPONSE; Name=\"$NAME\"; Email=\"$EMAIL\"; Subject=\"$SUBJECT\"; Message=\"${MESSAGE:0:100}...\"" | sudo tee -a /var/log/send_messages.log
 
 else
     $0 --help
-    echo "Script Version 0.12"
+    echo "Script Version 0.13"
 fi
