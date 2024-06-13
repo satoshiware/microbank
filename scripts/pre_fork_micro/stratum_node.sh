@@ -178,15 +178,12 @@ sudo ufw --force enable # Enable Firewall @ Boot and Start it now!
 
 # Open firewall to the stratum port for any local ip
 PNETWORK=$(echo $(hostname -I) | cut -d '.' -f 1)
-read -p "Open firewall to the stratum port (if not already) for any local ip? (y|n): "
-if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
-    if [[ ${PNETWORK} = "192" ]]; then
-        sudo ufw allow from 192.168.0.0/16 to any port 3333
-    elif [[ ${PNETWORK} = "172" ]]; then
-        sudo ufw allow from 172.16.0.0/12 to any port 3333
-    elif [[ ${PNETWORK} = "10" ]]; then
-        sudo ufw allow from 10.0.0.0/8 to any port 3333
-    fi
+if [[ ${PNETWORK} = "192" ]]; then
+    sudo ufw allow from 192.168.0.0/16 to any port 3333
+elif [[ ${PNETWORK} = "172" ]]; then
+    sudo ufw allow from 172.16.0.0/12 to any port 3333
+elif [[ ${PNETWORK} = "10" ]]; then
+    sudo ufw allow from 10.0.0.0/8 to any port 3333
 fi
 
 # Install/Setup/Enable SSH(D)
