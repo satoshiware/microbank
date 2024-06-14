@@ -20,7 +20,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -i, --install     Install (or upgrade) this script (mnconnect) in /usr/local/sbin/ (Repository: /satoshiware/microbank/scripts/pre_fork_micro/mnconnect.sh)
       -o, --out         Make an outbound outbound connection to the P2P Node
       -v, --view        See configured connection and status
-      -d, --delete      Delete a connection
+      -d, --delete      Delete a connection: CONNECTION_ID
       -k  --key         Show hostname and public key for this node
 EOF
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install (or upgrade) this script (mnconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/mnconnect.sh)
@@ -107,7 +107,7 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See configured outbound connection
     echo ""; echo "Bitcoin Configuration File:"
     sudo cat /etc/bitcoin.conf; echo ""
 
-elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
+elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection: CONNECTION_ID
     if [[ ! ${#} = "2" ]]; then
         echo "Enter the Connection ID to delete (Example: \"mnconnect --delete 1691422785\")."
         exit 0
@@ -133,5 +133,5 @@ elif [[ $1 = "-k" || $1 = "--key" ]]; then # Show hostname and public key for th
 
 else
     $0 --help
-    echo "Script Version 0.032"
+    echo "Script Version 0.033"
 fi
