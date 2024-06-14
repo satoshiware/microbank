@@ -19,9 +19,9 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -h, --help        Display this help message and exit
       -i, --install     Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
       -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
-      -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)
+      -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)  ~~~~~~~~~~~PORT 19022 DEFAULT PORT~~~~~~~~~~~~~~
       -v, --view        See all configured connections and view status
-      -d, --delete      Delete a connection
+      -d, --delete      Delete a connection: CONNECTION_ID
       -f, --info        Get the connection parameters for this node
 EOF
 
@@ -183,9 +183,9 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
 #   okok=$(ssh-keygen -l -f fifo)
 #   rm fifo
 
-elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection
+elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection: CONNECTION_ID
     if [[ ! ${#} = "2" ]]; then
-        echo "Enter the time stamp of the connction to delete (Example: \"p2pconnect --delete 1691422785\")."
+		echo "Enter the Connection ID to delete (Example: \"mnconnect --delete 1691422785\")."
         exit 0
     fi
 
