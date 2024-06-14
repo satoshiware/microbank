@@ -21,31 +21,15 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -m, --miners      Show miners and hashrates ?????????????????????????????????????
       -b, --blocks      List the latest (40) blocks solved ?????????????????????????????
       -t, --tail        Display the tail end of the debug log (/var/log/ckpool/ckpool.log) ????????????????????
-	  -v, --view        View remote connection(s) - Read authorized_keys @ /home/stratum/.ssh/
+      -v, --view        View remote connection(s) - Read authorized_keys @ /home/stratum/.ssh/
       -d, --delete      Delete an incoming remote connection: CONNECTION_ID
       -f, --info        Get the connection parameters to setup a remote mining operation
-	  
+
+      !!!!/etc/ckpool.conf the pool configuration file - Change name in that file.
 
     With this tool, you can view all the pertinent information to ensure a healthy mining operation.
     Also, with this tool and the help of the mnconnect utility, you can set up an incoming connection for a remote mining operation.
         Run the "~/microbank/micronode_stratum_remote.sh" on a SBC (e.g. Raspberry Pi Zero 2) to set it up for the "Remote Access Point"
-
- $(ls -d 00* | tail -n 1) # Remove all log folders except the last one
-
-rm rf 00* !("$(ls -d 00* | tail -n 1)"|"filename2") -v
-
-rm rf 00* !("$(ls -d 00* | tail -n 1)"|"filename2") -v
-
-rm -v !("filename1")
-
-
-find ./00* ! -name 'file.txt' -type f -exec rm -rf {} +
-
-
-
-find ./00* ! -name "$(ls -d 00* | tail -n 1)" -type d -exec rm -rf {} +
-    
-    
 
 Notes:
     Once configured, just point the miner(s) to this node (or the "Remote Access Point") via its private network static ip on port 3333.
@@ -72,10 +56,10 @@ elif [[ $1 = "--install" ]]; then # Install this script (stmutility) in /usr/loc
     sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
     sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
     sudo rm /etc/ssh/ssh_host_rsa_key* 2> /dev/null
-	
+
     sudo cat $0 | sudo tee /usr/local/sbin/stmutility > /dev/null
     sudo chmod +x /usr/local/sbin/stmutility
-	
+
 elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for a remote mining operation
     echo "Configuring inbound connection for a remote mining operation..."
     read -p "Remote Connection Name: " CONNNAME
@@ -85,14 +69,22 @@ elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for
     echo "${PUBLICKEY} # ${CONNNAME}, CONN_ID: ${TMSTAMP}, REMOTE" | sudo tee -a /home/stratum/.ssh/authorized_keys
 
 elif [[ $1 = "-u" || $1 = "--update" ]]; then # Load a new mining address (if previous one is used), cleanup log folders, delete inactive user, restart the pool
+    # Delete all log folder that start with "00" except for the latest one in the directory /var/log/ckpool
+    sudo find /var/log/ckpool -regex '^.*\/00.*' ! -name "$(sudo find /var/log/ckpool -regex '^.*\/00.*' -type d | sort | tail -n 1 | cut -d '/' -f 5)" -type d -exec rm -rf {} +
 
-	########### Is there a way to suspend this service?????
-	# Delete all log folder that start with "00" except for the latest one in the directory /var/log/ckpool
-	sudo find /var/log/ckpool -regex '^.*\/00.*' ! -name "$(sudo find /var/log/ckpool -regex '^.*\/00.*' -type d | sort | tail -n 1 | cut -d '/' -f 5)" -type d -exec rm -rf {} +
-		
+
+
+    sed -i "/btcaddress/c\ \"btcaddress\" : \"$($BTC -rpcwallet=mining getnewaddress)\"," /etc/ckpool.conf.bak
+
+
+
+
+    # Is there a way to suspend this service?????
+
+
     #Delete inactive miners (havn't mined for over a week or something)
-    
-	#restart the pool.
+
+    #restart the pool.
     #Delete all those extra folders that are a 100 blcks old???
 
 elif [[ $1 = "-s" || $1 = "--status" ]]; then # View the current status of the pool
@@ -122,9 +114,9 @@ fi
 
 
     sudo sed -i "/${2}/d" /root/.ssh/known_hosts 2> /dev/null # Remove the known host containing the time stamp
-	
-	
-	
+
+
+
 
 elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information file (/etc/micronode.info) with connection parameters for this node
     if [ -f "/etc/micronode.info" ]; then
@@ -157,7 +149,7 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information
 
 
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # View remote connection(s) - Read authorized_keys @ /home/stratum/.ssh/
-	sudo cat /home/stratum/.ssh/authorized_keys
+    sudo cat /home/stratum/.ssh/authorized_keys
 
 elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete an incoming remote connection: CONNECTION_ID
     if [[ ! ${#} = "2" ]]; then
@@ -171,12 +163,12 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete an incoming remote connec
     # Force disconnect all users
     STRATUM_PIDS=$(ps -u stratum 2> /dev/null | grep sshd)
     while IFS= read -r line ; do sudo kill -9 $(echo $line | cut -d ' ' -f 1) 2> /dev/null; done <<< "$STRATUM_PIDS"
-	
+
 elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters to setup a remote mining operation
     mnconnect --key
     echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')"
 
 else
     $0 --help
-	echo "Script Version 0.01"
+    echo "Script Version 0.01"
 fi
