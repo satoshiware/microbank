@@ -69,6 +69,8 @@ sudo chmod 755 /usr/bin/rpcauth
 # Download Bitcoin Core (micro), Verify Checksum
 read -p "Bitcoin Core URL (.tar.gz) source (/w compiled microcurrency): " SOURCE
 read -p "SHA 256 Checksum for the .tar.gz source file: " CHECKSUM
+read -p "Domain name address: " DNS; DNS=${DNS,,}; DNS=${DNS#http://}; DNS=${DNS#https://}; DNS=${DNS#www.}; DNS=${DNS%.com}; DNS=${DNS%.org}; DNS=${DNS%.net} # Make lowercase and remove http(s), www, .com, .org, and .net if they exist.
+echo $DNS
 
 wget $SOURCE
 if ! [ -f ~/${SOURCE##*/} ]; then echo "Error: Could not download source!"; exit 1; fi
@@ -319,7 +321,7 @@ $(printf '\t')"notify" : true
 $(printf '\t')}
 ],
 "btcaddress" : "${MININGADDRESS}",
-"btcsig" : "",
+"btcsig" : "${DNS}",
 "serverurl" : [
 $(printf '\t')"0.0.0.0:3333"
 ],
