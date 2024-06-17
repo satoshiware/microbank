@@ -9,6 +9,9 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    exit 1
 fi
 
+# Universal envrionment variables
+BTC=$(cat /etc/bash.bashrc | grep "alias btc=" | cut -d "\"" -f 2)
+
 # See which stmutility parameter was passed and execute accordingly
 if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
@@ -72,23 +75,25 @@ elif [[ $1 = "-u" || $1 = "--update" ]]; then # Load a new mining address (if pr
     # Delete all log folder that start with "00" except for the latest one in the directory /var/log/ckpool
     sudo find /var/log/ckpool -regex '^.*\/00.*' ! -name "$(sudo find /var/log/ckpool -regex '^.*\/00.*' -type d | sort | tail -n 1 | cut -d '/' -f 5)" -type d -exec rm -rf {} +
 
+    # Get current mining address
+    ADDRESS=$(sudo sed -n '/btcaddress/p' /etc/ckpool.conf | cut -d "\"" -f 4)
 
+    # Check address to see if it is in the blockchain.
+    $BTC -rpcwallet=mining listtransactions "*" 10000 0 false | grep "$ADDRESS" | wc -l  ############ How big do we want that number or how often do we check?  look for a return greater than 0
 
-    sed -i "/btcaddress/c\ \"btcaddress\" : \"$($BTC -rpcwallet=mining getnewaddress)\"," /etc/ckpool.conf.bak
+    # Load a new mining address
+    sudo sed -i "/btcaddress/c\"btcaddress\" : \"$($BTC -rpcwallet=mining getnewaddress)\"," /etc/ckpool.conf
 
-
-
-
-    # Is there a way to suspend this service?????
-
+    # Is there a way to suspend this service????? Is there a better way??
+    sudo systemctl stop ckpool
+    sudo systemctl start ckpool  #restart the pool.
 
     #Delete inactive miners (havn't mined for over a week or something)
 
-    #restart the pool.
-    #Delete all those extra folders that are a 100 blcks old???
-
 elif [[ $1 = "-s" || $1 = "--status" ]]; then # View the current status of the pool
     cat /var/log/ckpool/pool/pool.status
+
+    sudo systemctl status ckpool
 
     ## Is Bitcoind running?
     ## Is the node connected?
