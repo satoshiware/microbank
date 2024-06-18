@@ -16,74 +16,24 @@ BTC=$(cat /etc/bash.bashrc | grep "alias btc=" | cut -d "\"" -f 2)
 if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
-      -h, --help        Display this help message and exit
-      -i, --install     Install this script (stmutility) in /usr/local/sbin/ (Repository: /satoshiware/microbank/scripts/pre_fork_micro/stmutility.sh)
-      -r, --remote      Configure inbound connection for a remote mining operation
-	  --email !!!!!!!!!!!
-	  -cron for email updates !!!!!!!!!!!!!
-	  -cron for updates !!!!!!!!!!
-!!!!! -u, --update      Delete log folders (/var/log/ckpool/00*) and if previous mining address has received coins then 
-							load a new mining address (/etc/ckpool.conf), delete inactive users (/var/log/ckpool/users), and restart ckpool
-      -s, --status      View the current status of the pool??????????????/var/log/ckpool/pool/pool.status
-      -m, --miners      Show local miners and hashrates ?????????????????????????????????????
-      -b, --blocks      List the latest (40) blocks solved ????????????????????????????? What's the goal here?????
-      -t, --tail        Display the tail end (40 lines) of the debug log (/var/log/ckpool/ckpool.log)
-      -v, --view        View remote connection(s) - Read authorized_keys @ /home/stratum/.ssh/
-      -d, --delete      Delete an incoming remote connection: CONNECTION_ID
-      -f, --info        Get the connection parameters to setup a remote mining operation
-
-
-
-	{
-	 "hashrate1m": "84.5T"
-	 "hashrate5m": "77.4T"
-	 "hashrate1hr": "80T",
-	 "hashrate1d": "81.3T",
-	 "hashrate7d": "81.9T",
-	 "lastupdate": 1718661699,
-	 "workers": 1, 
-	 "shares": 560724348793,
-	 "bestshare": 2727623.7524854098, 
-	 "worker": 
-		[
-			{
-				"workername": "Antminer-S19j-0",
-				"hashrate1m": "84.5T",
-				"hashrate5m": "77.4T",
-				"hashrate1hr": "80T",
-				"hashrate1d": "81.3T",
-				"hashrate7d": "81.9T",
-				"lastupdate": 1718661699,
-				"shares": 560724348793,
-				"bestshare": 2727623.7524854098
-			}
-		]
-	}
-
-	sudo /bin/sh -c 'sudo -u root files=(/var/log/stratum/users/*)'
-	
-	echo ${files[@]}
-	
-	
-	files=(/var/log/stratum/users/*)
-	echo ${files[@]}
-	
-	sudo cat /var/log/stratum/users/Antminer-S19j-0 | jq '.hashrate1m'
-	sudo cat /var/log/stratum/users/Antminer-S19j-0 | jq '.hashrate5m'
-	sudo cat /var/log/stratum/users/Antminer-S19j-0 | jq '.hashrate1hr'
-
-
-
-
-    With this tool, you can view all the pertinent information to ensure a healthy mining operation.
-    Also, with this tool and the help of the mnconnect utility, you can set up an incoming connection for a remote mining operation.
-        Run the "~/microbank/micronode_stratum_remote.sh" on a SBC (e.g. Raspberry Pi Zero 2) to set it up for the "Remote Access Point"
-
-Notes:
-    Once configured, just point the miner(s) to this node (or the "Remote Access Point") via its private network static ip on port 3333.
-        Example: stratum+tcp://$IP_ADDRESS:3333
-    Run the "usb_miner.sh" on a SBC (e.g. Raspberry Pi Zero 2W [WIRELESS]) to setup and run a USB miner (e.g. R909)
+      -h, --help    Display this help message and exit
+      --install     Install this script (stmutility) in /usr/local/sbin/ (Repository: /satoshiware/microbank/scripts/pre_fork_micro/stmutility.sh)
+      --cron-weekly (Re)Create a weekly cronjob to send mining status email at 6:30 AM on Monday: RECIPIENTS_NAME  EMAIL
+      --cron-error  (Re)Create an daily cronjob to notify (via email) of any problems: RECIPIENTS_NAME  EMAIL
+      --email       Email (send out) the mining status (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
+      --error       Check for errors and report to user via email (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
+      --remote      Configure inbound connection for a remote mining operation
+      --update      Delete log folders (/var/log/ckpool/00*) and if previous mining address has received coins then
+                        load a new mining address (/etc/ckpool.conf), delete inactive users (7 days), and restart ckpool
+      -s, --status  View the current status of the pool (sudo systemctl status ckpool)
+      -m, --miners  Show pool status (/var/log/ckpool/pool/pool.status) and local miners with their respective hashrates (/var/log/ckpool/users)
+!!!!  -b, --blocks  List the latest (40) blocks solved
+      -t, --tail    Display the tail end (40 lines) of the debug log (/var/log/ckpool/ckpool.log)
+      -v, --view    View remote connection(s) - Read authorized_keys @ /home/stratum/.ssh/
+      -d, --delete  Delete an incoming remote connection: CONNECTION_ID
+      -f, --info    Get the connection parameters to setup a remote mining operation
 EOF
+
 elif [[ $1 = "--install" ]]; then # Install this script (stmutility) in /usr/local/sbin/ (Repository: /satoshiware/microbank/scripts/pre_fork_micro/stmutility.sh)
     echo "Installing this script (stmutility) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/stmutility ]; then
@@ -108,7 +58,79 @@ elif [[ $1 = "--install" ]]; then # Install this script (stmutility) in /usr/loc
     sudo cat $0 | sudo tee /usr/local/sbin/stmutility > /dev/null
     sudo chmod +x /usr/local/sbin/stmutility
 
-elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for a remote mining operation
+    # Add hourly Cron Job to run the update routine. Run "crontab -l" as $USER to see all its cron jobs.
+    (crontab -l | grep -v -F "/usr/local/sbin/stmutility --update" ; echo "0 * * * * /usr/local/sbin/stmutility --update" ) | crontab -
+
+elif [[ $1 = "--cron-weekly" ]]; then # (Re)Create a weekly cronjob to send mining status email at 6:30 AM on Monday: RECIPIENTS_NAME  EMAIL
+    NAME=$2; EMAIL=$3
+    if [[ -z $NAME || -z $EMAIL ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    # Add Weekly Cron Job to send out an email update. Run "crontab -l" as $USER to see all its cron jobs.
+    (crontab -l | grep -v -F "/usr/local/sbin/stmutility --email" ; echo "30 6 * * 1 /usr/local/sbin/stmutility --email $NAME $EMAIL" ) | crontab -
+
+elif [[ $1 = "--cron-error" ]]; then # (Re)Create an daily cronjob to notify (via email) of any problems: RECIPIENTS_NAME  EMAIL
+    NAME=$2; EMAIL=$3
+    if [[ -z $NAME || -z $EMAIL ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    # Add hourly Cron Job to check for errors. Run "crontab -l" as $USER to see all its cron jobs.
+    (crontab -l | grep -v -F "/usr/local/sbin/stmutility --error" ; echo "0 0 * * * /usr/local/sbin/stmutility --error $NAME $EMAIL" ) | crontab -
+
+elif [[ $1 = "--email" ]]; then # Email (send out) the mining status (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
+    NAME=$2; EMAIL=$3
+    if [[ -z $NAME || -z $EMAIL ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    MESSAGE="<b>---- Miners ----</b>$(stmutility --miners)<br><br><b>---- Last 40 Blocks ----</b>$(stmutility --blocks)<br><br><b>---- Debug Log ----</b>$(stmutility --tail)"
+    MESSAGE=${MESSAGE//$'\n'/'<br>'}
+    MESSAGE=${MESSAGE// /\&nbsp;}
+
+    send_messages --email $NAME $EMAIL "Mining Pool Snapshot" $MESSAGE
+
+elif [[ $1 = "--error" ]]; then # Check for errors and report to user via email (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
+    NAME=$2; EMAIL=$3
+    if [[ -z $NAME || -z $EMAIL ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    # Make sure the pool software is running
+    if [[ ! systemctl is-active --quiet ckpool ]]; then
+        send_messages --email $NAME $EMAIL "Pool Software Has Stopped" "Hey you, your mining pool software is not running."
+        exit 0
+    fi
+
+    # Make sure the pool is hashing (has it been down for more than 6 hours?)
+    if [[ $(sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate6hr') == "0" ]]; then
+        send_messages --email $NAME $EMAIL "Pool Is Not Hashing" "Hey you, your mining pool is not hashing.<br>Potentially, the miner(s) are down or the Stratum Node has become disconnected from the P2P Node."
+        exit 0
+    fi
+
+    # Has there been a miner down for more than an hour?
+    sudo find /var/log/ckpool/users -name '* *' -exec sh -c '
+        for file do
+            dir=${file%/*};
+            file=${file##*/};
+            without_spaces=$(printf %s "$file." | sed "s/ /_/g")
+            sudo mv "$dir/$file" "$dir/${without_spaces%.}";
+        done
+    ' _ {} + # Convert spaces " " in each filename to underscores '_' (prevents processing errors in the next step)
+
+    users=($(sudo ls /var/log/ckpool/users))
+    for u in "${users[@]}"; do
+        if [[ $(sudo cat /var/log/ckpool/users/$u | jq -r '.hashrate1hr') == "0" ]]; then
+            send_messages --email $NAME $EMAIL "Miner $u Stopped Working" "Hey you, it has been a while since your miner \"$u\" has submitted any shares."
+        fi
+    done
+
+elif [[ $1 = "--remote" ]]; then # Configure inbound connection for a remote mining operation
     echo "Configuring inbound connection for a remote mining operation..."
     read -p "Remote Connection Name: " CONNNAME
     read -p "Remote Operation's (Public) Key: " PUBLICKEY
@@ -116,87 +138,102 @@ elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for
 
     echo "${PUBLICKEY} # ${CONNNAME}, CONN_ID: ${TMSTAMP}, REMOTE" | sudo tee -a /home/stratum/.ssh/authorized_keys
 
-elif [[ $1 = "-u" || $1 = "--update" ]]; then # Delete log folders (/var/log/ckpool/00*) and if previous mining address has received coins then load a new mining address (/etc/ckpool.conf), delete inactive users (/var/log/ckpool/users), and restart ckpool
+elif [[ $1 = "--update" ]]; then # Delete log folders (/var/log/ckpool/00*) and if previous mining address has received coins then load a new mining address (/etc/ckpool.conf), delete inactive users (7 days), and restart ckpool
     # Delete all log folder that start with "00" except for the latest one in the directory /var/log/ckpool
     sudo find /var/log/ckpool -regex '^.*\/00.*' ! -name "$(sudo find /var/log/ckpool -regex '^.*\/00.*' -type d | sort | tail -n 1 | cut -d '/' -f 5)" -type d -exec rm -rf {} +
-	
-	
-	ADDRESS=$(sudo sed -n '/btcaddress/p' /etc/ckpool.conf | cut -d "\"" -f 4) # Get current mining address
-	if [[ $($BTC -rpcwallet=mining listtransactions "*" 1000 0 false | grep "$ADDRESS" | wc -l) -gt 0 ]]; then # Check mining address to see if it is in the blockchain.
-		sudo systemctl stop ckpool # Stop the pool ?????????? Better Way ????????????
-		
-		######## Need to wait ################
-		sudo sed -i "/btcaddress/c\"btcaddress\" : \"$($BTC -rpcwallet=mining getnewaddress)\"," /etc/ckpool.conf # Load a new mining address
-		
-		#Delete inactive miners (havn't mined for over a week or something) !!!!!!!!!!!!!!!!!!!!!!
-		
-		sudo systemctl start ckpool # Start the pool ?????????? Better Way ????????????
-	fi
 
-elif [[ $1 = "-s" || $1 = "--status" ]]; then # View the current status of the pool
-    cat /var/log/ckpool/pool/pool.status
+    ADDRESS=$(sudo sed -n '/btcaddress/p' /etc/ckpool.conf | cut -d "\"" -f 4) # Get current mining address
+    if [[ $($BTC -rpcwallet=mining listtransactions "*" 5000 0 false | grep "$ADDRESS" | wc -l) -gt 0 ]]; then # Check mining address to see if it is in the blockchain.
+        sudo systemctl stop ckpool # Stop the pool
+        sleep 10 # Wait 10 seconds while ckpool service is stopping
 
+        sudo sed -i "/btcaddress/c\"btcaddress\" : \"$($BTC -rpcwallet=mining getnewaddress)\"," /etc/ckpool.conf # Load a new mining address
+
+        # Delete inactive miners (havn't mined for over a week)
+        sudo find /var/log/ckpool/users -name '* *' -exec sh -c '
+            for file do
+                dir=${file%/*};
+                file=${file##*/};
+                without_spaces=$(printf %s "$file." | sed "s/ /_/g")
+                sudo mv "$dir/$file" "$dir/${without_spaces%.}";
+            done
+        ' _ {} +  # Convert spaces " " in each filename to underscores '_' (prevents processing errors in the next step)
+
+        users=($(sudo ls /var/log/ckpool/users))
+        echo ""
+        for u in "${users[@]}"; do
+            if [[ $(sudo cat /var/log/ckpool/users/$u | jq -r '.hashrate7d') == "0" ]]; then
+                sudo rm /var/log/ckpool/users/$u
+            fi
+        done
+
+        sudo systemctl start ckpool # Start the pool
+    fi
+
+elif [[ $1 = "-s" || $1 = "--status" ]]; then # View the current status of the pool (sudo systemctl status ckpool)
     sudo systemctl status ckpool
 
-    ## Is Bitcoind running?
-    ## Is the node connected?
-    ## Is ckpool running?
-    ## When was the last block solved??
+elif [[ $1 = "-m" || $1 = "--miners" ]]; then # Show pool status (/var/log/ckpool/pool/pool.status) and local miners with their respective hashrates (/var/log/ckpool/users)
+    echo -n "Workers: "; sudo head -n 1 /var/log/ckpool/pool/pool.status | jq -r '.Users'
+    echo -n "   Idle: "; sudo head -n 1 /var/log/ckpool/pool/pool.status | jq -r '.Idle'
+    echo -n "   Disconnected: "; sudo head -n 1 /var/log/ckpool/pool/pool.status | jq -r '.Disconnected'
+    echo ""
 
-elif [[ $1 = "-m" || $1 = "--miners" ]]; then # Show local miners and hashrates
-    ls /var/log/ckpool/users
-    #Make a seperate section for inactive miners (these miners will be deleted on next --update call)
+    echo "Pool Hashrate:"
+    echo -n "   1m: "; sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate1m'
+    echo -n "   5m: "; sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate5m'
+    echo -n "   15m: "; sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate15m'
+    echo -n "   1hr: "; sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate1hr'
+    echo -n "   6hr: "; sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate6hr'
+    echo -n "   1d: "; sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate1d'
+    echo -n "   7d: "; sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate7d'
+    echo ""
 
-elif [[ $1 = "-b" || $1 = "--blocks" ]]; then # List the latest (40) blocks solved?? Why? What's the goal??
-    echo "ok"
-	
-	btc getblockcount
+    # Convert spaces " " in each filename to underscores '_' (prevents processing errors in the next step)
+    sudo find /var/log/ckpool/users -name '* *' -exec sh -c '
+        for file do
+            dir=${file%/*};
+            file=${file##*/};
+            without_spaces=$(printf %s "$file." | sed "s/ /_/g")
+            sudo mv "$dir/$file" "$dir/${without_spaces%.}";
+        done
+    ' _ {} +
+
+    # Print hashrates for each worker (user file)
+    users=($(sudo ls /var/log/ckpool/users))
+    echo ""
+    for u in "${users[@]}"; do
+        echo "Worker Hashrate: $u"
+        echo -n "   1m: "; sudo cat /var/log/ckpool/users/$u | jq -r '.hashrate1m'
+        echo -n "   5m: "; sudo cat /var/log/ckpool/users/$u | jq -r '.hashrate5m'
+        echo -n "   1hr: "; sudo cat /var/log/ckpool/users/$u | jq -r '.hashrate1hr'
+        echo -n "   1d: "; sudo cat /var/log/ckpool/users/$u | jq -r '.hashrate1d'
+        echo -n "   7d: "; sudo cat /var/log/ckpool/users/$u | jq -r '.hashrate7d'
+        echo ""
+    done
+
+elif [[ $1 = "-b" || $1 = "--blocks" ]]; then # List the latest (40) blocks solved   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Not Finiehsed!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # Get range of block heights
+    BLOCKHEIGHT=$($BTC getblockcount)
+    regex='^[0-9]+$'
+    if ! [[ $BLOCKHEIGHT =~ $regex ]]; then
+        echo "Error! bitcoind is not responding!"
+        exit 1
+    fi
+    START=$((BLOCKHEIGHT-39))
+
+    # Loop through each block and report ############## Enable txindex to be able to see all transactions????### Sped this up   ### extract pool name from block ##################
+    for (( i=$START; i<=$BLOCKHEIGHT; i++ ));do
+        echo -n -e "Height: $i        Size (bytes): $($BTC getblock $($BTC getblockhash $i) | jq '.size')"
+        echo -n -e "        Value (coins): $($BTC -rpcwallet=mining gettransaction $($BTC getblock $($BTC getblockhash $i) | jq -r '.tx[0]') | jq -r '.details[0].amount')"
+        echo -e "        Source: $($BTC -rpcwallet=mining gettransaction $($BTC getblock $($BTC getblockhash $i) | jq -r '.tx[0]') | jq -r '.details[0].label')"
+    done
+
+    ##$BTC -rpcwallet=mining gettransaction $($BTC getblock $($BTC getblockhash $i) | jq -r '.tx[0]') | jq -r '.details[0].label'
+
 
 elif [[ $1 = "-t" || $1 = "--tail" ]]; then # Display the tail end (40 lines) of the debug log (/var/log/ckpool/ckpool.log)
     sudo tail /var/log/ckpool/ckpool.log -n 40
-
-else
-    $0 --help
-fi
-
-
-
-
-
-    sudo sed -i "/${2}/d" /root/.ssh/known_hosts 2> /dev/null # Remove the known host containing the time stamp
-
-
-
-
-elif [[ $1 = "-g" || $1 = "--generate" ]]; then # Generate micronode information file (/etc/micronode.info) with connection parameters for this node
-    if [ -f "/etc/micronode.info" ]; then
-        echo "/etc/micronode.info file already exists"
-        exit 0
-    fi
-
-    echo "Here's important information about your micronode." | sudo tee /etc/micronode.info > /dev/null
-    echo "It can be used to establish secure micronode connections over ssh." | sudo tee -a /etc/micronode.info > /dev/null
-    echo "" | sudo tee -a /etc/micronode.info
-
-    echo "Hostname: $(hostname)" | sudo tee -a /etc/micronode.info
-    echo "Time Stamp: $(date +%s)" | sudo tee -a /etc/micronode.info
-
-    echo "Local IP: $(hostname -I)" | sudo tee -a /etc/micronode.info
-
-    if [ -z ${SSHPORT+x} ]; then SSHPORT="22"; fi
-    echo "SSH Port: ${SSHPORT}" | sudo tee -a /etc/micronode.info
-
-    # Remove unwanted/unused host keys
-    sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
-    sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
-    sudo rm /etc/ssh/ssh_host_rsa_key* 2> /dev/null
-
-    echo "Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')" | sudo tee -a /etc/micronode.info
-    echo "P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)" | sudo tee -a /etc/micronode.info
-
-    sudo chmod 400 /etc/micronode.info
-
-
 
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # View remote connection(s) - Read authorized_keys @ /home/stratum/.ssh/
     sudo cat /home/stratum/.ssh/authorized_keys
