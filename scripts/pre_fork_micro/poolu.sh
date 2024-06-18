@@ -27,7 +27,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                         load a new mining address (/etc/ckpool.conf), delete inactive users (7 days), and restart ckpool
       -s, --status  View the current status of the pool (sudo systemctl status ckpool)
       -m, --miners  Show pool status (/var/log/ckpool/pool/pool.status) and local miners with their respective hashrates (/var/log/ckpool/users)
-!!!!  -b, --blocks  List the latest (40) blocks solved
+      -b, --blocks  List the latest (40) blocks solved
       -t, --tail    Display the tail end (40 lines) of the debug log (/var/log/ckpool/ckpool.log)
       -v, --view    View remote connection(s) - Read authorized_keys @ /home/stratum/.ssh/
       -d, --delete  Delete an incoming remote connection: CONNECTION_ID
@@ -212,7 +212,7 @@ elif [[ $1 = "-m" || $1 = "--miners" ]]; then # Show pool status (/var/log/ckpoo
         echo ""
     done
 
-elif [[ $1 = "-b" || $1 = "--blocks" ]]; then # List the latest (40) blocks solved   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Not Finiehsed!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+elif [[ $1 = "-b" || $1 = "--blocks" ]]; then # List the latest (40) blocks solved
     # Get range of block heights
     BLOCKHEIGHT=$($BTC getblockcount)
     regex='^[0-9]+$'
@@ -222,15 +222,20 @@ elif [[ $1 = "-b" || $1 = "--blocks" ]]; then # List the latest (40) blocks solv
     fi
     START=$((BLOCKHEIGHT-39))
 
-    # Loop through each block and report ############## Enable txindex to be able to see all transactions????### Sped this up   ### extract pool name from block ##################
+    # Loop through each block and report
     for (( i=$START; i<=$BLOCKHEIGHT; i++ ));do
-        echo -n -e "Height: $i        Size (bytes): $($BTC getblock $($BTC getblockhash $i) | jq '.size')"
-        echo -n -e "        Value (coins): $($BTC -rpcwallet=mining gettransaction $($BTC getblock $($BTC getblockhash $i) | jq -r '.tx[0]') | jq -r '.details[0].amount')"
-        echo -e "        Source: $($BTC -rpcwallet=mining gettransaction $($BTC getblock $($BTC getblockhash $i) | jq -r '.tx[0]') | jq -r '.details[0].label')"
+        block_hash=$($BTC getblockhash $i)
+        block=$($BTC getblock $block_hash)
+        coinbase_hash=$(echo $block | jq -r '.tx[0]')
+        coinbase=$($BTC getrawtransaction $coinbase_hash 1)
+        source_hex=$(echo $(echo $coinbase | jq -r '.vin[0].coinbase' | sed 's/^.*636b706f6f6c..\?//')) # Remove everything up to the ascii text "ckpool" (0x636b706f6f6c) + one byte. Everything left is the owner's name (in ascii)
+        source_hex_delimented=$(echo $source_hex | sed 's/\([0-9AF]\{2\}\)/\\\x\1/gI') # Start each byte with '\x' so the printf command can properly interpret
+        source_txt=$(printf $source_hex_delimented)
+
+        echo -n -e "Height: $i        Size (bytes): $(echo $block | jq '.size')"
+        echo -n -e "        Value (coins): $(echo $coinbase | jq '.vout[0].value')"
+        echo -e "        Source: $source_txt"
     done
-
-    ##$BTC -rpcwallet=mining gettransaction $($BTC getblock $($BTC getblockhash $i) | jq -r '.tx[0]') | jq -r '.details[0].label'
-
 
 elif [[ $1 = "-t" || $1 = "--tail" ]]; then # Display the tail end (40 lines) of the debug log (/var/log/ckpool/ckpool.log)
     sudo tail /var/log/ckpool/ckpool.log -n 40
@@ -257,5 +262,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters to s
 
 else
     $0 --help
-    echo "Script Version 0.01"
+    echo "Script Version 0.10"
 fi
