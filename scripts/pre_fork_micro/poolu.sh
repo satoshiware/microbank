@@ -42,7 +42,7 @@ elif [[ $1 = "--install" ]]; then # Install this script (poolu) in /usr/local/sb
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/poolu
             cd ~; git clone https://github.com/satoshiware/microbank
-            bash ~/microbank/scripts/poolu.sh --install
+            bash ~/microbank/scripts/pre_fork_micro/poolu.sh --install
             rm -rf microbank
             exit 0
         else
@@ -102,7 +102,7 @@ elif [[ $1 = "--error" ]]; then # Check for errors and report to user via email 
     fi
 
     # Make sure the pool software is running
-    if [[ ! systemctl is-active --quiet ckpool ]]; then
+    if [[ ! $(systemctl is-active ckpool) == "active" ]]; then
         send_messages --email $NAME $EMAIL "Pool Software Has Stopped" "Hey you, your mining pool software is not running."
         exit 0
     fi
