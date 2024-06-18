@@ -19,16 +19,61 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -h, --help        Display this help message and exit
       -i, --install     Install this script (stmutility) in /usr/local/sbin/ (Repository: /satoshiware/microbank/scripts/pre_fork_micro/stmutility.sh)
       -r, --remote      Configure inbound connection for a remote mining operation
-!!!!! -u, --update      Load a new mining address (if previous one is used), cleanup log folders (/var/log/ckpool/*), delete inactive user (/var/log/ckpool/users/*), restart the pool
+	  --email !!!!!!!!!!!
+	  -cron for email updates !!!!!!!!!!!!!
+	  -cron for updates !!!!!!!!!!
+!!!!! -u, --update      Delete log folders (/var/log/ckpool/00*) and if previous mining address has received coins then 
+							load a new mining address (/etc/ckpool.conf), delete inactive users (/var/log/ckpool/users), and restart ckpool
       -s, --status      View the current status of the pool??????????????/var/log/ckpool/pool/pool.status
-      -m, --miners      Show miners and hashrates ?????????????????????????????????????
-      -b, --blocks      List the latest (40) blocks solved ?????????????????????????????
-      -t, --tail        Display the tail end of the debug log (/var/log/ckpool/ckpool.log) ????????????????????
+      -m, --miners      Show local miners and hashrates ?????????????????????????????????????
+      -b, --blocks      List the latest (40) blocks solved ????????????????????????????? What's the goal here?????
+      -t, --tail        Display the tail end (40 lines) of the debug log (/var/log/ckpool/ckpool.log)
       -v, --view        View remote connection(s) - Read authorized_keys @ /home/stratum/.ssh/
       -d, --delete      Delete an incoming remote connection: CONNECTION_ID
       -f, --info        Get the connection parameters to setup a remote mining operation
 
-      !!!!/etc/ckpool.conf the pool configuration file - Change name in that file.
+
+
+	{
+	 "hashrate1m": "84.5T"
+	 "hashrate5m": "77.4T"
+	 "hashrate1hr": "80T",
+	 "hashrate1d": "81.3T",
+	 "hashrate7d": "81.9T",
+	 "lastupdate": 1718661699,
+	 "workers": 1, 
+	 "shares": 560724348793,
+	 "bestshare": 2727623.7524854098, 
+	 "worker": 
+		[
+			{
+				"workername": "Antminer-S19j-0",
+				"hashrate1m": "84.5T",
+				"hashrate5m": "77.4T",
+				"hashrate1hr": "80T",
+				"hashrate1d": "81.3T",
+				"hashrate7d": "81.9T",
+				"lastupdate": 1718661699,
+				"shares": 560724348793,
+				"bestshare": 2727623.7524854098
+			}
+		]
+	}
+
+	sudo /bin/sh -c 'sudo -u root files=(/var/log/stratum/users/*)'
+	
+	echo ${files[@]}
+	
+	
+	files=(/var/log/stratum/users/*)
+	echo ${files[@]}
+	
+	sudo cat /var/log/stratum/users/Antminer-S19j-0 | jq '.hashrate1m'
+	sudo cat /var/log/stratum/users/Antminer-S19j-0 | jq '.hashrate5m'
+	sudo cat /var/log/stratum/users/Antminer-S19j-0 | jq '.hashrate1hr'
+
+
+
 
     With this tool, you can view all the pertinent information to ensure a healthy mining operation.
     Also, with this tool and the help of the mnconnect utility, you can set up an incoming connection for a remote mining operation.
@@ -71,24 +116,22 @@ elif [[ $1 = "-r" || $1 = "--remote" ]]; then # Configure inbound connection for
 
     echo "${PUBLICKEY} # ${CONNNAME}, CONN_ID: ${TMSTAMP}, REMOTE" | sudo tee -a /home/stratum/.ssh/authorized_keys
 
-elif [[ $1 = "-u" || $1 = "--update" ]]; then # Load a new mining address (if previous one is used), cleanup log folders, delete inactive user, restart the pool
+elif [[ $1 = "-u" || $1 = "--update" ]]; then # Delete log folders (/var/log/ckpool/00*) and if previous mining address has received coins then load a new mining address (/etc/ckpool.conf), delete inactive users (/var/log/ckpool/users), and restart ckpool
     # Delete all log folder that start with "00" except for the latest one in the directory /var/log/ckpool
     sudo find /var/log/ckpool -regex '^.*\/00.*' ! -name "$(sudo find /var/log/ckpool -regex '^.*\/00.*' -type d | sort | tail -n 1 | cut -d '/' -f 5)" -type d -exec rm -rf {} +
-
-    # Get current mining address
-    ADDRESS=$(sudo sed -n '/btcaddress/p' /etc/ckpool.conf | cut -d "\"" -f 4)
-
-    # Check address to see if it is in the blockchain.
-    $BTC -rpcwallet=mining listtransactions "*" 10000 0 false | grep "$ADDRESS" | wc -l  ############ How big do we want that number or how often do we check?  look for a return greater than 0
-
-    # Load a new mining address
-    sudo sed -i "/btcaddress/c\"btcaddress\" : \"$($BTC -rpcwallet=mining getnewaddress)\"," /etc/ckpool.conf
-
-    # Is there a way to suspend this service????? Is there a better way??
-    sudo systemctl stop ckpool
-    sudo systemctl start ckpool  #restart the pool.
-
-    #Delete inactive miners (havn't mined for over a week or something)
+	
+	
+	ADDRESS=$(sudo sed -n '/btcaddress/p' /etc/ckpool.conf | cut -d "\"" -f 4) # Get current mining address
+	if [[ $($BTC -rpcwallet=mining listtransactions "*" 1000 0 false | grep "$ADDRESS" | wc -l) -gt 0 ]]; then # Check mining address to see if it is in the blockchain.
+		sudo systemctl stop ckpool # Stop the pool ?????????? Better Way ????????????
+		
+		######## Need to wait ################
+		sudo sed -i "/btcaddress/c\"btcaddress\" : \"$($BTC -rpcwallet=mining getnewaddress)\"," /etc/ckpool.conf # Load a new mining address
+		
+		#Delete inactive miners (havn't mined for over a week or something) !!!!!!!!!!!!!!!!!!!!!!
+		
+		sudo systemctl start ckpool # Start the pool ?????????? Better Way ????????????
+	fi
 
 elif [[ $1 = "-s" || $1 = "--status" ]]; then # View the current status of the pool
     cat /var/log/ckpool/pool/pool.status
@@ -100,15 +143,17 @@ elif [[ $1 = "-s" || $1 = "--status" ]]; then # View the current status of the p
     ## Is ckpool running?
     ## When was the last block solved??
 
-elif [[ $1 = "-m" || $1 = "--miners" ]]; then # Show miners and hashrates
+elif [[ $1 = "-m" || $1 = "--miners" ]]; then # Show local miners and hashrates
     ls /var/log/ckpool/users
     #Make a seperate section for inactive miners (these miners will be deleted on next --update call)
 
-elif [[ $1 = "-b" || $1 = "--blocks" ]]; then # List the latest (40) blocks solved
+elif [[ $1 = "-b" || $1 = "--blocks" ]]; then # List the latest (40) blocks solved?? Why? What's the goal??
     echo "ok"
+	
+	btc getblockcount
 
-elif [[ $1 = "-t" || $1 = "--tail" ]]; then # Display the tail end of the debug log
-    echo "ok"
+elif [[ $1 = "-t" || $1 = "--tail" ]]; then # Display the tail end (40 lines) of the debug log (/var/log/ckpool/ckpool.log)
+    sudo tail /var/log/ckpool/ckpool.log -n 40
 
 else
     $0 --help
