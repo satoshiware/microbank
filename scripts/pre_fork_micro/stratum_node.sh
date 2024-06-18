@@ -21,7 +21,7 @@ The Stratum node is used to manage the microcurrency mining operation for a "min
 
 FYI:
     Use the mnconnect utility (just type "mnconnect" at the prompt) to create, view, or delete the connection with the p2p node.
-    Use the stmutility tool to view all the pertinent informaiton for a healthy mining operation (and setup a remote mining operations)
+    Use the poolu tool to configure notifications and view all the pertinent informaiton for a healthy mining operation (and setup a remote mining operations)
 
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
@@ -145,6 +145,7 @@ sudo chmod 400 /root/rpcpasswd
 # Generate Bitcoin Configuration File with the Appropriate Permissions
 cat << EOF | sudo tee /etc/bitcoin.conf
 server=1
+txindex=1
 $(rpcauth satoshi $(sudo cat /root/rpcpasswd) | grep 'rpcauth')
 [micro]
 EOF
@@ -352,12 +353,9 @@ $(printf '\t')sharedscripts
 }
 EOF
 
-# Create cron job to call the "stmutility" --update routine every 15 minutes
-(sudo crontab -l; echo "*/15 * * * * stmutility --update") | sudo crontab -
-
 # Install the micronode connection and stratum utilities
 bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh --install
-bash ~/microbank/scripts/pre_fork_micro/stmutility.sh --install
+bash ~/microbank/scripts/pre_fork_micro/poolu.sh --install
 bash ~/microbank/scripts/send_messages.sh --install
 
 # Restart the machine
