@@ -74,7 +74,6 @@ elif [[ $1 = "-o" || $1 = "--out" ]]; then # Make an outbound connection to the 
     cat << EOF | sudo tee /etc/default/p2pssh@${TMSTAMP}
 # ${CONNNAME}
 LOCAL_PORT=${LOCALMICROPORT}
-FORWARD_PORT=19333
 TARGET=${TARGETADDRESS}
 TARGET_PORT=22
 EOF
