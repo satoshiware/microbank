@@ -17,8 +17,12 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       -h, --help        Display this help message and exit
-      -i, --install     Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
-      -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
+      --install         Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
+!!!	  --cron            Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
+	  --verify		    Verify all connections (in and out) are active: RECIPIENTS_NAME  EMAIL
+							send email of there are any inactive/disconnected nodes
+							If any inbound (non-cluster nodes) connections have become inactive, run a "Dynamic DNS" script
+	  -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
       -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)
       -v, --view        See all configured connections and status
       -d, --delete      Delete a connection: CONNECTION_ID
@@ -118,7 +122,7 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
 
     # Show the p2pssh (autossh) process for each outgoing connection
     echo ""; echo "Outbound: View each p2pssh@* .env file and process status (/etc/default/p2pssh@*)"; echo "------------------------------------------------------------------"
-    p2pssh=($(sudo ls /etc/default/p2pssh*))
+    p2pssh=($(sudo ls /etc/default/p2pssh* 2> /dev/null))
     for i in "${p2pssh[@]}"; do
         echo "#########$(sudo head -n 1 $i)    $(sudo sed '2!d' $i)    $(sudo sed '3!d' $i)    $(sudo tail -n 1 $i) ########"
         sudo systemctl status $(echo $i | cut -d "/" -f 4); echo ""
@@ -126,7 +130,14 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
 
 
 
-
+elif [[ $1 = "-dd" || $1 = "--disconnected" ]]; then # Find all disconnections !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	# Make sure all added nodes are connected
+    info=$(btc getaddednodeinfo); length=$(echo -n $info | jq length)
+    for (( i=0; i<$length; i++ )); do
+        if [[ $(echo -n $info | jq ".[$i].connected") == "false" ]]; then
+			echo "Oh No! Node \"$(echo $info | jq -j -r ".[$i].addednode")\" is disconnected!"
+		fi
+    done
 
 
     # Search in stratum|p2p authorized_keys to match the timestamp with the . You know, we could just disconnect everyone!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -187,5 +198,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.15"
+    echo "Script Version 0.16"
 fi
