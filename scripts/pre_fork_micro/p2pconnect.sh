@@ -20,7 +20,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -i, --install     Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
       -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
       -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)
-      -v, --view        See all configured connections and view status
+      -v, --view        See all configured connections and status
       -d, --delete      Delete a connection: CONNECTION_ID
       -f, --info        Get the connection parameters for this node
 EOF
@@ -99,7 +99,7 @@ EOF
     echo "# ${CONNNAME}, CONN_ID: ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}" | sudo tee -a /etc/bitcoin.conf # Add comment to the bitcoin.conf file
     echo "addnode=localhost:${LOCALMICROPORT}" | sudo tee -a /etc/bitcoin.conf # Add connection
 
-elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and view status
+elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and status
     # Show the contents of the Bitcoin configuration file
     echo ""; echo "Outbound: Bitcoin Configuration File (/etc/bitcoin.conf)"; echo "------------------------------------------------------------------"; sudo cat /etc/bitcoin.conf
 
@@ -116,15 +116,15 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
     # Show the contents of the Authorized Keys file (inbound)
     echo ""; echo "Inbound: Authorized Keys File (/home/p2p/.ssh/authorized_keys)"; echo "------------------------------------------------------------------"; sudo cat /home/p2p/.ssh/authorized_keys
 
+    # Show the p2pssh (autossh) process for each outgoing connection
+    echo ""; echo "Outbound: View each p2pssh@* .env file and process status (/etc/default/p2pssh@*)"; echo "------------------------------------------------------------------"
+    p2pssh=($(sudo ls /etc/default/p2pssh*))
+    for i in "${p2pssh[@]}"; do
+        echo "#########$(sudo head -n 1 $i)    $(sudo sed '2!d' $i)    $(sudo sed '3!d' $i)    $(sudo tail -n 1 $i) ########"
+        sudo systemctl status $(echo $i | cut -d "/" -f 4); echo ""
+    done
 
 
-
-
-    ####### Show status of each autossh
-    ### do we need to see their envrionment file????? This is good for outgoing
-
-
-#   sudo r  m  /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
 
 
 
@@ -141,7 +141,6 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
 
 #    AAC3NzaC1lZDI1NTE5AAAAIMZ0yYY38wDVbwxjjeWY+sGQUrHkMIthSRgAOVdAA+Z4
 #    ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ0yYY38wDVbwxjjeWY+sGQUrHkMIthSRgAOVdAA+Z4
-
 
 #   cd ~  ###### try the "<<<" redirector instead
 #   mkfifo fifo
@@ -188,5 +187,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.10"
+    echo "Script Version 0.15"
 fi
