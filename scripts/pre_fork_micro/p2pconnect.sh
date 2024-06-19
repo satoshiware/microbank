@@ -89,7 +89,6 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
     cat << EOF | sudo tee /etc/default/p2pssh@${TMSTAMP}
 # ${CONNNAME}
 LOCAL_PORT=${LOCALMICROPORT}
-FORWARD_PORT=19333
 TARGET=${TARGETADDRESS}
 TARGET_PORT=${SSHPORT}
 EOF
@@ -101,56 +100,31 @@ EOF
     echo "addnode=localhost:${LOCALMICROPORT}" | sudo tee -a /etc/bitcoin.conf # Add connection
 
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and view status
-    echo "you made it buddy to --view"
-        # Inbound
-                # Level 1 Mining
-    #                       sudo cat /home/stratum/.ssh/authorized_keys # Show all
-                # level 2/3 P2P & Stratum
-    #                       sudo cat /home/p2p/.ssh/authorized_keys # Only show STRATUM // no need to filter on level 2
-                # Level 3 Remote Mining
-    #                       sudo cat /home/p2p/.ssh/authorized_keys # Only show REMOTE
+    # Show the contents of the Bitcoin configuration file
+    echo ""; echo "Outbound: Bitcoin Configuration File (/etc/bitcoin.conf)"; echo "------------------------------------------------------------------"; sudo cat /etc/bitcoin.conf
 
-        # Outbound
-                # level 1/2 P2P & Stratum
-    #                       sudo cat /root/.ssh/known_hosts
-    #                       cat /etc/bitcoin.conf
-                # level 1/2 P2P
-    #                       ls -all /etc/default/p2pssh*p2p
-                # level 1/2 STRATUM
-    #                       ls -all /etc/default/p2pssh*stratum
+    # Loop through each added node (i.e. local port)
+    echo ""; echo "Outbound: Added Node Info (Auto SSH Forwarded Ports)"; echo "------------------------------------------------------------------"
+    info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
+    for (( i=0; i<$length; i++ )); do
+        echo -n $info | jq -j -r ".[$i].addednode"; echo -n "        Connected: "; echo $info | jq ".[$i].connected"
+    done
 
-        # P2P (Level 3 Only)
-                # Inbound
-    #                       sudo cat /home/p2p/.ssh/authorized_keys # Only show P2P
-                # Outbound
-    #                       sudo cat /root/.ssh/known_hosts
-    #                       ls -all /etc/default/p2pssh*lvl3
-    #                       cat /etc/bitcoin.conf
+    # Show the contents of the Known Hosts file (outbound)
+    echo ""; echo "Outbound: Known Hosts File (/root/.ssh/known_hosts)"; echo "------------------------------------------------------------------"; sudo cat /root/.ssh/known_hosts
 
-         ########## level 1 only
-
-    # Level 1 -
-
-        # if we assume it is all ok, what do we hope to see with the connections?
-                # the details of the connections: name, time, address, outbound, inbound, mining, IP?
-                # does the node show a connection
-        # outbound
-
-        #       {CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}     # a
-
-        #       1 p2p outbound - 1 service file and 1 environment file
-        #       1 stratum outbound - 1 service file and 1 environment file
-
-
-        # Level 1 has 1 outbound connection and multiple
+    # Show the contents of the Authorized Keys file (inbound)
+    echo ""; echo "Inbound: Authorized Keys File (/home/p2p/.ssh/authorized_keys)"; echo "------------------------------------------------------------------"; sudo cat /home/p2p/.ssh/authorized_keys
 
 
 
-#!!!!!!!update forum or wsl/readme.md!!# With WSL, the host drive is already mounted. It can just be copied with cp (e.g. "cp -rf ~/backup /mnt/c/Users/$USERNAME/Desktop")
 
-#update p2pconnect to open/close port for local miner.
-    #   sudo ufw allow from 192.168.1.243 to any port 3333 # (whatever is the port)
 
+    ####### Show status of each autossh
+    ### do we need to see their envrionment file????? This is good for outgoing
+
+
+#   sudo r  m  /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
 
 
 
@@ -214,5 +188,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.08"
+    echo "Script Version 0.10"
 fi
