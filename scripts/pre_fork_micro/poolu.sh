@@ -229,8 +229,13 @@ elif [[ $1 = "-b" || $1 = "--blocks" ]]; then # List the latest (40) blocks solv
         coinbase_hash=$(echo $block | jq -r '.tx[0]')
         coinbase=$($BTC getrawtransaction $coinbase_hash 1)
         source_hex=$(echo $(echo $coinbase | jq -r '.vin[0].coinbase' | sed 's/^.*636b706f6f6c.\?.\?//')) # Remove everything up to the ascii text "ckpool" (0x636b706f6f6c) + one byte. Everything left is the owner's name (in ascii)
-        source_hex_delimented=$(echo $source_hex | sed 's/\([0-9AF]\{2\}\)/\\\x\1/gI') # Start each byte with '\x' so the printf command can properly interpret
-        source_txt=$(printf $source_hex_delimented)
+
+        if [[ -z $source_hex ]]; then
+            source_txt=""
+        else
+            source_hex_delimented=$(echo $source_hex | sed 's/\([0-9AF]\{2\}\)/\\\x\1/gI') # Start each byte with '\x' so the printf command can properly interpret
+            source_txt=$(printf $source_hex_delimented)
+        fi
 
         echo -n -e "Height: $i        Size (bytes): $(echo $block | jq '.size')"
         echo -n -e "        Value (coins): $(echo $coinbase | jq '.vout[0].value')"
@@ -262,5 +267,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters to s
 
 else
     $0 --help
-    echo "Script Version 0.10"
+    echo "Script Version 0.11"
 fi
