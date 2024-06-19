@@ -109,7 +109,7 @@ elif [[ $1 = "--error" ]]; then # Check for errors and report to user via email 
 
     # Make sure the pool is hashing (has it been down for more than 6 hours?)
     if [[ $(sudo sed '2!d' /var/log/ckpool/pool/pool.status | jq -r '.hashrate6hr') == "0" ]]; then
-        send_messages --email $NAME $EMAIL "Pool Is Not Hashing" "Hey you, your mining pool is not hashing.<br>Potentially, the miner(s) are down or the Stratum Node has become disconnected from the P2P Node."
+        send_messages --email $NAME $EMAIL "Pool Is Not Hashing" "Hey you, your mining pool is not hashing.<br>Potentially, the miner(s) is(are) down or the Stratum Node has become disconnected from the P2P Node."
         exit 0
     fi
 
@@ -126,7 +126,7 @@ elif [[ $1 = "--error" ]]; then # Check for errors and report to user via email 
     users=($(sudo ls /var/log/ckpool/users))
     for u in "${users[@]}"; do
         if [[ $(sudo cat /var/log/ckpool/users/$u | jq -r '.hashrate1hr') == "0" ]]; then
-            send_messages --email $NAME $EMAIL "Miner $u Stopped Working" "Hey you, it has been a while since your miner \"$u\" has submitted any shares."
+            send_messages --email $NAME $EMAIL "Miner $u Stopped Working" "Hey you, it has been a while since your miner $u has submitted any shares."
         fi
     done
 
@@ -267,5 +267,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters to s
 
 else
     $0 --help
-    echo "Script Version 0.11"
+    echo "Script Version 0.14"
 fi
