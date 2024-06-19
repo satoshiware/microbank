@@ -19,7 +19,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -h, --help        Display this help message and exit
       -i, --install     Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
       -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
-      -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)  ~~~~~~~~~~~PORT 19022 DEFAULT PORT~~~~~~~~~~~~~~
+      -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)
       -v, --view        See all configured connections and view status
       -d, --delete      Delete a connection: CONNECTION_ID
       -f, --info        Get the connection parameters for this node
@@ -59,45 +59,37 @@ elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound cluster connection
 
 elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connections (p2p <--> p2p)
     if [[ $(ls /etc/default/p2pssh*  2> /dev/null | wc -l) -ge "8" ]]; then
-        echo "Number of outbound connections is maxed out!"
-        echo "Bitcoin Core only supports 8 outbound connections!"
+        echo "Error! Number of outbound connections is maxed out!"
+        echo "Bitcoin Core (& microcurrency) software only supports 8 outbound connections!"
         exit 1
     fi
 
-    echo "Let's configure a (two-way) connection with another bank!"
-    read -p "What would you like to call this connection: " CONNNAME
-    read -p "What is the banks's p2p public key: " P2PKEY
-    read -p "What's the bank's p2p UID? (Unique ID): " TMSTAMP # Node UIDs are based on unix time stamps
-
-    if ! [[ ${TMSTAMP} -gt 1690000000 ]]; then
-        echo "Error! Not a valid time stamp!"
-        exit 1
-    fi
-
-    # With the parameters collected, set the inboud configuration
-    echo "${P2PKEY} # ${CONNNAME}, ${TMSTAMP}, P2P" | sudo tee -a /home/p2p/.ssh/authorized_keys
-
-    echo "Now, let's configure the outbound parameters!"
-    read -p "What's the bank's host public key: " HOSTKEY
-    read -p "What's the bank's address: " TARGETADDRESS
-    read -p "What's the bank's SSH port? (default = 22): " SSHPORT; if [ -z $SSHPORT ]; then SSHPORT="22"; fi
-    read -p "What's the bank's port for the (microcurrency) Bitcoin Core? (default = 19333): " MICROPORT; if [ -z $MICROPORT ]; then MICROPORT="19333"; fi
+    echo "Configuring a (two-way) connection with another bank!"
+    read -p "Connection Name: " CONNNAME
+    read -p "P2P (Public) Key: " P2PKEY
+    read -p "Host (Public) Key: " HOSTKEY
+    read -p "Address: " BANKADDRESS
+    read -p "SSH port? (default = 19022): " SSHPORT; if [ -z $SSHPORT ]; then SSHPORT="19022"; fi
+    TMSTAMP=$(date +%s)
 
     # Update known_hosts
-    HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${TARGETADDRESS})
+    HOSTSIG=$(ssh-keyscan -p ${SSHPORT} -H ${BANKADDRESS})
     if [[ "${HOSTSIG}" == *"${HOSTKEY}"* ]]; then
-        echo "${HOSTSIG} # ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}, P2P" | sudo tee -a /root/.ssh/known_hosts
+        echo "${HOSTSIG} # ${CONNNAME}, ${TMSTAMP}, ${BANKADDRESS}:${SSHPORT}, P2P" | sudo tee -a /root/.ssh/known_hosts
     else
         echo "CRITICAL ERROR: REMOTE HOST IDENTIFICATION DOES NOT MATCH GIVEN HOST KEY!!"
         exit 1
     fi
+
+    # Authorize incomming connection
+    echo "${P2PKEY} # ${CONNNAME}, CONN_ID: ${TMSTAMP}, P2P" | sudo tee -a /home/p2p/.ssh/authorized_keys
 
     # Create p2pssh@ environment file and start its corresponding systemd service
     LOCALMICROPORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
     cat << EOF | sudo tee /etc/default/p2pssh@${TMSTAMP}
 # ${CONNNAME}
 LOCAL_PORT=${LOCALMICROPORT}
-FORWARD_PORT=${MICROPORT}
+FORWARD_PORT=19333
 TARGET=${TARGETADDRESS}
 TARGET_PORT=${SSHPORT}
 EOF
@@ -105,7 +97,7 @@ EOF
 
     # Add the outbound connection to Bitcoin Core (micro) and update bitcoin.conf to be reestablish automatically upon restart or boot up
     sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf addnode localhost:${LOCALMICROPORT} "add"
-    echo "# ${CONNNAME}, ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}" | sudo tee -a /etc/bitcoin.conf # Add comment to the bitcoin.conf file
+    echo "# ${CONNNAME}, CONN_ID: ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}" | sudo tee -a /etc/bitcoin.conf # Add comment to the bitcoin.conf file
     echo "addnode=localhost:${LOCALMICROPORT}" | sudo tee -a /etc/bitcoin.conf # Add connection
 
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and view status
@@ -185,11 +177,11 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
 
 elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection: CONNECTION_ID
     if [[ ! ${#} = "2" ]]; then
-		echo "Enter the Connection ID to delete (Example: \"mnconnect --delete 1691422785\")."
+        echo "Enter the Connection ID to delete (Example: \"mnconnect --delete 1691422785\")."
         exit 0
     fi
 
-    # Delete outbound connections
+    # Delete outbound connection
     LOCAL_PORT=$(grep -o 'LOCAL_PORT=[0-9]*' /etc/default/p2pssh@${2}* 2> /dev/null | cut -d '=' -f 2) # Get the "Local Port" that corresponds with the time stamp
 
     sudo rm /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
@@ -202,11 +194,12 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection: CONNECTION_
 
     sudo sed -i "/${2}/d" /root/.ssh/known_hosts 2> /dev/null # Remove the known host containing the time stamp
 
-    sudo systemctl disable p2pssh@${2} --now 2> /dev/null # Disable/remove systemd services related to the time stamp
+    # Disable/remove systemd services related to the time stamp
+    sudo systemctl disable p2pssh@${2} --now 2> /dev/null
     sudo systemctl reset-failed p2pssh@${2} 2> /dev/null
 
-    # Delete inbound connections
-    sudo sed -i "/${2}/d" /home/p2p/.ssh/authorized_keys 2> /dev/null # Remove the key with a comment containing the passed "time stamp"
+    # Delete inbound connection
+    sudo sed -i "/${2}/d" /home/p2p/.ssh/authorized_keys 2> /dev/null
 
     # Force disconnect all users
     P2P_PIDS=$(ps -u p2p 2> /dev/null | grep sshd)
