@@ -88,11 +88,11 @@ elif [[ $1 = "--email" ]]; then # Email (send out) the mining status (requires s
         exit 1
     fi
 
-    MESSAGE="<b>---- Miners ----</b>$(poolu --miners)<br><br><b>---- Last 40 Blocks ----</b>$(poolu --blocks)<br><br><b>---- Debug Log ----</b>$(poolu --tail)"
+    MESSAGE="<b>---- Miners ----</b><br>$(poolu --miners)<br><br><b>---- Last 40 Blocks ----</b><br>$(poolu --blocks)<br><br><b>---- Debug Log ----</b><br>$(poolu --tail)"
     MESSAGE=${MESSAGE//$'\n'/'<br>'}
     MESSAGE=${MESSAGE// /\&nbsp;}
 
-    send_messages --email $NAME $EMAIL "Mining Pool Snapshot" $MESSAGE
+    send_messages --email $NAME $EMAIL "Mining Pool Snapshot" ${MESSAGE//\"/}
 
 elif [[ $1 = "--error" ]]; then # Check for errors and report to user via email (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
@@ -267,5 +267,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters to s
 
 else
     $0 --help
-    echo "Script Version 0.14"
+    echo "Script Version 0.15"
 fi
