@@ -202,6 +202,7 @@ elif [[ $1 = "--balances" ]]; then # Show balances for the Mining and Bank walle
     Mining Wallet:
         Unconfirmed Balance:    $($BTC -rpcwallet=mining getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
         Trusted Balance:        $($BTC -rpcwallet=mining getbalance)
+        Immature Balance:       $($BTC -rpcwallet=mining getbalances | jq '.mine.immature' | awk '{printf("%.8f", $1)}')
 
     Bank Wallet:
         Unconfirmed Balance:    $($BTC -rpcwallet=bank getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
@@ -371,5 +372,5 @@ elif [[ $1 = "--mempool" ]]; then # Show mempool stats
 
 else
     $0 --help
-    echo "Script Version 0.07"
+    echo "Script Version 0.08"
 fi
