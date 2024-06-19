@@ -239,9 +239,6 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-# Set stratum port configuration
-echo $(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()') | sudo tee /etc/stratum_port
-
 # Compile/Install CKPool/CKProxy
 git clone https://github.com/satoshiware/ckpool
 cd ckpool
