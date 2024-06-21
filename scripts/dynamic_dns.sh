@@ -121,28 +121,16 @@ elif [[ $1 = "--update" ]]; then # Check for an IP address change and update, lo
     fi
 
 elif [[ $1 = "--getip" ]]; then # Query freely available external services to discover external IPv4 address
-    # Uncomment ONLY ONE external sources to aquire your external IP address
-    
-	if [[ ]]; then echo ""
-	elif [[ $(curl -s -4 icanhazip.com) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 icanhazip.com)
-
-	
-
-	{ array[0]=$(curl -s -4 icanhazip.com); } &
-    { array[1]=$(curl -s -4 ifconfig.me); } &
-    { array[2]=$(curl -s -4 ipinfo.io/ip); } &
-    { array[3]=$(curl -s -4 api.ipify.org); } &
-    { array[4]=$(curl -s -4 ident.me); } &
-    { array[5]=$(curl -s -4 checkip.amazonaws.com); } &
-    { array[6]=$(curl -s -4 ipecho.net/plain); } &
-    { array[7]=$(curl -s -4 ifconfig.co); } &
-	
-	
-
-	
-	
-	
-    echo $currentIp
+    if [[ 0 = 1 ]]; then exit 1
+    elif [[ $(curl -s -4 icanhazip.com) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 icanhazip.com)
+    elif [[ $(curl -s -4 ifconfig.me) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 ifconfig.me)
+    elif [[ $(curl -s -4 ipinfo.io/ip) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 ipinfo.io/ip)
+    elif [[ $(curl -s -4 api.ipify.org) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 api.ipify.org)
+    elif [[ $(curl -s -4 ident.me) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 ident.me)
+    elif [[ $(curl -s -4 checkip.amazonaws.com) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 checkip.amazonaws.com)
+    elif [[ $(curl -s -4 ipecho.net/plain) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 ipecho.net/plain)
+    elif [[ $(curl -s -4 ifconfig.co) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 ifconfig.co)
+    else exit 1; fi
 
 elif [[ $1 = "--godaddy" ]]; then # GoDaddy private routine (not in the help menu) to query or update/change the DNS record(s): IP_ADDRESS
     IP_ADDRESS=$2
@@ -166,5 +154,5 @@ elif [[ $1 = "--godaddy" ]]; then # GoDaddy private routine (not in the help men
 
 else
     $0 --help
-    echo "Script Version 0.10" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
+    echo "Script Version 0.15" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
 fi
