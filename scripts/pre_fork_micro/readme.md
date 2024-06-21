@@ -30,6 +30,9 @@ Recommended Hardware:
 	
 Utility script(s) installed:
 	p2pconnect.sh
+	send_messages.sh
+	dynamic_dns.sh
+	
 
 # wallet_node.sh
 The "wallet_node.sh" script installs a "wallet" micronode (within a cluster).
@@ -50,6 +53,7 @@ Utility script(s) installed:
 	mnconnect.sh
 	teller.sh
 	payouts.sh
+	send_messages.sh
 
 # stratum_node.sh
 This script installs a "stratum" micronode (within a cluster).
@@ -69,6 +73,7 @@ Recommended Hardware:
 Utility script(s) installed:
 	mnconnect.sh
 	stmutility.sh
+	send_messages.sh
 	
 # electrs_node.sh ######## Still under active development: Add electrs (Rust) https://github.com/romanz/electrs, update readme information and comments ########
 This script installs a "electrs" micronode (within a cluster).
