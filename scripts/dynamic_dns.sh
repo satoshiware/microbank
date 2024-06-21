@@ -20,7 +20,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --getip       Query freely available external services to discover external IPv4 address
 
     Log Location:   /var/log/dynamic_dns.log
-    Supported DNS:  GoDaddy
+    Supported DNS:  GoDaddy - Get your API Keys @ https://developer.godaddy.com
                     HostGator - NA (Not yet available in this script. Work in Progress)
                     Bluehost - NA (Not yet available in this script. Work in Progress)
                     DreamHost - NA (Not yet available in this script. Work in Progress)
