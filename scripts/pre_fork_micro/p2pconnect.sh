@@ -20,7 +20,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       --install         Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
 !!!	  --cron            Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
 	  --verify		    Verify all connections (in and out) are active: RECIPIENTS_NAME  EMAIL
-							send email of there are any inactive/disconnected nodes
+							send email of there are any inactive/disconnected nodes (requires send_messages to be configured)
 							If any inbound (non-cluster nodes) connections have become inactive, run a "Dynamic DNS" script
 	  -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
       -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)
