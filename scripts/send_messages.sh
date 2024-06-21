@@ -10,7 +10,7 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 
 # See which send_messages parameter was passed and execute accordingly
-if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
+if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       --help        Display this help message and exit
@@ -182,5 +182,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 0.131"
+    echo "Script Version 0.132"
 fi
