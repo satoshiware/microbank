@@ -207,6 +207,7 @@ sudo systemctl enable bitcoind
 # Install the p2p micronode connect utility (p2pconnect.sh)
 bash ~/microbank/scripts/pre_fork_micro/p2pconnect.sh --install
 bash ~/microbank/scripts/send_messages.sh --install
+bash ~/microbank/scripts/dynamic_dns.sh --install
 
 # Restart the machine
 sudo reboot now
