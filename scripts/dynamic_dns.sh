@@ -77,15 +77,15 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
     fi
 
     read -p "Root Domain: "; REPLY=${REPLY,,}; REPLY=${REPLY#http://}; REPLY=${REPLY#https://}; REPLY=${REPLY#www.}; echo "DOMAIN=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null # Make lowercase and remove http(s) and www if they exist.
-    read -p "API Key: "; echo "KEY=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
+    read -p "API Key (Password): "; echo "KEY=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
     read -p "API Secret: "; echo "SECRET=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
 
     REPLY="GO"; i=1
     echo "RECORDS=()" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
     while [ ! -f $REPLY ]; do
         read -p "$i) (sub)domain to be updated (leave blank to finish): "
-        if [[ $REPLY = "*" ]]; then REPLY="*."
-        elif [ ! -f $REPLY ]; then REPLY=$(echo $REPLY | cut -d '.' -f 1); echo "RECORDS+=(\'$REPLY\')" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null; REPLY="NA"; fi # $REPLY is set to "NA" as the character '*' alone will cause a binary operator error
+        if [[ $REPLY = "*" ]]; then REPLY="*."; fi # $REPLY is set to "*." as the character '*' alone will cause a binary operator error
+        if [ ! -f $REPLY ]; then REPLY=$(echo $REPLY | cut -d '.' -f 1); echo "RECORDS+=(\'$REPLY\')" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null; REPLY="NA"; fi # $REPLY is set to "NA" as the character '*' alone will cause a binary operator error
         i=$(($i+1))
     done
 
