@@ -137,7 +137,7 @@ elif [[ $1 = "--godaddy" ]]; then # GoDaddy private routine (not in the help men
     source /etc/default/dynamic_dns.env
     headers="Authorization: sso-key $KEY:$SECRET"
     if [[ -z $IP_ADDRESS ]]; then # If no IP_ADDRESS was passed then query and return the IP address from the DNS service
-        result=$(curl -s -X GET -H "$headers" "https://api.godaddy.com/v1/domains/$DOMAIN/records/A/${RECORDS[0]}")
+        result=$(curl -s -X GET -H "$headers" "https://api.ote-godaddy.com/v1/domains/$DOMAIN/records/A/${RECORDS[0]}")
         echo $result | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"
         exit 0
     else
@@ -149,8 +149,17 @@ elif [[ $1 = "--godaddy" ]]; then # GoDaddy private routine (not in the help men
 
     # Update each DNS record
     for i in ${RECORDS[@]}; do
-        curl -X PUT "https://api.godaddy.com/v1/domains/$DOMAIN/records/A/$i" -H "accept: application/json" -H "Content-Type: application/json" -H "$headers" -d "[ { \"data\": \"$IP_ADDRESS\", \"port\": 1, \"priority\": 0, \"protocol\": \"string\", \"service\": \"string\", \"ttl\": 600, \"weight\": 1 } ]"
+        curl -X PUT "https://api.ote-godaddy.com/v1/domains/$DOMAIN/records/A/$i" -H "accept: application/json" -H "Content-Type: application/json" -H "$headers" -d "[ { \"data\": \"$IP_ADDRESS\", \"port\": 1, \"priority\": 0, \"protocol\": \"string\", \"service\": \"string\", \"ttl\": 600, \"weight\": 1 } ]"
     done
+
+
+#curl -X 'GET' \
+#  'https://api.ote-godaddy.com/v1/domains/available?domain=example.com&checkType=FAST&forTransfer=false' \
+#  -H 'accept: application/json' \
+#  -H 'Authorization: sso-key some_key_here'
+
+
+
 
 else
     $0 --help
