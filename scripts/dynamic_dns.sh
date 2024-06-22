@@ -20,11 +20,8 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --getip       Query freely available external services to discover external IPv4 address
 
     Log Location:   /var/log/dynamic_dns.log
-    Supported DNS:  GoDaddy - Get your API Keys @ https://developer.godaddy.com
-                    HostGator - NA (Not yet available in this script. Work in Progress)
-                    Bluehost - NA (Not yet available in this script. Work in Progress)
-                    DreamHost - NA (Not yet available in this script. Work in Progress)
-                    Namecheap - NA (Not yet available in this script. Work in Progress)
+    Supported DNS:  GoDaddy - Get your API Keys @ https://developer.godaddy.com (required subscription for GoDaddy's api to work; let's just call it NoDaddy)
+                    Namecheap - Enable "Dynamic DNS" under adnvaced DNS managedment and it will provide the KEY (password)
 EOF
 
 elif [[ $1 = "--install" ]]; then # Install or update this script (dynamic_dns) in /usr/local/sbin (/satoshiware/microbank/scripts/dynamic_dns.sh)
@@ -69,7 +66,7 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
         fi
     fi
 
-    read -p "DNS Service (e.g. godaddy): "
+    read -p "DNS Service (e.g. namecheap): "
     INPUT=$($0 "--${REPLY,,}" "NOIP" 2> /dev/null | grep "Script Version")
     if [[ -z $INPUT ]]; then
         echo "SERVICE=\"${REPLY,,}\"" | sudo tee /etc/default/dynamic_dns.env > /dev/null
@@ -87,10 +84,10 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
     echo "RECORDS=()" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
     while [ ! -f $REPLY ]; do
         read -p "$i) (sub)domain to be updated (leave blank to finish): "
-        if [ ! -f $REPLY ]; then echo "RECORDS+=(\'$REPLY\')" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null; fi
+        if [[ $REPLY = "*" ]]; then REPLY="*."
+        elif [ ! -f $REPLY ]; then REPLY=$(echo $REPLY | cut -d '.' -f 1); echo "RECORDS+=(\'$REPLY\')" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null; REPLY="NA"; fi # $REPLY is set to "NA" as the character '*' alone will cause a binary operator error
         i=$(($i+1))
     done
-    $0 --update
 
 elif [[ $1 = "--update" ]]; then # Check for an IP address change and update, log, and report to adminstrator via email accordingly (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
     # Load the root domain, key, secret, first dns record, and last known good IP address
@@ -112,17 +109,19 @@ elif [[ $1 = "--update" ]]; then # Check for an IP address change and update, lo
     if [[ $CURRENT_IP == $LAST_IP ]]; then # There's no change so log only
         echo "$(date) - IP Unchaged: $LAST_IP" | sudo tee -a /var/log/dynamic_dns.log
     else # Change IP, log, and email
-        $0 "--$SERVICE" "$CURRENT_IP"
+        response=$($0 "--$SERVICE" "$CURRENT_IP")
         echo "$(date) - IP Chaged From $LAST_IP to $CURRENT_IP" | sudo tee -a /var/log/dynamic_dns.log
+        echo $response | sudo tee -a /var/log/dynamic_dns.log
         NAME=$2; EMAIL=$3
         if ! [[ -z $NAME || -z $EMAIL ]]; then
-            send_messages --email $NAME $EMAIL "DNS Record(s) Updated" "Your DNS record(s) has/have been updated with your latest IP address from your ISP"
+            send_messages --email $NAME $EMAIL "DNS Record(s) Updated" "Your DNS record(s) has/have been updated with your latest IP address from your ISP<br><br>$response"
         fi
     fi
 
 elif [[ $1 = "--getip" ]]; then # Query freely available external services to discover external IPv4 address
     if [[ 0 = 1 ]]; then exit 1
     elif [[ $(curl -s -4 icanhazip.com) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 icanhazip.com)
+    elif [[ $(curl -s -4 http://dynamicdns.park-your-domain.com/getip) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 http://dynamicdns.park-your-domain.com/getip)
     elif [[ $(curl -s -4 ifconfig.me) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 ifconfig.me)
     elif [[ $(curl -s -4 ipinfo.io/ip) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 ipinfo.io/ip)
     elif [[ $(curl -s -4 api.ipify.org) =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then echo $(curl -s -4 api.ipify.org)
@@ -137,7 +136,7 @@ elif [[ $1 = "--godaddy" ]]; then # GoDaddy private routine (not in the help men
     source /etc/default/dynamic_dns.env
     headers="Authorization: sso-key $KEY:$SECRET"
     if [[ -z $IP_ADDRESS ]]; then # If no IP_ADDRESS was passed then query and return the IP address from the DNS service
-        result=$(curl -s -X GET -H "$headers" "https://api.ote-godaddy.com/v1/domains/$DOMAIN/records/A/${RECORDS[0]}")
+        result=$(curl -s -X GET -H "$headers" "https://api.godaddy.com/v1/domains/$DOMAIN/records/A/${RECORDS[0]}")
         echo $result | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"
         exit 0
     else
@@ -149,17 +148,31 @@ elif [[ $1 = "--godaddy" ]]; then # GoDaddy private routine (not in the help men
 
     # Update each DNS record
     for i in ${RECORDS[@]}; do
-        curl -X PUT "https://api.ote-godaddy.com/v1/domains/$DOMAIN/records/A/$i" -H "accept: application/json" -H "Content-Type: application/json" -H "$headers" -d "[ { \"data\": \"$IP_ADDRESS\", \"port\": 1, \"priority\": 0, \"protocol\": \"string\", \"service\": \"string\", \"ttl\": 600, \"weight\": 1 } ]"
+        curl -X PUT "https://api.godaddy.com/v1/domains/$DOMAIN/records/A/$i" -H "accept: application/json" -H "Content-Type: application/json" -H "$headers" -d "[ { \"data\": \"$IP_ADDRESS\", \"port\": 1, \"priority\": 0, \"protocol\": \"string\", \"service\": \"string\", \"ttl\": 600, \"weight\": 1 } ]"
     done
 
+elif [[ $1 = "--namecheap" ]]; then # Namecheap private routine (not in the help menu) to query or update/change the DNS record(s): IP_ADDRESS
+    IP_ADDRESS=$2
+    source /etc/default/dynamic_dns.env
+    if [[ -z $IP_ADDRESS ]]; then # If no IP_ADDRESS was passed then query and return the IP address from the DNS service
+        HOST=${RECORDS[0]}
+        if [[ $HOST = "@" ]]; then HOST=""
+        elif [[ $HOST = "*" ]]; then HOST="wildcardcouldbeanything." #
+        else HOST="${HOST}."; fi
 
-#curl -X 'GET' \
-#  'https://api.ote-godaddy.com/v1/domains/available?domain=example.com&checkType=FAST&forTransfer=false' \
-#  -H 'accept: application/json' \
-#  -H 'Authorization: sso-key some_key_here'
+        getent hosts $HOST$DOMAIN | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"
+        exit 0
+    else
+        if [[ ! "$IP_ADDRESS" =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then
+            echo "Error! IP address is not a valid IPv4 addres!"
+            exit 1
+        fi
+    fi
 
-
-
+    # Update each DNS record
+    for i in ${RECORDS[@]}; do
+        curl -s "https://dynamicdns.park-your-domain.com/update?host=$i&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS"
+    done
 
 else
     $0 --help
