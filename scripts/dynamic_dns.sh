@@ -108,11 +108,11 @@ elif [[ $1 = "--update" ]]; then # Check for an IP address change and update, lo
 
     # Log, email, and change IP if necessary
     CURRENT_IP=$($0 --getip)
-    LAST_IP==$($0 "--$SERVICE")
+    LAST_IP=$($0 "--$SERVICE")
     if [[ $CURRENT_IP == $LAST_IP ]]; then # There's no change so log only
         echo "$(date) - IP Unchaged: $LAST_IP" | sudo tee -a /var/log/dynamic_dns.log
     else # Change IP, log, and email
-        $0 "--$SERVICE $CURRENT_IP"
+        $0 "--$SERVICE" "$CURRENT_IP"
         echo "$(date) - IP Chaged From $LAST_IP to $CURRENT_IP" | sudo tee -a /var/log/dynamic_dns.log
         NAME=$2; EMAIL=$3
         if ! [[ -z $NAME || -z $EMAIL ]]; then
@@ -141,7 +141,7 @@ elif [[ $1 = "--godaddy" ]]; then # GoDaddy private routine (not in the help men
         echo $result | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"
         exit 0
     else
-        if [[ ! "$ip" =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then
+        if [[ ! "$IP_ADDRESS" =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then
             echo "Error! IP address is not a valid IPv4 addres!"
             exit 1
         fi
