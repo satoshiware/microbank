@@ -169,11 +169,11 @@ elif [[ $1 = "--namecheap" ]]; then # Namecheap private routine (not in the help
     fi
 
     # Update each DNS record
-    for i in ${RECORDS[@]}; do
-        curl -s "https://dynamicdns.park-your-domain.com/update?host=""$i""&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS"
+    for ((i = 0 ; i < ${#RECORDS[@]} ; i++)); do
+        curl -s "https://dynamicdns.park-your-domain.com/update?host=""${RECORDS[i]}""&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS"
     done
 
 else
     $0 --help
-    echo "Script Version 0.25" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
+    echo "Script Version 0.27" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
 fi
