@@ -78,7 +78,9 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
 
     read -p "Root Domain: "; REPLY=${REPLY,,}; REPLY=${REPLY#http://}; REPLY=${REPLY#https://}; REPLY=${REPLY#www.}; echo "DOMAIN=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null # Make lowercase and remove http(s) and www if they exist.
     read -p "API Key (Password): "; echo "KEY=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
-    read -p "API Secret (If Available): "; echo "SECRET=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
+    read -p "API Secret (If Available): "
+    if [[ -z $REPLY ]]; then REPLY=NA; fi
+    echo "SECRET=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
 
     REPLY="GO"; i=1
     echo "RECORDS=()" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
@@ -170,10 +172,10 @@ elif [[ $1 = "--namecheap" ]]; then # Namecheap private routine (not in the help
 
     # Update each DNS record
     for ((i = 0 ; i < ${#RECORDS[@]} ; i++)); do
-        curl -s "https://dynamicdns.park-your-domain.com/update?host=""${RECORDS[i]}""&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS"
+        curl -s "https://dynamicdns.park-your-domain.com/update?host=""${RECORDS[i]}""&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS" # Had to quote "${RECORDS[i]}" in order for the wildcard to work
     done
 
 else
     $0 --help
-    echo "Script Version 0.27" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
+    echo "Script Version 0.28" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
 fi
