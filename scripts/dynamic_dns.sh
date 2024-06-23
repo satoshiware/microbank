@@ -78,14 +78,14 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
 
     read -p "Root Domain: "; REPLY=${REPLY,,}; REPLY=${REPLY#http://}; REPLY=${REPLY#https://}; REPLY=${REPLY#www.}; echo "DOMAIN=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null # Make lowercase and remove http(s) and www if they exist.
     read -p "API Key (Password): "; echo "KEY=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
-    read -p "API Secret: "; echo "SECRET=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
+    read -p "API Secret (If Available): "; echo "SECRET=\"$REPLY\"" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
 
     REPLY="GO"; i=1
     echo "RECORDS=()" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
     while [ ! -f $REPLY ]; do
         read -p "$i) (sub)domain to be updated (leave blank to finish): "
         if [[ $REPLY = "*" ]]; then REPLY="*."; fi # $REPLY is set to "*." as the character '*' alone will cause a binary operator error
-        if [ ! -f $REPLY ]; then REPLY=$(echo $REPLY | cut -d '.' -f 1); echo "RECORDS+=(\'$REPLY\')" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null; REPLY="NA"; fi # $REPLY is set to "NA" as the character '*' alone will cause a binary operator error
+        if [ ! -f $REPLY ]; then REPLY=$(echo $REPLY | cut -d '.' -f 1); echo "RECORDS+=('$REPLY')" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null; REPLY="NA"; fi # $REPLY is set to "NA" as the character '*' alone will cause a binary operator error
         i=$(($i+1))
     done
 
@@ -157,9 +157,8 @@ elif [[ $1 = "--namecheap" ]]; then # Namecheap private routine (not in the help
     if [[ -z $IP_ADDRESS ]]; then # If no IP_ADDRESS was passed then query and return the IP address from the DNS service
         HOST=${RECORDS[0]}
         if [[ $HOST = "@" ]]; then HOST=""
-        elif [[ $HOST = "*" ]]; then HOST="wildcardcouldbeanything." #
+        elif [[ $HOST = "*" ]]; then HOST="wildcardcouldbeanything."
         else HOST="${HOST}."; fi
-
         getent hosts $HOST$DOMAIN | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"
         exit 0
     else
@@ -176,5 +175,5 @@ elif [[ $1 = "--namecheap" ]]; then # Namecheap private routine (not in the help
 
 else
     $0 --help
-    echo "Script Version 0.15" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
+    echo "Script Version 0.25" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
 fi
