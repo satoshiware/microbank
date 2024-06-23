@@ -113,9 +113,15 @@ elif [[ $1 = "--update" ]]; then # Check for an IP address change and update, lo
         response=$($0 "--$SERVICE" "$CURRENT_IP")
         echo "$(date) - IP Chaged From $LAST_IP to $CURRENT_IP" | sudo tee -a /var/log/dynamic_dns.log
         echo $response | sudo tee -a /var/log/dynamic_dns.log
-        NAME=$2; EMAIL=$3; MESSAGE="Your DNS record(s) has/have been updated with your latest IP address from your ISP<br><br>$response"
+        NAME=$2; EMAIL=$3
+        MESSAGE=$response; MESSAGE=${MESSAGE//</ }; MESSAGE=${MESSAGE//>/ }
+        MESSAGE=${MESSAGE//$'\n'/'<br>'}
+        MESSAGE=${MESSAGE// /\&nbsp;}
+        MESSAGE=${MESSAGE//\"/}
+        MESSAGE="Your DNS record(s) has/have been updated ($LAST_IP) with your latest IP ($CURRENT_IP) address from your ISP<br><br>$MESSAGE"
+
         if ! [[ -z $NAME || -z $EMAIL ]]; then
-            send_messages --email $NAME $EMAIL "DNS Record(s) Updated" ${MESSAGE//\"/}
+            send_messages --email $NAME $EMAIL "DNS Record(s) Updated" "$MESSAGE"
         fi
     fi
 
