@@ -84,10 +84,9 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
 
     REPLY="GO"; i=1
     echo "RECORDS=()" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null
-    while [ ! -f $REPLY ]; do
+    while [ ! -z $REPLY ]; do
         read -p "$i) (sub)domain to be updated (leave blank to finish): "
-        if [[ $REPLY = "*" ]]; then REPLY="*."; fi # $REPLY is set to "*." as the character '*' alone will cause a binary operator error
-        if [ ! -f $REPLY ]; then REPLY=$(echo $REPLY | cut -d '.' -f 1); echo "RECORDS+=('$REPLY')" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null; REPLY="NA"; fi # $REPLY is set to "NA" as the character '*' alone will cause a binary operator error
+        if [ ! -z $REPLY ]; then REPLY=$(echo "$REPLY" | cut -d '.' -f 1); echo "RECORDS+=('$REPLY')" | sudo tee -a /etc/default/dynamic_dns.env > /dev/null; fi
         i=$(($i+1))
     done
 
@@ -114,9 +113,9 @@ elif [[ $1 = "--update" ]]; then # Check for an IP address change and update, lo
         response=$($0 "--$SERVICE" "$CURRENT_IP")
         echo "$(date) - IP Chaged From $LAST_IP to $CURRENT_IP" | sudo tee -a /var/log/dynamic_dns.log
         echo $response | sudo tee -a /var/log/dynamic_dns.log
-        NAME=$2; EMAIL=$3
+        NAME=$2; EMAIL=$3; MESSAGE="Your DNS record(s) has/have been updated with your latest IP address from your ISP<br><br>$response"
         if ! [[ -z $NAME || -z $EMAIL ]]; then
-            send_messages --email $NAME $EMAIL "DNS Record(s) Updated" "Your DNS record(s) has/have been updated with your latest IP address from your ISP<br><br>$response"
+            send_messages --email $NAME $EMAIL "DNS Record(s) Updated" ${MESSAGE//\"/}
         fi
     fi
 
@@ -177,5 +176,5 @@ elif [[ $1 = "--namecheap" ]]; then # Namecheap private routine (not in the help
 
 else
     $0 --help
-    echo "Script Version 0.28" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
+    echo "Script Version 0.30" # Do not remove this line or modify anything other than the version number. Script uses this to check for private DNS service routines (e.g. --godaddy)
 fi
