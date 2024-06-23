@@ -170,7 +170,7 @@ elif [[ $1 = "--namecheap" ]]; then # Namecheap private routine (not in the help
 
     # Update each DNS record
     for i in ${RECORDS[@]}; do
-        curl -s "https://dynamicdns.park-your-domain.com/update?host=$i&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS"
+        curl -s "https://dynamicdns.park-your-domain.com/update?host=""$i""&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS"
     done
 
 else
