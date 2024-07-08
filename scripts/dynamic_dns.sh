@@ -69,7 +69,7 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
         fi
     fi
 
-    read -p "DNS Service (e.g. godaddy): "
+    read -p "DNS Service (e.g. namecheap): "
     INPUT=$($0 "--${REPLY,,}" "NOIP" 2> /dev/null | grep "Script Version")
     if [[ -z $INPUT ]]; then
         echo "SERVICE=\"${REPLY,,}\"" | sudo tee /etc/default/dynamic_dns.env > /dev/null
