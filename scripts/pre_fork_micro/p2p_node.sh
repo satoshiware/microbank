@@ -21,6 +21,8 @@ The "p2p_node.sh" script installs a "p2p" micronode (within a cluster) which is 
 
 FYI:
     Use the p2pconnect utility (just type "p2pconnect" at the prompt) to create, view, and delete connections.
+    Configure the send_messages utility (just type "send_messages --generate" at the prompt) to receive messages from this node.
+    Configure the dynamic_dns utility (just type "dynamic_dns --generate" at the prompt) if you do not have a static IP from your ISP.
 
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
