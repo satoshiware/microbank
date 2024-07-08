@@ -101,7 +101,6 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate the environment file (w/ neede
     read -p "Number of blocks in each Difficulty Epoch (e.g. 1440): "; echo "EPOCHINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
     read -p "Number of seconds (typically) between blocks (e.g. 120): "; echo "BLOCKINTERVAL=$REPLY" | sudo tee -a /etc/default/teller.env > /dev/null
 
-
 elif [[ $1 = "--cron" ]]; then # (Re)Create a weekly cronjob to send a wallet email update at 6:30 AM on Monday: RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
     if [[ -z $NAME || -z $EMAIL ]]; then
