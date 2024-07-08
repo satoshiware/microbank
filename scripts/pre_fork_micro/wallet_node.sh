@@ -23,6 +23,7 @@ FYI:
     Use the mnconnect utility (just type "mnconnect" at the prompt) to create, view, or delete the connection with the p2p node.
     Use the teller utility (just type "teller" at the prompt) to send, receive, and mange the bank's funds.
     Use the payouts utility (just type "payouts" at the prompt) to view, configure, and execute payouts (mining contracts).
+    Configure the send_messages utility (just type "send_messages --generate" at the prompt) to receive messages from this node.
 
     The "/home/$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
