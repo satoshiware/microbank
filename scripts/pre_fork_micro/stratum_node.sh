@@ -22,6 +22,7 @@ The Stratum node is used to manage the microcurrency mining operation for a "min
 FYI:
     Use the mnconnect utility (just type "mnconnect" at the prompt) to create, view, or delete the connection with the p2p node.
     Use the poolu tool to configure notifications and view all the pertinent informaiton for a healthy mining operation (and setup a remote mining operations)
+    Configure the send_messages utility (just type "send_messages --generate" at the prompt) to receive messages from this node.
 
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
     The "/var/lib/bitcoin/micro" directory contains debug logs, blockchain, etc.
