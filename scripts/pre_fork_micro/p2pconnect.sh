@@ -19,12 +19,12 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -h, --help        Display this help message and exit
       --install         Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
 !!!!!why "/bin/bash -ls"!!!!!     --cron            Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
-      --verify          Verify all connections (in and out) are active: RECIPIENTS_NAME  EMAIL
+      --verify??          Verify all connections (in and out) are active: RECIPIENTS_NAME  EMAIL
                             send email if there are any inactive/disconnected nodes (requires send_messages to be configured)
                             Note: If any inbound (non-cluster nodes) connections have become inactive, they "Dynamic DNS" script will be called
       -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
       -p, --p2p         Make p2p inbound/outbound connections (p2p <--> p2p)
-      -v, --view        See all configured connections and statuses
+      -v, --view        See all configured connections
       -d, --delete      Delete a connection: CONNECTION_ID
       -f, --info        Get the connection parameters for this node
 EOF
@@ -103,49 +103,15 @@ EOF
     echo "# ${CONNNAME}, CONN_ID: ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}" | sudo tee -a /etc/bitcoin.conf # Add comment to the bitcoin.conf file
     echo "addnode=localhost:${LOCALMICROPORT}" | sudo tee -a /etc/bitcoin.conf # Add connection
 
-elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and status
-    # Show network info
-    networkinfo=$($BTC getnetworkinfo)
-    echo "RPC \"getnetworkinfo\":"
-    echo -n "    Network Active: "; echo $networkinfo | jq -r '.networkactive'
-    echo -n "    In Connection(s): "; echo $networkinfo | jq -r '.connections_in'
-    echo -n "    Out Connection(s): "; echo $networkinfo | jq -r '.connections_out'
-    echo -n "    Total Connection(s): "; echo $networkinfo | jq -r '.connections'
-
-    # Show peer info
-    echo ""; echo "RPC \"getpeerinfo\":"
-    peerinfo=$($BTC getpeerinfo)
-    count=$(echo $peerinfo | jq -r '. | length')
-    for (( i=0; i<$count; i++ )); do
-        echo "    Connection #: $((i+1))"
-        echo -n "    Address: "; echo $peerinfo | jq -r ".[$i].addr"
-        echo -n "    Address Bind: "; echo $peerinfo | jq -r ".[$i].addrbind"
-        echo -n "    Connection Type: "; echo $peerinfo | jq -r ".[$i].connection_type"; echo ""
-    done
-
+elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections
     # Show the contents of the Authorized Keys file (inbound)
     echo ""; echo "Inbound: Authorized Keys File (/home/p2p/.ssh/authorized_keys)"; echo "------------------------------------------------------------------"; sudo cat /home/p2p/.ssh/authorized_keys
-
-    # Loop through each added node (i.e. local port)
-    echo ""; echo "Outbound: Added Node Info (Auto SSH Forwarded Ports)"; echo "------------------------------------------------------------------"
-    info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
-    for (( i=0; i<$length; i++ )); do
-        echo -n $info | jq -j -r ".[$i].addednode"; echo -n "        Connected: "; echo $info | jq ".[$i].connected"
-    done
 
     # Show the contents of the Bitcoin configuration file
     echo ""; echo "Outbound: Bitcoin Configuration File (/etc/bitcoin.conf)"; echo "------------------------------------------------------------------"; sudo cat /etc/bitcoin.conf
 
     # Show the contents of the Known Hosts file (outbound)
     echo ""; echo "Outbound: Known Hosts File (/root/.ssh/known_hosts)"; echo "------------------------------------------------------------------"; sudo cat /root/.ssh/known_hosts
-
-    # Show the p2pssh (autossh) process for each outgoing connection
-    echo ""; echo "Outbound: View each p2pssh@* .env file and process status (/etc/default/p2pssh@*)"; echo "------------------------------------------------------------------"
-    p2pssh=($(sudo ls /etc/default/p2pssh* 2> /dev/null))
-    for i in "${p2pssh[@]}"; do
-        echo "#########$(sudo head -n 1 $i)    $(sudo sed '2!d' $i)    $(sudo sed '3!d' $i)    $(sudo tail -n 1 $i) ########"
-        sudo systemctl status $(echo $i | cut -d "/" -f 4); echo ""
-    done
 
 elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection: CONNECTION_ID
     if [[ ! ${#} = "2" ]]; then
@@ -192,6 +158,35 @@ fi
 
 
 
+    # Show network info
+    networkinfo=$($BTC getnetworkinfo)
+    echo "RPC \"getnetworkinfo\":"
+    echo -n "    Network Active: "; echo $networkinfo | jq -r '.networkactive'
+    echo -n "    In Connection(s): "; echo $networkinfo | jq -r '.connections_in'
+    echo -n "    Out Connection(s): "; echo $networkinfo | jq -r '.connections_out'
+    echo -n "    Total Connection(s): "; echo $networkinfo | jq -r '.connections'
+	
+	# Show the p2pssh (autossh) process for each outgoing connection
+    echo ""; echo "Outbound: View each p2pssh@* .env file and process status (/etc/default/p2pssh@*)"; echo "------------------------------------------------------------------"
+    p2pssh=($(sudo ls /etc/default/p2pssh* 2> /dev/null))
+    for i in "${p2pssh[@]}"; do
+        echo "#########$(sudo head -n 1 $i)    $(sudo sed '2!d' $i)    $(sudo sed '3!d' $i)    $(sudo tail -n 1 $i) ########"
+        sudo systemctl status $(echo $i | cut -d "/" -f 4); echo ""
+    done
+	
+	# Loop through each added node (i.e. local port)
+    echo ""; echo "Outbound: Added Node Info (Auto SSH Forwarded Ports)"; echo "------------------------------------------------------------------"
+    info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
+    for (( i=0; i<$length; i++ )); do
+        echo -n $info | jq -j -r ".[$i].addednode"; echo -n "        Connected: "; echo $info | jq ".[$i].connected"
+    done
+	
+	
+## We could do a simple check to make sure the number match and if they do we are good.
+# Do we really want to research the individual outgoing ports???
+	
+
+
 #elif [[ $1 = "-dd" || $1 = "--disconnected" ]]; then # Find all disconnections !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # Make sure all added nodes are connected
 #    info=$(btc getaddednodeinfo); length=$(echo -n $info | jq length)
@@ -209,11 +204,13 @@ fi
     # Search in stratum|p2p authorized_keys to match the timestamp with the . You know, we could just disconnect everyone!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 #   ss -t -a | grep ssh
-#   ipaddr="192.168.1.240"
-#   ddport="42682"
-#   sdport="42676"
+   ipaddr="192.168.2.11"
+   ddport="36018"
+#   #####sdport="42676"
 
-#   cat /var/log/auth.log | grep "Accepted publickey for.*${ipaddr}.*${ddport}" # what about the stratum user instead of p2p
+   cat /var/log/auth.log | grep "Accepted publickey for.*${ipaddr}.*${ddport}"    # what about the stratum user instead of p2p
+
+journalctl -u ssh.service | grep "Accepted publickey for.*${ipaddr}.*${ddport}"
 #   UfullVXA44hjjgvle9qIP3Hn5vjrnj5vTq0nT5Z2Y2M
 
 #    AAC3NzaC1lZDI1NTE5AAAAIMZ0yYY38wDVbwxjjeWY+sGQUrHkMIthSRgAOVdAA+Z4
@@ -230,3 +227,22 @@ fi
 ##peer info, will the manual show the name added???
 ##well, all the outboud will show is the port forwards...
 
+
+
+
+
+todo: Make the script that configures inbound connection to add the SHA256(Base64) to authorized_keys "ssh-keygen -lf /$SOMEpubfile.pub"
+
+journalctl -u ssh.service | grep q8kcHXdiu0tCWY6e6don07upEKTZTN1uzuvOLeRrErA | tail -n 1 # Get the outgoing sshd Port Number communicating with said incomming connection
+ss -t -a | grep ":ssh .*36018"  # if found then it is connected??
+
+journalctl -u ssh.service | grep 08SjoMqb+oGrs+7jBRlwf/TLBErNiXFQu3xv239wU9A | tail -n 1 # Get the outgoing sshd Port Number communicating with said incomming connection
+ss -t -a | grep "^.*:ssh .*:43124 +$"  # if found then it is connected??
+ss -t -a | grep "^.*:ssh .*:43124\s\+$"
+
+
+256 SHA256:q8kcHXdiu0tCWY6e6don07upEKTZTN1uzuvOLeRrErA no comment (ED25519) # az-wallet
+256 SHA256:08SjoMqb+oGrs+7jBRlwf/TLBErNiXFQu3xv239wU9A no comment (ED25519) # stratum
+
+
+journalctl -u ssh.service | grep "session"
