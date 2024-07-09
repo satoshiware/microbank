@@ -147,7 +147,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Installs or updates this script
     sudo chmod +x /usr/local/sbin/payouts
 
     # Add Cron Job (Every Two Hours) that will execute the "payouts -o" command as $USER. Run "crontab -e" as $USER to see all its cron jobs.
-    (crontab -l | grep -v -F "/usr/local/sbin/payouts -o" ; echo "0 */2 * * * /usr/local/sbin/payouts -o" ) | crontab -
+    (crontab -l | grep -v -F "/usr/local/sbin/payouts -o" ; echo "0 */2 * * * /bin/bash -lc \"/usr/local/sbin/payouts -o\"" ) | crontab -
 
 elif [[ $1 = "-g" || $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/payouts.env
     echo "Generating the environment file /etc/default/payouts.env"
@@ -373,7 +373,7 @@ EOF
         t_payout=$(sqlite3 -separator '; ' $SQ3DBNAME "SELECT 'Epoch Period: ' || epoch_period, 'Epoch Block: ' || block_height, 'Block Time: ' || datetime(block_time, 'unixepoch', 'localtime') as dates, 'Difficulty: ' || difficulty, 'Payout: ' || printf('%.8f', (CAST(amount AS REAL) / 100000000)), 'Subsidy: ' || printf('%.8f', (CAST(subsidy AS REAL) / 100000000)), 'Blocks: ' || (block_height - $EPOCHBLOCKS) || ' - ' || (block_height - 1), 'Total Fees: ' || printf('%.8f', (CAST(total_fees AS REAL) / 100000000)) FROM payouts WHERE epoch_period = $NEXTEPOCH")
         payout_amount=$(sqlite3 $SQ3DBNAME "SELECT amount FROM payouts WHERE epoch_period = $NEXTEPOCH")
         qty_contracts=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active != 0 AND time<=$BLOCKTIME")
-         
+
         qty_utxo=$(($(sqlite3 $SQ3DBNAME "SELECT COUNT(*) FROM txs WHERE epoch_period = $NEXTEPOCH")))
         total=$(sqlite3 $SQ3DBNAME "SELECT printf('%.8f', (CAST(SUM(amount) AS REAL) / 100000000)) FROM txs WHERE epoch_period = $NEXTEPOCH")
 
@@ -749,13 +749,13 @@ elif [[ $1 = "-d" || $1 = "--dump" ]]; then # Show all the contents of the datab
     sqlite3 $SQ3DBNAME ".dump"
 
 elif [[ $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
-	sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts"
 
 elif [[ $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
     echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
     echo ""; echo "Note: The contract owners and contract buyers don't have to match."
-	echo "Example: Someone may buy extra contracts for a friend."; echo ""
+    echo "Example: Someone may buy extra contracts for a friend."; echo ""
 
 elif [[ $1 = "-r" || $1 = "--contracts" ]]; then # Show all contracts
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts"
@@ -881,7 +881,7 @@ elif [[ $1 = "--update-sale" ]]; then # Update sale status
     USER_EMAIL=$2; SALE_ID=$3; STATUS=$4
 
     if ! [[ $SALE_ID =~ ^[0-9]+$ ]]; then echo "Error! \"Sale ID\" is not a number!"; exit 1; fi
-	
+
     exists=$(sqlite3 $SQ3DBNAME "SELECT EXISTS(SELECT * FROM sales WHERE account_id = (SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}') AND sale_id = $SALE_ID)")
     if [[ $exists == "0" ]]; then
         echo "Error! \"User Email\" with provided \"Sale ID\" does not exist in the database (\"sales\" table)!"
@@ -1218,5 +1218,5 @@ EOF
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 1.01"
+    echo "Script Version 1.011"
 fi
