@@ -105,7 +105,7 @@ EOF
 
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and status
     # Show network info
-    networkinfo=$(btc getnetworkinfo)
+    networkinfo=$($BTC getnetworkinfo)
     echo "RPC \"getnetworkinfo\":"
     echo -n "    Network Active: "; echo $networkinfo | jq -r '.networkactive'
     echo -n "    In Connection(s): "; echo $networkinfo | jq -r '.connections_in'
@@ -114,7 +114,7 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
 
     # Show peer info
     echo ""; echo "RPC \"getpeerinfo\":"
-    peerinfo=$(btc getpeerinfo)
+    peerinfo=$($BTC getpeerinfo)
     count=$(echo $peerinfo | jq -r '. | length')
     for (( i=0; i<$count; i++ )); do
         echo "    Connection: $((i+1))"
@@ -185,7 +185,7 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.16"
+    echo "Script Version 0.17"
 fi
 
 
