@@ -117,8 +117,9 @@ elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections and
     peerinfo=$($BTC getpeerinfo)
     count=$(echo $peerinfo | jq -r '. | length')
     for (( i=0; i<$count; i++ )); do
-        echo "    Connection: $((i+1))"
+        echo "    Connection #: $((i+1))"
         echo -n "    Address: "; echo $peerinfo | jq -r ".[$i].addr"
+        echo -n "    Address Bind: "; echo $peerinfo | jq -r ".[$i].addrbind"
         echo -n "    Connection Type: "; echo $peerinfo | jq -r ".[$i].connection_type"; echo ""
     done
 
@@ -223,3 +224,9 @@ fi
 #   echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZ0yYY38wDVbwxjjeWY+sGQUrHkMIthSRgAOVdAA+Z4" > fifo &
 #   okok=$(ssh-keygen -l -f fifo)
 #   rm fifo
+
+
+
+##peer info, will the manual show the name added???
+##well, all the outboud will show is the port forwards...
+
