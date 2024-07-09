@@ -109,7 +109,7 @@ elif [[ $1 = "--cron" ]]; then # (Re)Create a weekly cronjob to send a wallet em
     fi
 
     # Add Weekly Cron Job to send out an email. Run "crontab -e" as $USER to see all its cron jobs.
-    (crontab -l | grep -v -F "/usr/local/sbin/teller --email" ; echo "30 6 * * 1 /usr/local/sbin/teller --email $NAME $EMAIL" ) | crontab -
+    (crontab -l | grep -v -F "/usr/local/sbin/teller --email" ; echo "30 6 * * 1 /bin/bash -lc \"/usr/local/sbin/teller --email $NAME $EMAIL\"" ) | crontab -
 
 elif [[ $1 = "--email" ]]; then # Email (send out) the wallet update (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
@@ -371,5 +371,5 @@ elif [[ $1 = "--mempool" ]]; then # Show mempool stats
 
 else
     $0 --help
-    echo "Script Version 0.08"
+    echo "Script Version 0.081"
 fi
