@@ -59,7 +59,7 @@ elif [[ $1 = "--install" ]]; then # Install this script (poolu) in /usr/local/sb
     sudo chmod +x /usr/local/sbin/poolu
 
     # Add hourly Cron Job to run the update routine. Run "crontab -l" as $USER to see all its cron jobs.
-    (crontab -l | grep -v -F "/usr/local/sbin/poolu --update" ; echo "0 * * * * /usr/local/sbin/poolu --update" ) | crontab -
+    (crontab -l | grep -v -F "/usr/local/sbin/poolu --update" ; echo "0 * * * * /bin/bash -lc \"/usr/local/sbin/poolu --update\"" ) | crontab -
 
 elif [[ $1 = "--cron-weekly" ]]; then # (Re)Create a weekly cronjob to send mining status email at 6:30 AM on Monday: RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
@@ -69,7 +69,7 @@ elif [[ $1 = "--cron-weekly" ]]; then # (Re)Create a weekly cronjob to send mini
     fi
 
     # Add Weekly Cron Job to send out an email update. Run "crontab -l" as $USER to see all its cron jobs.
-    (crontab -l | grep -v -F "/usr/local/sbin/poolu --email" ; echo "30 6 * * 1 /usr/local/sbin/poolu --email $NAME $EMAIL" ) | crontab -
+    (crontab -l | grep -v -F "/usr/local/sbin/poolu --email" ; echo "30 6 * * 1 /bin/bash -lc \"/usr/local/sbin/poolu --email $NAME $EMAIL\"" ) | crontab -
 
 elif [[ $1 = "--cron-error" ]]; then # (Re)Create an daily cronjob to notify (via email) of any problems: RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
@@ -79,7 +79,7 @@ elif [[ $1 = "--cron-error" ]]; then # (Re)Create an daily cronjob to notify (vi
     fi
 
     # Add hourly Cron Job to check for errors. Run "crontab -l" as $USER to see all its cron jobs.
-    (crontab -l | grep -v -F "/usr/local/sbin/poolu --error" ; echo "0 0 * * * /usr/local/sbin/poolu --error $NAME $EMAIL" ) | crontab -
+    (crontab -l | grep -v -F "/usr/local/sbin/poolu --error" ; echo "0 0 * * * /bin/bash -lc \"/usr/local/sbin/poolu --error $NAME $EMAIL\"" ) | crontab -
 
 elif [[ $1 = "--email" ]]; then # Email (send out) the mining status (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
@@ -267,5 +267,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters to s
 
 else
     $0 --help
-    echo "Script Version 0.15"
+    echo "Script Version 0.151"
 fi
