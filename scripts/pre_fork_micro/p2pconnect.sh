@@ -109,15 +109,15 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     CONF_IN_QTY=$(sudo cat /home/p2p/.ssh/authorized_keys | grep . | grep "\S" | wc -l)
     CONF_OUT_QTY=$(sudo cat /root/.ssh/known_hosts | grep . | grep "\S" | wc -l)
     if [[ ! $NET_ACTIVE == "true" || $CONF_IN_QTY -ne $IN_QTY || $CONF_OUT_QTY -gt $OUT_QTY ]]; then
+        NAME=$2; EMAIL=$3
         if [[ $CONF_IN_QTY -ne $IN_QTY ]]; then dynamic_dns --update $NAME $EMAIL; fi # Run Dynamic DNS if there's a mismatch between configured in' connections and auctual in' connections.
 
-        NAME=$2; EMAIL=$3
         if [[ -z $NAME || -z $EMAIL ]]; then
             echo "Error! Insufficient Email Parameters!"
         else
             MESSAGE=${MESSAGE//$'\n'/'<br>'}
             MESSAGE=${MESSAGE// /\&nbsp;}
-            send_messages --email $NAME $EMAIL "Wallet Node Snapshot" $MESSAGE
+            send_messages --email $NAME $EMAIL "Micro Node Connection Issues" $MESSAGE
         fi
     fi
 
