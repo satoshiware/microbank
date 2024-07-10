@@ -69,7 +69,7 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     NET_ACTIVE=$(echo $networkinfo | jq -r '.networkactive')
     IN_QTY=$(echo $networkinfo | jq -r '.connections_in')
     OUT_QTY=$(echo $networkinfo | jq -r '.connections_out')
-    echo "RPC \"getnetworkinfo\":" | tee /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
+    echo "RPC getnetworkinfo:" | tee /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
     echo -n "    Network Active: " | tee -a /tmp/message; echo $NET_ACTIVE | tee -a /tmp/message
     echo -n "    In Connection(s): " | tee -a /tmp/message; echo $IN_QTY | tee -a /tmp/message
     echo -n "    Out Connection(s): " | tee -a /tmp/message; echo $OUT_QTY | tee -a /tmp/message
@@ -91,7 +91,7 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     done
 
     # Loop through each added node (i.e. local port)
-    echo "" | tee -a /tmp/message; echo "Outbound: Added Node Info (RPC \"getaddednodeinfo\")" | tee -a /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
+    echo "" | tee -a /tmp/message; echo "Outbound: Added Node Info (RPC getaddednodeinfo)" | tee -a /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
     info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
     for (( i=0; i<$length; i++ )); do
         echo -n "    " | tee -a /tmp/message; echo -n $info | jq -j -r ".[$i].addednode" | tee -a /tmp/message; echo -n "        Connected: " | tee -a /tmp/message; echo $info | jq ".[$i].connected" | tee -a /tmp/message
@@ -230,5 +230,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.181"
+    echo "Script Version 0.185"
 fi
