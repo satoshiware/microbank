@@ -63,10 +63,7 @@ elif [[ $1 = "--cron" ]]; then # (Re)Create cronjob to run --status routine ever
     # Add Cron Job to run the --status routine every 6 hours. Run "crontab -e" as $USER to see all its cron jobs.
     (crontab -l | grep -v -F "/usr/local/sbin/p2pconnect --status" ; echo "0 */6 * * * /bin/bash -lc \"/usr/local/sbin/p2pconnect --status $NAME $EMAIL\"" ) | crontab -
 
-elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and out): RECIPIENTS_NAME  EMAIL.
-    # Sends email if there are any inactive/disconnected nodes (requires send_messages to be configured).
-    # Note: If any inbound connections have become inactive, the "Dynamic DNS" script will be called.
-
+elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and out): RECIPIENTS_NAME  EMAIL. Sends email if there are any inactive/disconnected nodes (requires send_messages to be configured). Note: If any inbound connections have become inactive, the "Dynamic DNS" script will be called.
     # Get/Show network info
     networkinfo=$($BTC getnetworkinfo)
     NET_ACTIVE=$(echo $networkinfo | jq -r '.networkactive')
@@ -79,7 +76,7 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
 
     # Show status of each configured incomming connection
     echo ""; echo "Configured Incomming Connection(s):"; echo "------------------------------------------------------------------"
-    sudo /bin/bash -c "readarray -t incomming < /home/p2p/.ssh/authorized_keys"
+    readarray -t incomming <<< $(sudo cat /home/p2p/.ssh/authorized_keys | grep . | grep "\S")
     for line in "${incomming[@]}"; do
         hash=$(echo "$line" | grep -Go 'SHA256(Base64): .*' | cut -d " " -f 2)
         port=$(journalctl -u ssh.service | grep $hash | tail -n 1 | grep -Go 'port.*ssh2' | cut -d " " -f 2)
@@ -106,10 +103,23 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
     for (( i=0; i<$length; i++ )); do
         echo -n $info | jq -j -r ".[$i].addednode"; echo -n "        Connected: "; echo $info | jq ".[$i].connected"
-    done; echo ""
+    done
 
-    ########### Test for connections ##################
+    # Test for any failed connection and respond accordingly
+    CONF_IN_QTY=$(sudo cat /home/p2p/.ssh/authorized_keys | grep . | grep "\S" | wc -l)
+    CONF_OUT_QTY=$(sudo cat /root/.ssh/known_hosts | grep . | grep "\S" | wc -l)
+    if [[ ! $NET_ACTIVE == "true" || $CONF_IN_QTY -ne $IN_QTY || $CONF_OUT_QTY -gt $OUT_QTY ]]; then
+        if [[ $CONF_IN_QTY -ne $IN_QTY ]]; then dynamic_dns --update $NAME $EMAIL; fi # Run Dynamic DNS if there's a mismatch between configured in' connections and auctual in' connections.
 
+        NAME=$2; EMAIL=$3
+        if [[ -z $NAME || -z $EMAIL ]]; then
+            echo "Error! Insufficient Email Parameters!"
+        else
+            MESSAGE=${MESSAGE//$'\n'/'<br>'}
+            MESSAGE=${MESSAGE// /\&nbsp;}
+            send_messages --email $NAME $EMAIL "Wallet Node Snapshot" $MESSAGE
+        fi
+    fi
 
 elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
     echo "Let's configure an inbound connection from a wallet, stratum, or electrum node!"
@@ -171,7 +181,7 @@ EOF
 
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections
     # Show the contents of the Authorized Keys file (inbound)
-    echo ""; echo "Inbound: Authorized Keys File (/home/p2p/.ssh/authorized_keys)"; echo "------------------------------------------------------------------"; sudo cat /home/p2p/.ssh/authorized_keys
+    echo "Inbound: Authorized Keys File (/home/p2p/.ssh/authorized_keys)"; echo "------------------------------------------------------------------"; sudo cat /home/p2p/.ssh/authorized_keys
 
     # Show the contents of the Bitcoin configuration file
     echo ""; echo "Outbound: Bitcoin Configuration File (/etc/bitcoin.conf)"; echo "------------------------------------------------------------------"; sudo cat /etc/bitcoin.conf
