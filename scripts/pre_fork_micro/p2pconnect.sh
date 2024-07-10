@@ -72,19 +72,19 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     NET_ACTIVE=$(echo $networkinfo | jq -r '.networkactive')
     IN_QTY=$(echo $networkinfo | jq -r '.connections_in')
     OUT_QTY=$(echo $networkinfo | jq -r '.connections_out')
-    echo "RPC \"getnetworkinfo\":"
+    echo "RPC \"getnetworkinfo\":"; echo "------------------------------------------------------------------"
     echo -n "    Network Active: "; echo $NET_ACTIVE
     echo -n "    In Connection(s): "; echo $IN_QTY
     echo -n "    Out Connection(s): "; echo $OUT_QTY
 
     # Show status of each configured incomming connection
-    echo "Configured Incomming Connection(s):"
+    echo ""; echo "Configured Incomming Connection(s):"; echo "------------------------------------------------------------------"
     sudo /bin/bash -c "readarray -t incomming < /home/p2p/.ssh/authorized_keys"
     for line in "${incomming[@]}"; do
-        hash=$(echo "$line" | grep -Go 'SHA256(Base64): .*' |  cut -d " " -f 2)
+        hash=$(echo "$line" | grep -Go 'SHA256(Base64): .*' | cut -d " " -f 2)
         port=$(journalctl -u ssh.service | grep $hash | tail -n 1 | grep -Go 'port.*ssh2' | cut -d " " -f 2)
         connected=$(ss -t -a | grep "^.*:ssh .*:$port\s\+$") # If line returned then the incomming connection is active!
-        echo "    $line"
+        echo -n "   "; echo $line | cut -d "#" -f 2
         if [[ -z $connected ]]; then
             echo "    Connected: False"
         else
@@ -106,20 +106,9 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
     for (( i=0; i<$length; i++ )); do
         echo -n $info | jq -j -r ".[$i].addednode"; echo -n "        Connected: "; echo $info | jq ".[$i].connected"
-    done
+    done; echo ""
 
-
-#elif [[ $1 = "-dd" || $1 = "--disconnected" ]]; then # Find all disconnections !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # Make sure all added nodes are connected
-#    info=$(btc getaddednodeinfo); length=$(echo -n $info | jq length)
-#    for (( i=0; i<$length; i++ )); do
-#        if [[ $(echo -n $info | jq ".[$i].connected") == "false" ]]; then
-#           echo "Oh No! Node \"$(echo $info | jq -j -r ".[$i].addednode")\" is disconnected!"
-#       fi
-#    done
-
-
-
+    ########### Test for connections ##################
 
 
 elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
@@ -229,5 +218,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.18"
+    echo "Script Version 0.181"
 fi
