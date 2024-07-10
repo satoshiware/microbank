@@ -29,7 +29,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -f, --info        Get the connection parameters for this node
 EOF
 
-elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
+elif [[ $1 = "--install" ]]; then # Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
     echo "Installing this script (p2pconnect) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/p2pconnect ]; then
         echo "This script (p2pconnect) already exists in /usr/local/sbin!"
@@ -37,7 +37,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Install (or upgrade) this scrip
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/p2pconnect
             cd ~; git clone https://github.com/satoshiware/microbank
-            bash ~/microbank/scripts/pre_fork_micro/p2pconnect.sh -i
+            bash ~/microbank/scripts/pre_fork_micro/p2pconnect.sh --install
             rm -rf microbank
             exit 0
         else
@@ -102,7 +102,7 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     p2pssh=($(sudo ls /etc/default/p2pssh* 2> /dev/null))
     for i in "${p2pssh[@]}"; do
         echo "#########$(sudo head -n 1 $i)    $(sudo sed '2!d' $i)    $(sudo sed '3!d' $i)    $(sudo tail -n 1 $i) ########" | tee -a /tmp/message
-        sudo systemctl status $(echo $i | cut -d "/" -f 4); echo "" | tee -a /tmp/message
+        sudo systemctl status $(echo $i | cut -d "/" -f 4) | tee -a /tmp/message; echo "" | tee -a /tmp/message
     done
 
     # Test for any failed connection and respond accordingly
@@ -230,5 +230,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.185"
+    echo "Script Version 0.186"
 fi
