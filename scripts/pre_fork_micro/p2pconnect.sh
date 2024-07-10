@@ -90,6 +90,13 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
         echo ""
     done
 
+    # Loop through each added node (i.e. local port)
+    echo ""; echo "Outbound: Added Node Info (RPC \"getaddednodeinfo\")"; echo "------------------------------------------------------------------"
+    info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
+    for (( i=0; i<$length; i++ )); do
+        echo -n "    "; echo -n $info | jq -j -r ".[$i].addednode"; echo -n "        Connected: "; echo $info | jq ".[$i].connected"
+    done
+
     # Show the p2pssh (autossh) process for each outgoing connection
     echo ""; echo "Outbound: View each p2pssh@* .env file and process status (/etc/default/p2pssh@*)"; echo "------------------------------------------------------------------"
     p2pssh=($(sudo ls /etc/default/p2pssh* 2> /dev/null))
@@ -98,23 +105,14 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
         sudo systemctl status $(echo $i | cut -d "/" -f 4); echo ""
     done
 
-    # Loop through each added node (i.e. local port)
-    echo ""; echo "Outbound: Added Node Info (RPC \"getaddednodeinfo\")"; echo "------------------------------------------------------------------"
-    info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
-    for (( i=0; i<$length; i++ )); do
-        echo -n $info | jq -j -r ".[$i].addednode"; echo -n "        Connected: "; echo $info | jq ".[$i].connected"
-    done
-
     # Test for any failed connection and respond accordingly
     CONF_IN_QTY=$(sudo cat /home/p2p/.ssh/authorized_keys | grep . | grep "\S" | wc -l)
     CONF_OUT_QTY=$(sudo cat /root/.ssh/known_hosts | grep . | grep "\S" | wc -l)
     if [[ ! $NET_ACTIVE == "true" || $CONF_IN_QTY -ne $IN_QTY || $CONF_OUT_QTY -gt $OUT_QTY ]]; then
         NAME=$2; EMAIL=$3
-        if [[ $CONF_IN_QTY -ne $IN_QTY ]]; then dynamic_dns --update $NAME $EMAIL; fi # Run Dynamic DNS if there's a mismatch between configured in' connections and auctual in' connections.
+        if [[ $CONF_IN_QTY -ne $IN_QTY ]]; then echo ""; echo "Running Dynamic DNS"; dynamic_dns --update $NAME $EMAIL > /dev/null; fi # Run Dynamic DNS if there's a mismatch between configured in' connections and auctual in' connections.
 
-        if [[ -z $NAME || -z $EMAIL ]]; then
-            echo "Error! Insufficient Email Parameters!"
-        else
+        if ! [[ -z $NAME || -z $EMAIL ]]; then
             MESSAGE=${MESSAGE//$'\n'/'<br>'}
             MESSAGE=${MESSAGE// /\&nbsp;}
             send_messages --email $NAME $EMAIL "Micro Node Connection Issues" $MESSAGE
