@@ -69,10 +69,10 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     NET_ACTIVE=$(echo $networkinfo | jq -r '.networkactive')
     IN_QTY=$(echo $networkinfo | jq -r '.connections_in')
     OUT_QTY=$(echo $networkinfo | jq -r '.connections_out')
-    echo "RPC \"getnetworkinfo\":" | tee /tmp/message; echo "------------------------------------------------------------------"
-    echo -n "    Network Active: " | tee -a /tmp/message; echo $NET_ACTIVE
-    echo -n "    In Connection(s): " | tee -a /tmp/message; echo $IN_QTY
-    echo -n "    Out Connection(s): " | tee -a /tmp/message; echo $OUT_QTY
+    echo "RPC \"getnetworkinfo\":" | tee /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
+    echo -n "    Network Active: " | tee -a /tmp/message; echo $NET_ACTIVE | tee -a /tmp/message
+    echo -n "    In Connection(s): " | tee -a /tmp/message; echo $IN_QTY | tee -a /tmp/message
+    echo -n "    Out Connection(s): " | tee -a /tmp/message; echo $OUT_QTY | tee -a /tmp/message
 
     # Show status of each configured incomming connection
     echo "" | tee -a /tmp/message; echo "Configured Incomming Connection(s):" | tee -a /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
@@ -113,11 +113,15 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
         if [[ $CONF_IN_QTY -ne $IN_QTY ]]; then dynamic_dns --update $NAME $EMAIL > /dev/null; fi # Run Dynamic DNS if there's a mismatch between configured in' connections and auctual in' connections.
 
         if ! [[ -z $NAME || -z $EMAIL ]]; then
+            MESSAGE=$(cat /tmp/message)
             MESSAGE=${MESSAGE//$'\n'/'<br>'}
             MESSAGE=${MESSAGE// /\&nbsp;}
             send_messages --email $NAME $EMAIL "Micro Node Connection Issues" $MESSAGE
         fi
     fi
+
+    # Delete message file
+    rm /tmp/message
 
 elif [[ $1 = "-n" || $1 = "--in" ]]; then # Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
     echo "Let's configure an inbound connection from a wallet, stratum, or electrum node!"
