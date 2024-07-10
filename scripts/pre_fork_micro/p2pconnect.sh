@@ -69,40 +69,40 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     NET_ACTIVE=$(echo $networkinfo | jq -r '.networkactive')
     IN_QTY=$(echo $networkinfo | jq -r '.connections_in')
     OUT_QTY=$(echo $networkinfo | jq -r '.connections_out')
-    echo "RPC \"getnetworkinfo\":"; echo "------------------------------------------------------------------"
-    echo -n "    Network Active: "; echo $NET_ACTIVE
-    echo -n "    In Connection(s): "; echo $IN_QTY
-    echo -n "    Out Connection(s): "; echo $OUT_QTY
+    echo "RPC \"getnetworkinfo\":" | tee /tmp/message; echo "------------------------------------------------------------------"
+    echo -n "    Network Active: " | tee -a /tmp/message; echo $NET_ACTIVE
+    echo -n "    In Connection(s): " | tee -a /tmp/message; echo $IN_QTY
+    echo -n "    Out Connection(s): " | tee -a /tmp/message; echo $OUT_QTY
 
     # Show status of each configured incomming connection
-    echo ""; echo "Configured Incomming Connection(s):"; echo "------------------------------------------------------------------"
+    echo "" | tee -a /tmp/message; echo "Configured Incomming Connection(s):" | tee -a /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
     readarray -t incomming <<< $(sudo cat /home/p2p/.ssh/authorized_keys | grep . | grep "\S")
     for line in "${incomming[@]}"; do
         hash=$(echo "$line" | grep -Go 'SHA256(Base64): .*' | cut -d " " -f 2)
         port=$(journalctl -u ssh.service | grep $hash | tail -n 1 | grep -Go 'port.*ssh2' | cut -d " " -f 2)
         connected=$(ss -t -a | grep "^.*:ssh .*:$port\s\+$") # If line returned then the incomming connection is active!
-        echo -n "   "; echo $line | cut -d "#" -f 2
+        echo -n "   " | tee -a /tmp/message; echo $line | cut -d "#" -f 2 | tee -a /tmp/message
         if [[ -z $connected ]]; then
-            echo "    Connected: False"
+            echo "    Connected: False" | tee -a /tmp/message
         else
-            echo "    Connected: True"
+            echo "    Connected: True" | tee -a /tmp/message
         fi
-        echo ""
+        echo "" | tee -a /tmp/message
     done
 
     # Loop through each added node (i.e. local port)
-    echo ""; echo "Outbound: Added Node Info (RPC \"getaddednodeinfo\")"; echo "------------------------------------------------------------------"
+    echo "" | tee -a /tmp/message; echo "Outbound: Added Node Info (RPC \"getaddednodeinfo\")" | tee -a /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
     info=$($BTC getaddednodeinfo); length=$(echo -n $info | jq length)
     for (( i=0; i<$length; i++ )); do
-        echo -n "    "; echo -n $info | jq -j -r ".[$i].addednode"; echo -n "        Connected: "; echo $info | jq ".[$i].connected"
+        echo -n "    " | tee -a /tmp/message; echo -n $info | jq -j -r ".[$i].addednode" | tee -a /tmp/message; echo -n "        Connected: " | tee -a /tmp/message; echo $info | jq ".[$i].connected" | tee -a /tmp/message
     done
 
     # Show the p2pssh (autossh) process for each outgoing connection
-    echo ""; echo "Outbound: View each p2pssh@* .env file and process status (/etc/default/p2pssh@*)"; echo "------------------------------------------------------------------"
+    echo "" | tee -a /tmp/message; echo "Outbound: View each p2pssh@* .env file and process status (/etc/default/p2pssh@*)" | tee -a /tmp/message; echo "------------------------------------------------------------------" | tee -a /tmp/message
     p2pssh=($(sudo ls /etc/default/p2pssh* 2> /dev/null))
     for i in "${p2pssh[@]}"; do
-        echo "#########$(sudo head -n 1 $i)    $(sudo sed '2!d' $i)    $(sudo sed '3!d' $i)    $(sudo tail -n 1 $i) ########"
-        sudo systemctl status $(echo $i | cut -d "/" -f 4); echo ""
+        echo "#########$(sudo head -n 1 $i)    $(sudo sed '2!d' $i)    $(sudo sed '3!d' $i)    $(sudo tail -n 1 $i) ########" | tee -a /tmp/message
+        sudo systemctl status $(echo $i | cut -d "/" -f 4); echo "" | tee -a /tmp/message
     done
 
     # Test for any failed connection and respond accordingly
@@ -110,7 +110,7 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     CONF_OUT_QTY=$(sudo cat /root/.ssh/known_hosts | grep . | grep "\S" | wc -l)
     if [[ ! $NET_ACTIVE == "true" || $CONF_IN_QTY -ne $IN_QTY || $CONF_OUT_QTY -gt $OUT_QTY ]]; then
         NAME=$2; EMAIL=$3
-        if [[ $CONF_IN_QTY -ne $IN_QTY ]]; then echo ""; echo "Running Dynamic DNS"; dynamic_dns --update $NAME $EMAIL > /dev/null; fi # Run Dynamic DNS if there's a mismatch between configured in' connections and auctual in' connections.
+        if [[ $CONF_IN_QTY -ne $IN_QTY ]]; then dynamic_dns --update $NAME $EMAIL > /dev/null; fi # Run Dynamic DNS if there's a mismatch between configured in' connections and auctual in' connections.
 
         if ! [[ -z $NAME || -z $EMAIL ]]; then
             MESSAGE=${MESSAGE//$'\n'/'<br>'}
