@@ -18,8 +18,8 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     Options:
       -h, --help        Display this help message and exit
       --install         Install (or upgrade) this script (p2pconnect) in /usr/local/sbin/ (/satoshiware/microbank/scripts/pre_fork_micro/p2pconnect.sh)
-      --cron            (Re)Create cronjob to run --status routine every 6 hours: RECIPIENTS_NAME  EMAIL
-      --status          Show/Verify status of all connections (in and out): RECIPIENTS_NAME  EMAIL
+      --cron            (Re)Create cronjob to run --status routine every 6 hours: RECIPIENTS_FIRST_NAME  EMAIL
+      --status          Show/Verify status of all connections (in and out): RECIPIENTS_FIRST_NAME  EMAIL
                             Sends email if there are any inactive/disconnected nodes (requires send_messages to be configured).
                             Note: If any inbound connections have become inactive, the "Dynamic DNS" script will be called.
       -n, --in          Configure inbound cluster connection (p2p <-- wallet, p2p <-- stratum, or p2p <-- electrum)
@@ -230,5 +230,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.187"
+    echo "Script Version 0.188"
 fi
