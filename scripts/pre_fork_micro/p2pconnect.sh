@@ -171,14 +171,14 @@ elif [[ $1 = "-p" || $1 = "--p2p" ]]; then # Make p2p inbound/outbound connectio
     cat << EOF | sudo tee /etc/default/p2pssh@${TMSTAMP}
 # ${CONNNAME}
 LOCAL_PORT=${LOCALMICROPORT}
-TARGET=${TARGETADDRESS}
+TARGET=${BANKADDRESS}
 TARGET_PORT=${SSHPORT}
 EOF
     sudo systemctl enable p2pssh@${TMSTAMP} --now
 
     # Add the outbound connection to Bitcoin Core (micro) and update bitcoin.conf to be reestablish automatically upon restart or boot up
     sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf addnode localhost:${LOCALMICROPORT} "add"
-    echo "# ${CONNNAME}, CONN_ID: ${TMSTAMP}, ${TARGETADDRESS}:${SSHPORT}" | sudo tee -a /etc/bitcoin.conf # Add comment to the bitcoin.conf file
+    echo "# ${CONNNAME}, CONN_ID: ${TMSTAMP}, ${BANKADDRESS}:${SSHPORT}" | sudo tee -a /etc/bitcoin.conf # Add comment to the bitcoin.conf file
     echo "addnode=localhost:${LOCALMICROPORT}" | sudo tee -a /etc/bitcoin.conf # Add connection
 
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections
@@ -230,5 +230,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.186"
+    echo "Script Version 0.187"
 fi
