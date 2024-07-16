@@ -22,6 +22,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
     Log Location:   /var/log/dynamic_dns.log
     Supported DNS:  GoDaddy - Get your API Keys @ https://developer.godaddy.com (required subscription for GoDaddy's api to work; let's just call it NoDaddy)
                     Namecheap - Enable "Dynamic DNS" under adnvaced DNS managedment and it will provide the KEY (password)
+                    IONOS - In the API Developer Portal, create a set of API keys (Public & Private), enable the DDNS service, and authorize new API keys
 EOF
 
 elif [[ $1 = "--install" ]]; then # Install or update this script (dynamic_dns) in /usr/local/sbin (/satoshiware/microbank/scripts/dynamic_dns.sh)
@@ -179,6 +180,32 @@ elif [[ $1 = "--namecheap" ]]; then # Namecheap private routine (not in the help
     for ((i = 0 ; i < ${#RECORDS[@]} ; i++)); do
         curl -s "https://dynamicdns.park-your-domain.com/update?host=""${RECORDS[i]}""&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS" # Had to quote "${RECORDS[i]}" in order for the wildcard to work
     done
+
+elif [[ $1 = "--ionos" ]]; then # IONOS private routine (not in the help menu) to query or update/change the DNS record(s): IP_ADDRESS
+    IP_ADDRESS=$2
+    source /etc/default/dynamic_dns.env
+    if [[ -z $IP_ADDRESS ]]; then # If no IP_ADDRESS was passed then query and return the IP address from the DNS service
+        HOST=${RECORDS[0]}
+        if [[ $HOST = "@" ]]; then HOST=""
+        elif [[ $HOST = "*" ]]; then HOST="wildcardcouldbeanything."
+        else HOST="${HOST}."; fi
+        getent hosts $HOST$DOMAIN | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b"
+        exit 0
+    else
+        if [[ ! "$IP_ADDRESS" =~ ^(([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))\.){3}([1-9]?[0-9]|1[0-9][0-9]|2([0-4][0-9]|5[0-5]))$ ]]; then
+            echo "Error! IP address is not a valid IPv4 addres!"
+            exit 1
+        fi
+    fi
+
+    # Update each DNS record
+    for ((i = 0 ; i < ${#RECORDS[@]} ; i++)); do
+        curl -s "https://dynamicdns.park-your-domain.com/update?host=""${RECORDS[i]}""&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS" # Had to quote "${RECORDS[i]}" in order for the wildcard to work
+    done
+
+
+            https://ipv4.api.hosting.ionos.com/dns/v1/dyndns?q=NDFjZmM3YmVjYjQzNDRhMTkxMzliZDAwYzA2OGU3NzEuU2FvNlhuR2U4UmtxNGdiQzlMN19TLWpZanM4LWZBdGsxX2Ixa2FFUmRFWUp4Z1pmR3NWOVFpUjZYZGQ5TTZ5QjBIZkxSRFAyN2lzeHhCRWNuNVpSU0E
+https://www.ionos.com/help/domains/configuring-your-ip-address/set-up-dynamic-dns-with-company-name/
 
 else
     $0 --help
