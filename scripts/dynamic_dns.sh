@@ -16,13 +16,16 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --help        Display this help message and exit
       --install     Install or update this script (dynamic_dns) in /usr/local/sbin (/satoshiware/microbank/scripts/dynamic_dns.sh)
       --generate    (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/dynamic_dns.env
-      --update      Check for an IP address change and update, log, and report to adminstrator via email accordingly (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
+      --update      Check for an IP address change and update, log, and report to adminstrator via email accordingly (requires send_messages to be configured): RECIPIENTS_FIRST_NAME  EMAIL
       --getip       Query freely available external services to discover external IPv4 address
 
     Log Location:   /var/log/dynamic_dns.log
     Supported DNS:  GoDaddy - Get your API Keys @ https://developer.godaddy.com (required subscription for GoDaddy's api to work; let's just call it NoDaddy)
                     Namecheap - Enable "Dynamic DNS" under adnvaced DNS managedment and it will provide the KEY (password)
+                        Note: This doesn't use the "API Secret" in the --generate routine. Just leave it blank.
                     IONOS - In the API Developer Portal, create a set of API keys (Public & Private), enable the DDNS service, and authorize new API keys
+                        Note: This doesn't use "API Secret" --generate routine. Just leave it blank.
+                              For the "API Key", enter the full pre-formalized updating URL (including the "https://").
 EOF
 
 elif [[ $1 = "--install" ]]; then # Install or update this script (dynamic_dns) in /usr/local/sbin (/satoshiware/microbank/scripts/dynamic_dns.sh)
@@ -198,14 +201,8 @@ elif [[ $1 = "--ionos" ]]; then # IONOS private routine (not in the help menu) t
         fi
     fi
 
-    # Update each DNS record
-    for ((i = 0 ; i < ${#RECORDS[@]} ; i++)); do
-        curl -s "https://dynamicdns.park-your-domain.com/update?host=""${RECORDS[i]}""&domain=$DOMAIN&password=$KEY&ip=$IP_ADDRESS" # Had to quote "${RECORDS[i]}" in order for the wildcard to work
-    done
-
-
-            https://ipv4.api.hosting.ionos.com/dns/v1/dyndns?q=NDFjZmM3YmVjYjQzNDRhMTkxMzliZDAwYzA2OGU3NzEuU2FvNlhuR2U4UmtxNGdiQzlMN19TLWpZanM4LWZBdGsxX2Ixa2FFUmRFWUp4Z1pmR3NWOVFpUjZYZGQ5TTZ5QjBIZkxSRFAyN2lzeHhCRWNuNVpSU0E
-https://www.ionos.com/help/domains/configuring-your-ip-address/set-up-dynamic-dns-with-company-name/
+    # Update the DNS record(s)
+    curl -s $KEY
 
 else
     $0 --help

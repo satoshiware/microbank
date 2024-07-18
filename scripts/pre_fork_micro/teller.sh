@@ -21,8 +21,8 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --help        Display this help message and exit
       --install     Install (or upgrade) this script (teller) in /usr/local/sbin (/satoshiware/microbank/scripts/pre_fork_micro/teller.sh)
       --generate    (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/teller.env
-      --cron        (Re)Create a weekly cronjob to send a wallet email update at 6:30 AM on Monday: RECIPIENTS_NAME  EMAIL
-      --email       Email (send out) the wallet update (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
+      --cron        (Re)Create a weekly cronjob to send a wallet email update at 6:30 AM on Monday: RECIPIENTS_FIRST_NAME  EMAIL
+      --email       Email (send out) the wallet update (requires send_messages to be configured): RECIPIENTS_FIRST_NAME  EMAIL
 
       --watch       See all addresses being "watched" with corresponding details
                     Parameters: (ADDRESS)
@@ -371,5 +371,5 @@ elif [[ $1 = "--mempool" ]]; then # Show mempool stats
 
 else
     $0 --help
-    echo "Script Version 0.081"
+    echo "Script Version 0.082"
 fi

@@ -18,10 +18,10 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
     Options:
       -h, --help    Display this help message and exit
       --install     Install this script (poolu) in /usr/local/sbin/ (Repository: /satoshiware/microbank/scripts/pre_fork_micro/poolu.sh)
-      --cron-weekly (Re)Create a weekly cronjob to send mining status email at 6:30 AM on Monday: RECIPIENTS_NAME  EMAIL
-      --cron-error  (Re)Create an daily cronjob to notify (via email) of any problems: RECIPIENTS_NAME  EMAIL
-      --email       Email (send out) the mining status (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
-      --error       Check for errors and report to user via email (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
+      --cron-weekly (Re)Create a weekly cronjob to send mining status email at 6:30 AM on Monday: RECIPIENTS_FIRST_NAME  EMAIL
+      --cron-error  (Re)Create an daily cronjob to notify (via email) of any problems: RECIPIENTS_FIRST_NAME  EMAIL
+      --email       Email (send out) the mining status (requires send_messages to be configured): RECIPIENTS_FIRST_NAME  EMAIL
+      --error       Check for errors and report to user via email (requires send_messages to be configured): RECIPIENTS_FIRST_NAME  EMAIL
       --remote      Configure inbound connection for a remote mining operation
       --update      Delete log folders (/var/log/ckpool/00*) and if previous mining address has received coins then
                         load a new mining address (/etc/ckpool.conf), delete inactive users (7 days), and restart ckpool
@@ -267,5 +267,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters to s
 
 else
     $0 --help
-    echo "Script Version 0.151"
+    echo "Script Version 0.152"
 fi
