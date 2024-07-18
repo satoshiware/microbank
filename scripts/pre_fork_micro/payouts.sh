@@ -31,13 +31,13 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 
 # Load envrionment variables and then verify
-if [[ -f /etc/default/payouts.env && ! ($1 == "-i" || $1 == "--install") ]]; then
+if [[ -f /etc/default/payouts.env && ! ($1 == "-i" || $1 == "--install" || $1 == "-g" || $1 == "--generate") ]]; then
     source /etc/default/payouts.env
     if [[ -z $NETWORK || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $EXPLORER || -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $TX_BATCH_SZ || -z $ADMINISTRATOREMAIL ]]; then
         echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/payouts.env\" file"
         exit 1;
     fi
-elif [[ $1 == "-i" || $1 == "--install" ]]; then echo ""
+elif [[ $1 == "-i" || $1 == "--install" || $1 == "-g" || $1 == "--generate" ]]; then echo ""
 else
     echo "Error! The \"/etc/default/payouts.env\" environment file does not exist!"
     echo "Run this script with the \"-g\" or \"--generate\" parameter."
@@ -51,12 +51,6 @@ UNLOCK="$BTC -rpcwallet=bank walletpassphrase $(sudo cat /root/passphrase) 600"
 # Database Location and development mode
 SQ3DBNAME=/var/lib/payouts.db
 LOG=/var/log/payout.log
-SQ3DBNAME=~/tmp_payouts.db.development # This line is automatically commented out during the --install
-if [[ $SQ3DBNAME == *"development"* && ! ($1 == "-i" || $1 == "--install") ]]; then
-    LOG=~/log.payout.development
-    if [ ! -f ~/tmp_payouts.db.development ]; then sudo cp /var/lib/payouts.db ~/tmp_payouts.db.development; fi
-    echo ""; read -p "You are in development mode! Press enter to continue ..."; echo ""
-fi
 
 # See which payouts parameter was passed and execute accordingly
 if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
@@ -124,7 +118,6 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       Data Base:                /var/lib/payouts.db (~/tmp_payouts.db.development)
       Prepared Emails:          /var/tmp/payout.emails
       Previously Sent Emails:   /var/tmp/payout.emails.bak
-
 EOF
 
 elif [[ $1 = "-i" || $1 = "--install" ]]; then # Installs or updates this script (payouts) /w a "payouts -o" cron job (Run "crontab -e" as $USER to see all ${USER}'s cron jobs)
@@ -143,7 +136,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Installs or updates this script
         fi
     fi
 
-    sudo cat $0 | sed '/SQ3DBNAME=~\/tmp_payouts.db.development/d' | sudo tee /usr/local/sbin/payouts > /dev/null
+    sudo cat $0 | sudo tee /usr/local/sbin/payouts > /dev/null
     sudo chmod +x /usr/local/sbin/payouts
 
     # Add Cron Job (Every Two Hours) that will execute the "payouts -o" command as $USER. Run "crontab -e" as $USER to see all its cron jobs.
@@ -209,6 +202,7 @@ elif [[ $1 = "-b" || $1 = "--database" ]]; then # Creates an sqlite3 DB and then
         FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE);
     CREATE TABLE contracts (
         contract_id INTEGER PRIMARY KEY,
+        account_id INTEGER NOT NULL,
         sale_id INTEGER,
         quantity INTEGER NOT NULL,
         time INTEGER NOT NULL,
@@ -753,7 +747,7 @@ elif [[ $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
 
 elif [[ $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
-    echo ""; echo "Status: NOT_PAID = 0 or NULL; PAID = 1; TRIAL = 2; DISABLED = 3"
+    echo ""; echo "Status: DISABLED = 0 or NULL; ACTIVE = 1; TRIAL = 2"
     echo ""; echo "Note: The contract owners and contract buyers don't have to match."
     echo "Example: Someone may buy extra contracts for a friend."; echo ""
 
@@ -956,25 +950,6 @@ EOF
     # Query the DB
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE account_id = $ACCOUNT_ID"
 
-    # Let's see if the teller needs to make another bulk purchase
-    TOTAL=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
-    SOLD=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE active = 1 AND (SELECT contact FROM accounts WHERE account_id = contracts.account_id) = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
-        # NOTE: "$SOLD" is the qty of contracts that have been sold to customers AND allocated with the "--add-contr". Non allocated contracts will not count.
-    if [[ $((TOTAL - SOLD)) -lt 0 ]]; then
-        NAME=$(sqlite3 $SQ3DBNAME "SELECT (CASE WHEN accounts.preferred_name IS NULL THEN accounts.first_name ELSE accounts.preferred_name END) FROM accounts WHERE account_id = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
-        EMAIL=$(sqlite3 $SQ3DBNAME "SELECT email FROM accounts WHERE account_id = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
-
-        # Add bulk (teller) sales
-        while [[ $((TOTAL - SOLD)) -lt 0 ]]; do
-            $0 --add-sale $EMAIL $TELLERBULKPURCHASE TELLER_SALE
-            TOTAL=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = (SELECT contact FROM accounts WHERE email = '${USER_EMAIL,,}')")
-            echo "$(date) - Bulk teller sale was made (automatically) for $NAME ($EMAIL)!" | sudo tee -a $LOG
-        done
-
-        # Send email
-        /usr/local/sbin/send_messages -m "$NAME" "$EMAIL" "Bulk Hash Rate Purchase" "Hi $NAME,<br><br>Congratulations!!! You have purchased (automatically) some more hash rate (in bulk) to cover all your core customers!<br><br>At your convienence, negotiate payment (in SATS please) with your Lvl2 (Banker) Hub"
-    fi
-
 elif [[ $1 = "--disable-contr" ]]; then # Disable a contract
     MICRO_ADDRESS=$2; CONTRACT_ID=$3
 
@@ -1114,12 +1089,10 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
         exit 1
     fi
 
-    # Find out if the user has unpaid or trial mode sales
-    STATUS=$(sqlite3 $SQ3DBNAME "SELECT status FROM sales WHERE (SELECT account_id FROM accounts WHERE email = '$EMAIL') = account_id AND (status = 0 OR status = 2) ORDER BY status ASC LIMIT 1")
+    # Find out if the user has a trial mode sale and encourage him/her to make it official
+    STATUS=$(sqlite3 $SQ3DBNAME "SELECT status FROM sales WHERE (SELECT account_id FROM accounts WHERE email = '$EMAIL') = account_id AND status = 2 ORDER BY status ASC LIMIT 1")
     if [[ -z $STATUS ]]; then
         STATUS=""
-    elif [[ $STATUS -eq 0 ]]; then
-        STATUS="<br>Also, just a quick reminder to get the money (cash) sent to cover the unpaid mining contract(s)... Thank You!<br>"
     elif [[ $STATUS -eq 2 ]]; then
         STATUS="<br>Also, a quick reminder that this mining contract is in trial mode. Reach out today and let's make it official! Thank You!<br>"
     fi
@@ -1218,5 +1191,5 @@ EOF
 else
     echo "Method not found"
     echo "Run script with \"--help\" flag"
-    echo "Script Version 1.011"
+    echo "Script Version 1.02"
 fi
