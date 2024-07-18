@@ -144,7 +144,7 @@ elif [[ $1 = "-i" || $1 = "--install" ]]; then # Installs or updates this script
 
 elif [[ $1 = "-g" || $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/payouts.env
     echo "Generating the environment file /etc/default/payouts.env"
-    if [ ! -f /etc/default/payouts.env ]; then
+    if [ -f /etc/default/payouts.env ]; then
         echo "The environment file already exists!"
 
         read -p "Would you like to edit the file? (y|n): "
@@ -943,8 +943,8 @@ elif [[ $1 = "--add-contr" ]]; then # Add a contract
     ACCOUNT_ID=$(sqlite3 $SQ3DBNAME "SELECT account_id FROM accounts WHERE email = '${USER_EMAIL,,}'")
     sudo sqlite3 $SQ3DBNAME << EOF
         PRAGMA foreign_keys = ON;
-        INSERT INTO contracts (account_id, sale_id, quantity, time, active, delivered, micro_address)
-        VALUES ($ACCOUNT_ID, $SALE_ID, $QTY, $(date +%s), 1, 0, '${MICRO_ADDRESS,,}');
+        INSERT INTO contracts (account_id, sale_id, quantity, time, active, micro_address)
+        VALUES ($ACCOUNT_ID, $SALE_ID, $QTY, $(date +%s), 1, '${MICRO_ADDRESS,,}');
 EOF
 
     # Query the DB
@@ -1189,7 +1189,6 @@ EOF
     fi
 
 else
-    echo "Method not found"
-    echo "Run script with \"--help\" flag"
-    echo "Script Version 1.02"
+    $0 --help
+    echo "Script Version 1.03"
 fi
