@@ -598,15 +598,13 @@ elif [[ $1 = "-m" || $1 = "--email-prep" ]]; then # Prepare all core customer no
     tmp=$(sqlite3 $SQ3DBNAME << EOF
     SELECT
         accounts.account_id,
-        (CASE WHEN accounts.preferred_name IS NULL THEN accounts.first_name ELSE accounts.preferred_name END),
+        accounts.first_name,
         accounts.email,
         CAST(SUM(txs.amount) AS REAL) / 100000000,
         (SELECT CAST(SUM(amount) AS REAL) / 100000000
             FROM txs, contracts
             WHERE txs.contract_id = contracts.contract_id AND accounts.account_id = contracts.account_id),
-        SUM(contracts.quantity) * $HASHESPERCONTRACT / 1000000000,
-        (SELECT phone FROM accounts sub WHERE sub.account_id = accounts.contact),
-        (SELECT email FROM accounts sub WHERE sub.account_id = accounts.contact)
+        SUM(contracts.quantity) * $HASHESPERCONTRACT / 1000000000
     FROM accounts, txs, contracts
     WHERE accounts.account_id = contracts.account_id AND contracts.contract_id = txs.contract_id AND txs.epoch_period = (SELECT MAX(epoch_period) FROM payouts)
     GROUP BY accounts.account_id
@@ -667,18 +665,11 @@ EOF
         echo "$0 --email-master-summary ${master_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
     done
 
-    # Add Teller Summaries-emails to the list (payout.emails)
-    tmp=$(sudo sqlite3 $SQ3DBNAME "SELECT email FROM accounts WHERE EXISTS(SELECT * FROM accounts sub WHERE contact = accounts.account_id)")
-    eol=$'\n'; read -a contact_emails <<< ${tmp//$eol/ }
-    for i in "${!contact_emails[@]}"; do
-        echo "$0 --email-teller-summary ${contact_emails[$i]}" | sudo tee -a /var/tmp/payout.emails
-    done
-
     # Add command to send out banker summary on the list (payout.emails)
     echo "$0 --email-banker-summary" | sudo tee -a /var/tmp/payout.emails
 
     # Set the notified flag
-    sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
+    #############sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
 
     # Log Results
     echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)." | sudo tee -a $LOG
@@ -766,7 +757,7 @@ elif [[ $1 = "-t" || $1 = "--totals" ]]; then # Show total amounts for each cont
     sqlite3 $SQ3DBNAME << EOF
 .mode columns
     SELECT
-        accounts.first_name || COALESCE(' (' || accounts.preferred_name || ') ', ' ') || COALESCE(accounts.last_name, '') AS Name,
+        accounts.first_name || ' ' || COALESCE(accounts.last_name, '') AS Name,
         contracts.micro_address AS Address,
         CAST(SUM(txs.amount) as REAL) / 100000000 AS Total
     FROM accounts, contracts, txs
@@ -930,7 +921,7 @@ elif [[ $1 = "--add-contr" ]]; then # Add a contract
     total=$(sqlite3 $SQ3DBNAME "SELECT quantity FROM sales WHERE sale_id = $SALE_ID")
     assigned=$(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) FROM contracts WHERE sale_id = $SALE_ID AND active != 0")
     if [[ ! $QTY -le $((total - assigned)) ]]; then
-        echo "Error! The \"Sale ID\" provided cannot accommodate more than $((total - assigned)) \"shares\"!"
+        echo "Error! The \"Sale ID\" provided cannot accommodate any more than $((total - assigned)) \"shares\"!"
         exit 1
     fi
 
@@ -987,7 +978,7 @@ elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme ca
     echo ""; echo "After modification:"; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the administrator and manager
+elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administrator and manager
 
 
     MESSAGE="$MESSAGE<br><i>Note: <br>"
@@ -1004,7 +995,7 @@ elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary of tellers to the
 .separator ''
         SELECT
             '<tr>',
-            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
+            '<td>' || (SELECT first_name || ' ' || COALESCE(last_name, '') FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
             '<td>' || (SELECT email FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
             '<td>' || sale_id || '</td>',
             '<td>' || (quantity * $HASHESPERCONTRACT / 1000000000)  || '</td>',
@@ -1022,7 +1013,7 @@ EOF
 .separator ''
         SELECT
             '<tr>',
-            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '')) || '</td>',
+            '<td>' || (SELECT first_name || ' ' || COALESCE(last_name, '')) || '</td>',
             '<td>' || email || '</td>',
             '<td>' || COALESCE(((SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
             '<td>' || ((SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = accounts.account_id)) * $HASHESPERCONTRACT / 1000000000)  || '</td>',
@@ -1041,11 +1032,7 @@ elif [[ $1 = "--email-master-summary" ]]; then # Send sub account summary to a m
     MASTER_EMAIL=$2; EMAIL_ADMIN_IF_SET=$3
 
     NAME=$(sqlite3 $SQ3DBNAME << EOF
-        SELECT
-            CASE WHEN preferred_name IS NULL
-                THEN first_name
-                ELSE preferred_name
-            END
+        SELECT first_name
         FROM accounts
         WHERE email = '${MASTER_EMAIL,,}'
 EOF
@@ -1059,7 +1046,7 @@ EOF
 .separator ''
         SELECT
             '<tr>',
-            '<td>' || (SELECT first_name || COALESCE(' (' || preferred_name || ') ', ' ') || COALESCE(last_name, '') FROM accounts WHERE account_id = contracts.account_id) || '</td>',
+            '<td>' || (SELECT first_name || ' ' || COALESCE(last_name, '') FROM accounts WHERE account_id = contracts.account_id) || '</td>',
             '<td>' || (quantity * $HASHESPERCONTRACT / 1000000000)  || '</td>',
             '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
             '<td>' || micro_address || IIF(active = 2, ' (Opened)', '') || '</td>',
@@ -1190,5 +1177,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.04"
+    echo "Script Version 1.05"
 fi
