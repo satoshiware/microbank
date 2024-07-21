@@ -655,7 +655,7 @@ EOF
     # Format all the array data togethor for core customer emails and add them to the payout.emails file
     latest_epoch_period=$(sqlite3 $SQ3DBNAME "SELECT MAX(epoch_period) FROM payouts")
     for i in "${!notify_data[@]}"; do
-        echo "$0 --email-core-customer ${notify_data[$i]//|/ } \$SATRATE \$USDSATS $latest_epoch_period ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
+        echo "$0 --email-core-customer ${notify_data[$i]//|/ } \$CONTACT_PHONE \$CONTACT_EMAIL \$SATRATE \$USDSATS $latest_epoch_period ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Add Master emails to the list (payout.emails)
@@ -669,7 +669,7 @@ EOF
     echo "$0 --email-banker-summary" | sudo tee -a /var/tmp/payout.emails
 
     # Set the notified flag
-    #############sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
+    sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET notified = 1 WHERE notified IS NULL;"
 
     # Log Results
     echo "$(date) - $(wc -l < /var/tmp/payout.emails) email(s) have been prepared to send to customer(s)." | sudo tee -a $LOG
@@ -1177,5 +1177,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.05"
+    echo "Script Version 1.06"
 fi
