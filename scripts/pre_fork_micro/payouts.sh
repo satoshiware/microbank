@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# When do we install the send_messages routing?
 # We don't have anything the checks for the database being installed.
 # --email-banker-summary Needs some work!!!!!!!!
 
@@ -10,14 +9,6 @@
 #sms env file has keys and not secure.
 # Add text messaging. What about the ability to see market rates asap! This would be cool.
 # Making payouts crashes when utxos are low.
-
-# Make sure the send_messages --email routine is installed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#if ! command -v /usr/local/sbin/send_messages --email &> /dev/null; then
-#    echo "Error! The \"send_messages --email\" routine could not be found!" | sudo tee -a $LOG
-#    echo "Download the script and execute \"./send_messages --email.sh --install\" to install this routine."
-#    read -p "Press enter to continue ..."
-#fi
-
 
 
 
@@ -33,7 +24,7 @@ fi
 # Load envrionment variables and then verify
 if [[ -f /etc/default/payouts.env && ! ($1 == "-i" || $1 == "--install" || $1 == "-g" || $1 == "--generate") ]]; then
     source /etc/default/payouts.env
-    if [[ -z $NETWORK || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $EXPLORER || -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $TX_BATCH_SZ || -z $ADMINISTRATOREMAIL ]]; then
+    if [[ -z $NETWORK || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $EXPLORER || -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $TX_BATCH_SZ || -z $ADMINISTRATOREMAIL || -z $CONTACT_PHONE || -z $CONTACT_EMAIL ]]; then
         echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/payouts.env\" file"
         exit 1;
     fi
@@ -67,7 +58,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       -s, --send        Send the Money
       -c, --confirm     Confirm the sent payouts are confirmed in the blockchain; updates the DB
       -m, --email-prep  Prepare all core customer notification emails for the latest epoch
-      -n, --send-email  Sends all the prepared emails in the file "/var/tmp/payout.emails"
+      -n, --send-email  Sends all the prepared emails in the file "/var/tmp/payout.emails" (Requires send_messages to be installed/configured)
       -w, --crawl       Look for opened (previously spent) addresses
 
 ----- Generic Database Queries ----------------------------------------------------------------------------------------------
@@ -176,7 +167,10 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # (Re)Generate(s) the environmen
     read -p "Number of outputs for each send transaction (e.g. 10): "; echo "TX_BATCH_SZ=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
 
     read -p "Administrator email (e.g. your_email@somedomain.com): "; echo "ADMINISTRATOREMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
-    read -p "Manager email (e.g. friends_email@somedomain.com): "; echo "MANAGER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Manager email (e.g. friends_email@somedomain.com): "; echo "MANAGER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+    read -p "Customer Phone Contact: "; echo "CONTACT_PHONE=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+    read -p "Customer Email Contact: "; echo "CONTACT_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
 
 elif [[ $1 = "-b" || $1 = "--database" ]]; then # Creates an sqlite3 DB and then loads all available epochs from the blockchain
     SQ3DBNAME=/var/lib/payouts.db # Make sure it using the production (not the development) database
@@ -387,7 +381,7 @@ EOF
         echo "$ENTRY" | sudo tee -a $LOG
 
         # Send Email
-        fee_percent_diff=$(awk -v fee=$TOTAL_FEES -v payment=$total_payment 'BEGIN {printf("%.6f\n", ((fee / 100000000) / payment) * 100)}')
+        fee_percent_diff=$(awk -v fee=$TOTAL_FEES -v payment=$total 'BEGIN {printf("%.6f\n", ((fee / 100000000) / payment) * 100)}')
         bank_balance=$($BTC -rpcwallet=bank getbalance)
         t_payout="${t_payout//; /<br>}"
         MESSAGE=$(cat << EOF
@@ -443,6 +437,7 @@ elif [[ $1 = "-s" || $1 = "--send" ]]; then # Send the Money
         message="$(date) - Not enough money in the bank to send payouts! The bank has $bank_balance $DENOMINATION, but it needs $((total_payment + 100000000)) $DENOMINATION before any payouts will be sent."
         echo $message | sudo tee -a $LOG
         /usr/local/sbin/send_messages --email "Satoshi" "${ADMINISTRATOREMAIL}" "Not Enough Money in The Bank" "$message"
+        exit 0
     fi
 
     # Query db for tx_id, address, and amount - preparation to send out first set of payments
@@ -1177,5 +1172,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.06"
+    echo "Script Version 1.07"
 fi
