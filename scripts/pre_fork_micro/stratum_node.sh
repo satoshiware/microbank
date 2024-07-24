@@ -294,16 +294,29 @@ sudo systemctl enable ssh
 sudo systemctl enable bitcoind --now
 echo "waiting a few seconds for bitcoind to start"; sleep 15
 
+# Find the unmounted device /dev/sd?1. This device is assumbed to be the usb thumb drive if connected per instructions
+mapfile -t disks < <( lsblk | grep "sd[a|b]1.*part" )
+for i in "${disks[@]}"; do
+    i=$(echo $i | cut -d ' ' -f 1)
+    i="s$(echo $i | cut -d 's' -f 2)"
+
+    exists=$(mount | grep "/dev/$i ")
+    if [[ ! -z $exists ]]; then
+        usb_device=$(echo $i)
+        break
+    fi
+done
+
 # Copy (via USB) & load the (encrypted) mining wallet (generated on the "Wallet" micronode)
 sudo mkdir -p /media/usb
-sudo mount /dev/sda1 /media/usb
+sudo mount /dev/$usb_device /media/usb
 sudo systemctl daemon-reload # Take changed configurations from filesystem and regenerate dependency trees
 
 sudo -u bitcoin mkdir -p /var/lib/bitcoin/micro/wallets/mining
 sudo chmod 700 /var/lib/bitcoin/micro/wallets/mining
 sudo install -C -m 600 -o bitcoin -g bitcoin /media/usb/mining.dat /var/lib/bitcoin/micro/wallets/mining/wallet.dat
 
-sudo umount /dev/sda1
+sudo umount /dev/$usb_device
 
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf loadwallet mining true
 
