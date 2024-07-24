@@ -214,15 +214,27 @@ sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="mining" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
+# Find the unmounted device /dev/sd?1. This device is assumbed to be the usb thumb drive if connected per instructions
+mapfile -t disks < <( lsblk | grep "sd[a|b]1.*part" )
+for i in "${disks[@]}"; do
+    i=$(echo $i | cut -d ' ' -f 1)
+    i="s$(echo $i | cut -d 's' -f 2)"
+
+    exists=$(mount | grep "/dev/$i ")
+    if [[ ! -z $exists ]]; then
+        usb_device=$(echo $i)
+        break
+    fi
+done
+
 # Backup Wallets
 sudo mkdir -p /media/usb
-sudo mount /dev/sda1 /media/usb
+sudo mount /dev/$usb_device /media/usb
 sudo systemctl daemon-reload # Take changed configurations from filesystem and regenerate dependency trees
 sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/mining/wallet.dat /media/usb/mining.dat
 sudo install -C -m 400 /var/lib/bitcoin/micro/wallets/bank/wallet.dat /media/usb/bank.dat
 sudo install -C -m 400 /root/passphrase /media/usb/passphrase
-sudo umount /dev/sda1
-sudo rm -rf /media/usb
+sudo umount /dev/$usb_device
 
 # Create Aliases to lock and unlocks (24 Hours) wallets
 echo "alias unlockwallets=\"btc -rpcwallet=mining walletpassphrase \\\$(sudo cat /root/passphrase) 86400; btc -rpcwallet=bank walletpassphrase \\\$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
