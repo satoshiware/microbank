@@ -25,6 +25,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
       --remote      Configure inbound connection for a remote mining operation
       --update      Delete log folders (/var/log/ckpool/00*) and if previous mining address has received coins then
                         load a new mining address (/etc/ckpool.conf), delete inactive users (7 days), and restart ckpool
+						Note: cron job installed (with --install routine) to run this routine every hour
       -s, --status  View the current status of the pool (sudo systemctl status ckpool)
       -m, --miners  Show pool status (/var/log/ckpool/pool/pool.status) and local miners with their respective hashrates (/var/log/ckpool/users)
       -b, --blocks  List the latest (40) blocks solved
