@@ -301,7 +301,7 @@ for i in "${disks[@]}"; do
     i="s$(echo $i | cut -d 's' -f 2)"
 
     exists=$(mount | grep "/dev/$i ")
-    if [[ ! -z $exists ]]; then
+    if [[ -z $exists ]]; then
         usb_device=$(echo $i)
         break
     fi
