@@ -21,7 +21,7 @@ This script creates a remote mining access point to stratum node (within a clust
 This way, mining operation can be on seperate networks from the mining (stratum) node.
 
 Once setup and running, miners on the same local network can be directed to the following address:
-    stratum+tcp://$(hostname -I | tr -d '[:blank:]'):3333
+    stratum+tcp://$(hostname).local:3333
 
 FYI:
     The "$USER/.ssh/authorized_keys" file contains administrator login keys.
@@ -71,12 +71,14 @@ WantedBy=multi-user.target
 EOF
 
 # Display this remote mining bridge information
+echo ""; echo "-----------------------------------------------------------------------------------"; echo "-----------------------------------------------------------------------------------"; echo "-----------------------------------------------------------------------------------"
 echo "Hostname: $(hostname)" | sudo tee -a /etc/micronode.info
 echo "Local IP: $(hostname -I)" | sudo tee -a /etc/micronode.info
 echo "This P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)"
+echo "-----------------------------------------------------------------------------------"; echo ""
 
 # Get the necessary details to connect to the Level 3 node
-echo "Need to get the details in order to connect this remote mining bridge to your level 3 node..."
+echo "Need to get the details in order to connect this remote mining bridge to your stratum node..."
 read -p "Target's Host (Public) Key: " HOSTKEY
 read -p "Target's Address: " TARGETADDRESS
 read -p "Target's SSH PORT (default = 19024): " SSHPORT; if [ -z $SSHPORT ]; then SSHPORT="19024"; fi
