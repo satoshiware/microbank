@@ -1106,7 +1106,7 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
                     <td></td>
                     <td>See Link</td>
                     <td></td><td></td><td></td><td></td><td></td>
-                    <td>https://docs.google.com/spreadsheets/d/1JE6nsqXlbMGUAA9YuYAwfJujg0IozsRkdZx9TM6B49o/edit?usp=sharing</td>
+                    <td>$SATRATE</td>
                 </tr>
                 <tr>
                     <td></td>
@@ -1161,5 +1161,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.08"
+    echo "Script Version 1.09"
 fi
