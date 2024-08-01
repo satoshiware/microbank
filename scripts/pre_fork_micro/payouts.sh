@@ -650,7 +650,7 @@ EOF
     # Format all the array data togethor for core customer emails and add them to the payout.emails file
     latest_epoch_period=$(sqlite3 $SQ3DBNAME "SELECT MAX(epoch_period) FROM payouts")
     for i in "${!notify_data[@]}"; do
-        echo "$0 --email-core-customer ${notify_data[$i]//|/ } \$CONTACT_PHONE \$CONTACT_EMAIL \$SATRATE \$USDSATS $latest_epoch_period ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
+        echo "$0 --email-core-customer ${notify_data[$i]//|/ } $latest_epoch_period ${addresses[$i]#*.} ${txids[$i]#*.}" | sudo tee -a /var/tmp/payout.emails
     done
 
     # Add Master emails to the list (payout.emails)
@@ -682,16 +682,9 @@ elif [[ $1 = "-n" || $1 = "--send-email" ]]; then # Sends all the prepared email
         exit
     fi
 
-    # Get market data
-    old_satrate=$(sqlite3 $SQ3DBNAME "SELECT satrate FROM payouts WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) - 1")
-    SATRATE=$(/usr/local/sbin/market --getmicrorate $old_satrate)
-    USDSATS=$(/usr/local/sbin/market --getusdrate)
-    if [[ -z $SATRATE || -z $USDSATS ]]; then echo "Error! Could not get market rates!"; exit 1; fi
-    sudo sqlite3 $SQ3DBNAME "UPDATE payouts SET satrate = $SATRATE WHERE epoch_period = (SELECT MAX(epoch_period) FROM payouts) AND satrate IS NULL"
-
     # Sending Emails NOW!!
-    echo "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!" | sudo tee -a $LOG
-    /usr/local/sbin/send_messages --email "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now! Market data: SATRATE=$SATRATE; USDSATS=$USDSATS!"
+    echo "$(date) - Sending all the prepared emails right now!" | sudo tee -a $LOG
+    /usr/local/sbin/send_messages --email "Satoshi" "${ADMINISTRATOREMAIL}" "SENDING EMAILS NOW!!!" "$(date) - Sending all the prepared emails right now!"
     sudo mv /var/tmp/payout.emails /var/tmp/payout.emails.bak
     sudo touch /var/tmp/payout.emails
     while read -r line; do
@@ -1094,7 +1087,7 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
             You have successfully mined <b><u>$AMOUNT</u></b> coins on the \"${NETWORK}\" network ${CLARIFY}with a hashrate of <b>${HASHRATE} GH/s</b> to the following address(es):<br><br>
             <b>${ADDRESSES}</b><br><br>
             So far, you have mined a total of <b><u>${TOTAL}</u></b> coins<sup>${NETWORKPREFIX}</sup>.<br>
-            Please visit the link below (under Market Data) to see the value of your AZ coins.<br><br>
+            Please visit the link below (under <b><u>Market Data</u></b>) to see the value of your AZ coins.<br><br>
             Notice! Always ensure the key(s) associated with this/these address(es) are in your possession!!
             Please reach out ASAP if you need a new savings card!<br>
             ${STATUS}
@@ -1112,7 +1105,7 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
                     <td></td>
                     <td>Total ${NETWORKPREFIX} Coins</td>
                     <td></td><td></td><td></td><td></td><td></td>
-                    <td>$(echo $(sqlite3 $SQ3DBNAME "SELECT SUM(subsidy) * $EPOCHBLOCKS / 100000000 FROM payouts"))</td>
+                    <td>$(awk -v total=$(sqlite3 $SQ3DBNAME "SELECT SUM(subsidy) * $EPOCHBLOCKS / 100000000 FROM payouts") 'BEGIN {printf "%'"'"'.0f\n", total}') Coins</td>
                 </tr>
             </table><br>
 
@@ -1154,5 +1147,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.12"
+    echo "Script Version 1.14"
 fi
