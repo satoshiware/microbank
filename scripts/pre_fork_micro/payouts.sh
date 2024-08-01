@@ -24,7 +24,7 @@ fi
 # Load envrionment variables and then verify
 if [[ -f /etc/default/payouts.env && ! ($1 == "-i" || $1 == "--install" || $1 == "-g" || $1 == "--generate") ]]; then
     source /etc/default/payouts.env
-    if [[ -z $NETWORK || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $EXPLORER || -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $TX_BATCH_SZ || -z $ADMINISTRATOREMAIL || -z $CONTACT_PHONE || -z $CONTACT_EMAIL ]]; then
+    if [[ -z $NETWORK || -z $NETWORKPREFIX || -z $DENOMINATION || -z $DENOMINATIONNAME || -z $INITIALREWARD || -z $EPOCHBLOCKS || -z $HALVINGINTERVAL || -z $HASHESPERCONTRACT || -z $BLOCKINTERVAL || -z $TX_BATCH_SZ || -z $ADMINISTRATOREMAIL || -z $CONTACT_PHONE || -z $CONTACT_EMAIL || -z $MARKET_LINK ]]; then
         echo ""; echo "Error! Not all variables have proper assignments in the \"/etc/default/payouts.env\" file"
         exit 1;
     fi
@@ -94,8 +94,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
 ----- Messaging -------------------------------------------------------------------------------------------------------------
       --email-banker-summary    Send summary to the administrator (Satoshi) and manager (Bitcoin CEO)
       --email-core-customer     Send payout email to "core customer"
-                                Parameters: NAME; EMAIL; AMOUNT; TOTAL; HASHRATE; CONTACTPHONE; CONTACTEMAIL; COINVALUESATS;
-                                            USDVALUESATS; ADDRESSES; TXIDS; (EMAIL_ADMIN_IF_SET)
+                                Parameters: NAME; EMAIL; AMOUNT; TOTAL; HASHRATE; ADDRESSES; TXIDS; (EMAIL_ADMIN_IF_SET)
       --email-master-summary    Send sub account(s) summary to a master
                                 Parameters: EMAIL  (EMAIL_ADMIN_IF_SET)
 
@@ -155,7 +154,6 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # (Re)Generate(s) the environmen
     read -p "Network Prefix (e.g. AZ): "; echo "NETWORKPREFIX=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
     read -p "Denomination (e.g. SAGZ): "; echo "DENOMINATION=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
     read -p "Denomination Name (e.g. saguaros): "; echo "DENOMINATIONNAME=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
-    read -p "Microcurrency Block Explorer (e.g. <a href=https://somemicrocurrency.com/explorer><u>Some microcurrency Explorer</u></a>): "; echo "EXPLORER=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null; echo "" | sudo tee -a /etc/default/payouts.env > /dev/null
 
     read -p "Initial block subsidy (e.g. 1500000000): "; echo "INITIALREWARD=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null; INITIALREWARD=$REPLY
     read -p "Number of blocks before each difficulty adjustment (e.g. 1440): "; echo "EPOCHBLOCKS=$REPLY" | sudo tee -a /etc/default/payouts.env > /dev/null
@@ -171,6 +169,8 @@ elif [[ $1 = "-g" || $1 = "--generate" ]]; then # (Re)Generate(s) the environmen
 
     read -p "Customer Phone Contact: "; echo "CONTACT_PHONE=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
     read -p "Customer Email Contact: "; echo "CONTACT_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
+
+    read -p "URL Link to Market Data: "; echo "MARKET_LINK=\"$REPLY\"" | sudo tee -a /etc/default/payouts.env > /dev/null
 
 elif [[ $1 = "-b" || $1 = "--database" ]]; then # Creates an sqlite3 DB and then loads all available epochs from the blockchain
     SQ3DBNAME=/var/lib/payouts.db # Make sure it using the production (not the development) database
@@ -1060,10 +1060,10 @@ EOF
     fi
 
 elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core customer
-    NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; CONTACTPHONE=$7; CONTACTEMAIL=$8; COINVALUESATS=$9; USDVALUESATS=${10}; LATEST_EPOCH_PERIOD=${11}; ADDRESSES=${12}; TXIDS=${13}; EMAIL_ADMIN_IF_SET=${14}
+    NAME=$2; EMAIL=$3; AMOUNT=$4; TOTAL=$5; HASHRATE=$6; LATEST_EPOCH_PERIOD=$7; ADDRESSES=$8; TXIDS=$9; EMAIL_ADMIN_IF_SET=${10}
 
     # Input checking
-    if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $CONTACTPHONE || -z $CONTACTEMAIL || -z $COINVALUESATS || -z $USDVALUESATS || -z $ADDRESSES || -z $TXIDS ]]; then
+    if [[ -z $NAME || -z $EMAIL || -z $AMOUNT || -z $TOTAL || -z $HASHRATE || -z $ADDRESSES || -z $TXIDS ]]; then
         echo "Error! Insufficient Parameters!"
         exit 1
     elif [[ ! $(echo "${ADDRESSES}" | awk '{print toupper($0)}') == *"${NETWORKPREFIX}1Q"* ]]; then
@@ -1093,10 +1093,10 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
 
             You have successfully mined <b><u>$AMOUNT</u></b> coins on the \"${NETWORK}\" network ${CLARIFY}with a hashrate of <b>${HASHRATE} GH/s</b> to the following address(es):<br><br>
             <b>${ADDRESSES}</b><br><br>
-            So far, you have mined a total of <b><u>${TOTAL}</u></b> coins<sup>${NETWORKPREFIX}</sup> worth <b>$(awk -v total=${TOTAL} -v coinvaluesats=${COINVALUESATS} 'BEGIN {printf "%'"'"'.2f\n", total * coinvaluesats}') \$ATS </b><sup>(\$$(awk -v total=${TOTAL} -v coinvaluesats=${COINVALUESATS} -v usdvaluesats=${USDVALUESATS} 'BEGIN {printf "%'"'"'.2f\n", total * coinvaluesats / usdvaluesats}') USD)</sup> as of this email!<br><br>
+            So far, you have mined a total of <b><u>${TOTAL}</u></b> coins<sup>${NETWORKPREFIX}</sup>.<br>
+            Please visit the link below (under Market Data) to see the value of your AZ coins.<br><br>
             Notice! Always ensure the key(s) associated with this/these address(es) are in your possession!!
-            Please reach out ASAP if you need a new savings card!<br><br>
-            Please utilize our ${NETWORK} block explorer to get more details on an address or TXID: $EXPLORER<br>
+            Please reach out ASAP if you need a new savings card!<br>
             ${STATUS}
             <br><hr><br>
 
@@ -1106,7 +1106,7 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
                     <td></td>
                     <td>See Link</td>
                     <td></td><td></td><td></td><td></td><td></td>
-                    <td>${COINVALUESATS}</td>
+                    <td>${MARKET_LINK}</td>
                 </tr>
                 <tr>
                     <td></td>
@@ -1131,22 +1131,15 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
                 </tr>
             </table><br>
 
-            <b><u>Contact Details</u></b><br>
+            <b><u>Contact Information</u></b><br>
             <ul>
-                <li>${CONTACTPHONE}</li>
-                <li>${CONTACTEMAIL}</li>
+                <li>${CONTACT_PHONE}</li>
+                <li>${CONTACT_EMAIL}</li>
             </ul><br>
 
             <b><u>TXID(s):</u></b><br>
             <ul>
                 <li>${TXIDS}</li>
-            </ul><br>
-
-            <b><u>We\`re Here to Help!</u></b><br>
-            <ul>
-                <li>Don't hesitate to reach out to purchase more mining power!!!</li>
-                <li>If you’re interested in mining for yourself, ask us about the ${NETWORKPREFIX} / BTC Quarter Stick miner.</li>
-                <li>To join the \"${NETWORKPREFIX} Money\" community and the discussion check out the forum @ <a href=\"https://forum.satoshiware.org\"><u><i>forum.satoshiware.org</i></u></a></li>
             </ul><br>
         </body></html>
 EOF
@@ -1161,5 +1154,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.11"
+    echo "Script Version 1.12"
 fi
