@@ -1106,11 +1106,11 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
                     <td></td>
                     <td>See Link</td>
                     <td></td><td></td><td></td><td></td><td></td>
-                    <td>$SATRATE</td>
+                    <td>${COINVALUESATS}</td>
                 </tr>
                 <tr>
                     <td></td>
-                    <td>Total ${NETWORKPREFIX} Coins</sup></td>
+                    <td>Total ${NETWORKPREFIX} Coins</td>
                     <td></td><td></td><td></td><td></td><td></td>
                     <td>$(echo $(sqlite3 $SQ3DBNAME "SELECT SUM(subsidy) * $EPOCHBLOCKS / 100000000 FROM payouts"))</td>
                 </tr>
@@ -1161,5 +1161,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.09"
+    echo "Script Version 1.11"
 fi
