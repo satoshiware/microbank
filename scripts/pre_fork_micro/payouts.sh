@@ -1086,9 +1086,11 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
             You have successfully mined <b><u>$AMOUNT</u></b> coins on the \"${NETWORK}\" network ${CLARIFY}with a hashrate of <b>${HASHRATE} GH/s</b> to the following address(es):<br><br>
             <b>${ADDRESSES}</b><br><br>
             So far, you have mined a total of <b><u>${TOTAL}</u></b> coins<sup>${NETWORKPREFIX}</sup>.<br>
-            Please visit the following link (for The AZ Money Exchange) to see the value of your AZ coins:<br>
-            <a>${MARKET_LINK}</a><br>
-            <u><i>If you'd like to buy more AZ Money, or sell any you currently have, please contact us today via email or text (contact info below) to get started!<br><br>
+            Please visit the following link (for The AZ Money Exchange) to see the value of your AZ coins:<br><br>
+
+            <a>${MARKET_LINK}</a><br><br>
+
+            <i>If you'd like to buy more AZ Money, or sell any you currently have, please contact us today via email or text (contact info below) to get started!<br><br>
 
             Notice! Always ensure the key(s) associated with this/these address(es) are in your possession!!
             Please reach out ASAP if you need a new savings card!<br>
@@ -1149,5 +1151,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.15"
+    echo "Script Version 1.16"
 fi
