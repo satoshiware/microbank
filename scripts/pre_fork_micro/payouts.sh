@@ -1090,7 +1090,7 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
 
             <a>${MARKET_LINK}</a><br><br>
 
-            <i>If you'd like to buy more AZ Money, or sell any you currently have, please contact us today via email or text (contact info below) to get started!<br><br>
+            <i>If you would like to buy more AZ Money, or sell any you currently have, please contact us today via email or text (contact info below) to get started!<br><br>
 
             Notice! Always ensure the key(s) associated with this/these address(es) are in your possession!!
             Please reach out ASAP if you need a new savings card!<br>
