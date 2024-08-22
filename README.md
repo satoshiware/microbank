@@ -71,7 +71,7 @@ Critical data is encrypted and backed up off site (e.g. Amazon or Google cloud).
 Scripts should be able to run both x86 and ARM (both 64 bit) and maybe even RISC-V at some point in the future.
 
 ### **Methodology**
-Minimum Linux Install (e.g. ArchLinux) managing KVM Type 1 Virtualized Containers
+Minimum Linux Install w/ KVM Type 1 Virtualized Containers
 - VM1… Linux OS w/ Service1
 - VM2… Linux OS w/ Service2
       <br>:
