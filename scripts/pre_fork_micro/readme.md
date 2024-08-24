@@ -7,15 +7,15 @@ To execute any of these scripts, login as a sudo user (that is not root) and exe
     cd ~; git clone https://github.com/satoshiware/microbank
     bash ./microbank/scripts/pre_fork_micro/$SCRIPT_NAME.sh
 
-	rm -rf ~/microbank # After reboot, delete the microbank folder from the home directory.
-	
+    rm -rf ~/microbank # After reboot, delete the microbank folder from the home directory.
+
 # cross-compile_micro.sh
 This file generates the binanries (and sha 256 checksums) for bitcoin core (microcurrency edition)
 from the https://github.com/satoshiware/bitcoin repository. This script was made for linux
 x86 64 bit and has been tested on Debian 11/12 (w/ WSL).
 Compilation Supported Processors:
-	x86 64 bit (x86_64)
-	ARM 64 bit (aarch64-linux-gnu)
+    x86 64 bit (x86_64)
+    ARM 64 bit (aarch64-linux-gnu)
 
 # p2p_node.sh
 This script installs a "p2p" micronode (within a cluster) which is used to manage connections with all other internal and external nodes.
@@ -27,12 +27,12 @@ Recommended Hardware:
     4GB RAM
     M.2 PCI SSD 500MB
     Netgear 5 Port Switch (PoE+ @ 120W)
-	
+
 Utility script(s) installed:
-	p2pconnect.sh
-	send_messages.sh
-	dynamic_dns.sh
-	
+    p2pconnect.sh
+    send_messages.sh
+    dynamic_dns.sh
+
 
 # wallet_node.sh
 The "wallet_node.sh" script installs a "wallet" micronode (within a cluster).
@@ -47,13 +47,13 @@ Recommended Hardware:
     4GB RAM
     M.2 PCI SSD 500MB
     Netgear 5 Port Switch (PoE+ @ 120W)
-	** USB Drive **
-	
+    ** USB Drive **
+
 Utility script(s) installed:
-	mnconnect.sh
-	teller.sh
-	payouts.sh
-	send_messages.sh
+    mnconnect.sh
+    teller.sh
+    payouts.sh
+    send_messages.sh
 
 # stratum_node.sh
 This script installs a "stratum" micronode (within a cluster).
@@ -67,14 +67,14 @@ Recommended Hardware:
     4GB RAM
     M.2 PCI SSD 500MB
     Netgear 5 Port Switch (PoE+ @ 120W)
-	
-	**USB from the wallet creation
+
+    **USB from the wallet creation
 
 Utility script(s) installed:
-	mnconnect.sh
-	stmutility.sh
-	send_messages.sh
-	
+    mnconnect.sh
+    stmutility.sh
+    send_messages.sh
+
 # electrs_node.sh ######## Still under active development: Add electrs (Rust) https://github.com/romanz/electrs, update readme information and comments ########
 This script installs a "electrs" micronode (within a cluster).
 The electrs server indexes the entire Bitcoin blockchain, and the resulting index enables fast queries for any given user wallet,
@@ -87,9 +87,9 @@ Recommended Hardware:
     8GB RAM
     M.2 PCI SSD 1TB
     Netgear 5 Port Switch (PoE+ @ 120W)
-	
+
 Utility script(s) installed:
-	mnconnect.sh
+    mnconnect.sh
 
 # stratum_remote.sh
 This script will create a remote mining access point to stratum node (within a cluster).
@@ -111,7 +111,32 @@ Recommended Hardware:
     Aluminum Passive Case
     OTG Micro USB Ethernet Adapter
     USB Power Supply
-	
+
+# gekko_host.sh
+This script creates a host (using cgminer) to operate miners produced by Gekko Science.
+
+Once setup and running, connect Gekko miners to this host and they will automatically start running.
+
+Direct your web browser to "http://$(hostname).local" to see mining stats.
+See cgminer log on the web server @ http://$(hostname).local/log.html (updated every 5 minutes)
+See latest cgminer screen shot @ http://$(hostname).local/screen.html (updated every 5 minutes)
+
+Use the "cgctl" utility (installed with this script) to start, stop, and restart cgminer
+as well as generate logs and screen shots for the webpage.
+
+FYI:
+    The "$USER/.ssh/authorized_keys" file contains administrator login keys.
+    The "/etc/cgminer.conf" file contains the cgminer configuration.
+    sudo systemctl status cgminer # View the running status of cgminer.
+    The "/var/log/cgminer/cgminer.log" file contains the logging information.
+    Support webpage: https://kano.is/gekko.php
+
+Recommended Hardware:
+    Rasperry Pi Zero 2 W
+    Aluminum Passive Case
+    micro usb hub (to connect the miners)
+    USB Power Supply
+
 ##################################### SUPPORT UTILITIES #############################################
 # p2pconnect.sh // Install the p2p micronode connect utility (p2pconnect.sh)
 
@@ -125,7 +150,7 @@ Recommended Hardware:
 # Communication???? Back a directory...
 
 # Goddady Dynamic DNS???
-	
+
 
 
 
