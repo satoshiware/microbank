@@ -6,8 +6,8 @@ To execute any of these scripts, login as a sudo user (that is not root) and exe
     sudo apt-get -y install git
     cd ~; git clone https://github.com/satoshiware/microbank
     bash ./microbank/scripts/pre_fork_micro/$SCRIPT_NAME.sh
-
     rm -rf ~/microbank # After reboot, delete the microbank folder from the home directory.
+	sudo reboot now
 
 # cross-compile_micro.sh
 This file generates the binanries (and sha 256 checksums) for bitcoin core (microcurrency edition)
