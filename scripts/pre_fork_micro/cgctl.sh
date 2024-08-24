@@ -41,7 +41,6 @@ elif [[ $1 = "--install" ]]; then # Installs or updates this script (payouts) /w
 
     # Add Cron Jobs
     (crontab -l | grep -v -F "/usr/local/sbin/cgctl --start" ; echo "@reboot /bin/bash -lc \"/usr/local/sbin/cgctl --start\"" ) | crontab - # Start cgminer @ boot
-    (crontab -l | grep -v -F "sleep" ; echo "@reboot /bin/bash -lc \"sleep 60; /usr/local/sbin/cgctl --log; /usr/local/sbin/cgctl --screen\"" ) | crontab - # Update log and screen shot on the web shortly after bootup
     (crontab -l | grep -v -F "/usr/local/sbin/cgctl --log" ; echo "*/5 * * * * /bin/bash -lc \"/usr/local/sbin/cgctl --log\"" ) | crontab - # Cron Job: Update log (on the web) every 5 minutes
     (crontab -l | grep -v -F "/usr/local/sbin/cgctl --screen" ; echo "*/5 * * * * /bin/bash -lc \"/usr/local/sbin/cgctl --screen\"" ) | crontab - # Cron Job: Update screen shot (on the web) every 5 minutes
     (crontab -l | grep -v -F "/usr/local/sbin/cgctl --restart" ; echo "0 0 * * * /bin/bash -lc \"/usr/local/sbin/cgctl --restart\"" ) | crontab - # Cron Job: Restart every day
