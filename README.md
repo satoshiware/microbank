@@ -99,3 +99,49 @@ Minimum Linux Install w/ KVM Type 1 Virtualized Containers
 - Email (Dovecot/Postfix/Rspamd/PostgreSQL)
 - NTP Time
 - Backup
+
+# Initial Setup
+- Download Debian ISO (AMD64 or ARM64): debian.org/distrib/netinst
+  - Download & Run Latest Rufus Version (Windows): github.com/pbatard/rufus/releases
+  - Connect a USB Drive (4GB+) & Select The Device in Rufus
+  - Select “debian-xx.x.x-xxx64-netinst.iso” Image
+  - Leave Most Settings @ Default Values
+    - Partition scheme: 	GPT
+    - Target system:	UEFI
+  - Click “Start”
+- Connect USB Drive to the microbank node
+- Configure BIOS (microbank node) & Override Boot Device
+  - Setup RAID Configurations
+  - Configure NVME boot device
+  - Setup One-Shot Boot Override to USB Drive
+  - Save Configuration and Exit
+- When Debian Install Screen Appears, Select “Install” and continue…
+- Here are the settings we used for our installation. Adjust as needed.
+  - Language: 		English
+  - Territory:		United States
+  - Keymap:		American English
+  - Network Interface: 	exxxx
+  - Hostname:		az-microbank
+  - Domain Name:	microbank.btcofaz.com
+  - Root Password:	<Leave Blank>
+  - Verify Password:	<Leave Blank>
+  - User’s Name:		<Leave Blank>
+  - Username:		satoshi
+  - Password:		satoshi
+  - Verify Password	satoshi
+  - Time Zone: 		Arizona
+  - Partitioning Method:	Entire Disk with LVM (/wo software encryption)
+    - Disk:			/dev/nvmexxx
+    - Partitioning Method:	All files in one partition
+    - <ins>*Remove existing logical volume data*</ins>
+    - <ins>*Write changes and configure LVM*</ins>
+    - Partitioning Size:	max
+    - <ins>*Write changes to disk*</ins>
+  - Mirror Country:	United States
+  - Archive Mirror:		deb.debian.org
+  - HTTP Proxy:		<Leave Blank>
+  - Participate in Survey:	No
+  - Software Install:	DESELECT ALL – SELECT “<ins>SSH server</ins>” ONLY
+  - <ins>*Select continue to reboot*</ins>
+
+
