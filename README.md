@@ -121,16 +121,16 @@ Minimum Linux Install w/ KVM Type 1 Virtualized Containers
   - Territory:		United States
   - Keymap:		American English
   - Network Interface: 	exxxx
-  - Hostname:		az-microbank
-  - Domain Name:	microbank.btcofaz.com
-  - Root Password:	<Leave Blank>
-  - Verify Password:	<Leave Blank>
-  - User’s Name:		<Leave Blank>
+  - Hostname:	  az-microbank | az-dev
+  - Domain Name:	local
+  - Root Password:	*Leave Blank*
+  - Verify Password:	*Leave Blank*
+  - User’s Name:		*Leave Blank*
   - Username:		satoshi
   - Password:		satoshi
   - Verify Password	satoshi
   - Time Zone: 		Arizona
-  - Partitioning Method:	Entire Disk with LVM (/wo software encryption)
+  - Partitioning Method:	Entire Disk with LVM (without software encryption)
     - Disk:			/dev/nvmexxx
     - Partitioning Method:	All files in one partition
     - <ins>*Remove existing logical volume data*</ins>
@@ -143,5 +143,3 @@ Minimum Linux Install w/ KVM Type 1 Virtualized Containers
   - Participate in Survey:	No
   - Software Install:	DESELECT ALL – SELECT “<ins>SSH server</ins>” ONLY
   - <ins>*Select continue to reboot*</ins>
-
-
