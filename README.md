@@ -143,3 +143,11 @@ Minimum Linux Install w/ KVM Type 1 Virtualized Containers
   - Participate in Survey:	No
   - Software Install:	DESELECT ALL – SELECT “<ins>SSH server</ins>” ONLY
   - <ins>*Select continue to reboot*</ins>
+- Login Remotely via SSH, Install git, and Get/Run the "base_setup.sh" script
+  ```
+  sudo apt-get -y install git
+  cd ~; git clone https://github.com/satoshiware/microbank
+  bash ./microbank/scripts/base_setup.sh
+  ```
+- Configure Static IP on Router & Make SSH port available everywhere
+- Restart the computer
