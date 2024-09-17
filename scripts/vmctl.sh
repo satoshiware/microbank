@@ -72,13 +72,37 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
         --console pty,target_type=serial \
         --noautoconsole \
         --autostart \
+		--watchdog model=i6300esb,action=reset \
         --boot uefi
+
+sudo apt-get -y install watchdog # Install Watchdog
+cat << EOF | sudo tee /etc/watchdog.conf # Configure Watchdog
+watchdog-device = /dev/watchdog
+log-dir =  /var/log/watchdog
+realtime = yes
+priority = 1
+EOF
+
+#/etc/default/watchdog file and set the watchdog_module to i6300esb
+sudo systemctl enable watchdog
+#Fully power off the VM (not restart). This is important as it'll allow it to adopt the new hardware configuration.
+#Power the VM back on and check the watchdog module is up and working by running dmesg | grep i6300. You should see something like the below:
+#Code:
+
+#[    7.249538] i6300ESB timer 0000:00:04.0: initialized. heartbeat=30 sec (nowayout=0)
+
+#Everything is now configured and the only thing left to do is to give it a test. To run a test, trigger a kernel panic by running echo c > /proc/sysrq-trigger. After a short while (60 seconds or so) you should see the VM automatically reset, and you're done! I hope you find this useful.
+
+
+
+
+
+
 
     echo ""; echo "Note: When install is complete (~5 Minutes), it will shutdown (and stay there) 'till the host-server reboots or 'till it's manually started."
     echo "Take advantage to configure a static IP in the router for this new VM."
 
-#--watchdog WATCHDOG        Configure a guest watchdog device
-#--rng RNG                  Configure a guest RNG device. Ex: --rng /dev/urandom
+#--watchdog model=i6300esb,action=reset         Configure a guest watchdog device
 #--launchSecurity sev??
 #   Enable AMD's "Secure Encrypted Virtualization" (SEV)
 #   Waiting for support for Intel's "Trust Domain Extensions" (TDX)
