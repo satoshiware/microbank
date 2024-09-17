@@ -18,7 +18,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --create      Create new VM instance
       --shutdown    Freeze all VMs and shutdown the host server
       --reboot      Freeze all VMs and reboot the host server
-	  --delete 		Deletes a VM instance; Parameters: $VM_NAME
+      --delete      Deletes a VM instance; Parameters: $VM_NAME
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (vmctl) in /usr/local/sbin (/satoshiware/microbank/scripts/vmctl.sh)
@@ -105,10 +105,10 @@ elif [[ $1 == "--reboot" ]]; then # Freeze all VMs and reboot the host server
     echo "Restarting in 5 minutes..."
 
 elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
-	sudo virsh destroy ${2}
-	sudo virsh managedsave-remove ${2}
-	sudo virsh undefine --nvram ${2}
-	sudo rm /var/lib/libvirt/images/${2}.qcow2 # Remove VM (Only if it is shutdown)
+    sudo virsh destroy ${2}
+    sudo virsh managedsave-remove ${2}
+    sudo virsh undefine --nvram ${2}
+    sudo rm /var/lib/libvirt/images/${2}.qcow2 # Remove VM (Only if it is shutdown)
 
 else
     $0 --help
