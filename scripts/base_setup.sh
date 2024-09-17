@@ -46,8 +46,8 @@ sudo virsh setvcpus \$VM_NAME <number-of-CPUs> --config                 # Change
 sudo virsh setvcpus \$VM_NAME <max-number-of-CPUs> --maximum --config   # Change maximum number of virtual CPUs
 
 #### Disk Space ####
-sudo virsh domblkinfo $VM_NAME -all                                     # Disk Capacity, Allocation, and Physical characteristics
-du -h /var/lib/libvirt/images/${VM_IMAGE}                               # See the actual size of the image file
+sudo virsh domblkinfo \$VM_NAME -all                                     # Disk Capacity, Allocation, and Physical characteristics
+du -h /var/lib/libvirt/images/\${VM_IMAGE}                               # See the actual size of the image file
 
 #### Control ####
 sudo virsh console \$VM_NAME                                            # Switch to active VM ("Ctrl + ]" or to exit)
@@ -56,6 +56,9 @@ sudo virsh shutdown \$VM_NAME                                           # Shutdo
 sudo virsh reboot \$VM_NAME                                             # Reboot VM instance
 sudo virsh reset domain \$VM_NAME                                       # Sends the reset signal (as if the reset button was pressed)
 sudo virsh destroy \$VM_NAME --graceful                                 # Force a shutdown (gracefully if possible)
+
+Note: The "vmctl" script was installed. Use this to install new VM instances.
+    Execute "vmctl" to learn of its features.
 EOF
 read -p "Press the enter key to continue..."
 
@@ -133,6 +136,15 @@ sudo virsh net-define ~/tmp_nwbridge.xml # Define nwbridge as a persistent virtu
 sudo virsh net-start nwbridge # Activate the nwbridge and set it to autostart on boot.
 sudo virsh net-autostart nwbridge
 sudo rm ~/tmp_nwbridge.xml # Delete the nwbridge.xml file; It’s not required anymore
+
+#### Install vmctl VM control script
+echo "PATH=\"/usr/local/sbin:\$PATH\"" | sudo tee -a ~/.profile
+bash ~/microbank/scripts/vmctl.sh --install
+
+# Establish aliases for "sudo shutdown [now]" and "sudo reboot [now]"
+alias sudo='sudo '
+alias shutdown='echo "alias override: use \"vmctl --shutdown\""; echo "Manually overide aliases with the \"\\\" character before the alias cmd."'
+alias reboot='echo "alias override: use \"vmctl --reboot\""; echo "Manually overide aliases with the \"\\\" character before the alias cmd."'
 
 #### Download Debian ISO, Set Timezone, & Create Preseeding File
 sudo mkdir -p /dc/iso/bookworm; cd /dc/iso
