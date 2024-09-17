@@ -10,6 +10,62 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if not already.
 
+# Give the user pertinent information about this script and how to use it.
+#cat << EOF | sudo tee ~/readme.txt
+This script configures everything to run Type 1 VMs using qemu/kvm
+
+
+
+
+
+########################### Contol/Verification/Information CMDs ############################
+sudo virsh nodeinfo 			# Run the following command to get info for the host machine
+sudo ls -R -all /var/lib/libvirt/images; echo ""; sudo ls -all /etc/libvirt/qemu # See the guest os's image & xml files
+
+echo ""; sudo virsh list --all; echo ""
+read -p "Enter Full Name of Desired VM: " VM_NAME # Get a VM instance
+sudo virsh console \$VM_NAME 												# Switch to acive VM ("Ctrl + ]" or to exit)
+sudo virsh start \$VM_NAME 													# Start VM from inactive mode
+sudo virsh shutdown \$VM_NAME 												# Shutdown the new instace
+sudo virsh reboot \$VM_NAME 												# Reboot VM instace
+sudo virsh reset domain \$VM_NAME 											# Sends the reset signal (as if the reset button was pressed)
+sudo virsh destroy \$VM_NAME --graceful 									# Force a shutdown (gracefully if possible)
+sudo virsh destroy \$VM_NAME 												# Force a shutdown
+sudo virsh undefine --nvram \$VM_NAME; sudo rm /var/lib/libvirt/images/$VM_NAME.qcow2 # Remove VM (Only if it is shutdown)
+sudo virsh domifaddr \$VM_NAME --source agent 								# See MAC and IP of VM (only if running)
+
+sudo virsh dominfo \$VM_NAME 												# To query the actual memory balloon size; Shows max setting and how much has been used
+sudo virsh dommemstat --domain \$VM_NAME 									# Memory stat's
+sudo virsh setmem --domain \$VM_NAME --size 3G --config 					# Update the memory size (make sure VM is shut off)
+sudo virsh setmaxmem --domain \$VM_NAME --size 3G --config 					# Update the maximum memory size (make sure VM is shut off)
+
+sudo virsh vcpucount \$VM_NAME 												# Get vcpu count
+sudo virsh vcpuinfo \$VM_NAME 												# Get detailed domain vcpu information
+sudo virsh setvcpus \$VM_NAME <number-of-CPUs> --config 					# Change number of virtual CPUs
+sudo virsh setvcpus \$VM_NAME <max-number-of-CPUs> --maximum --config 		# Change maximum number of virtual CPUs
+
+sudo ls -all /etc/libvirt/qemu | grep -E "^-" 								# List XML files (/etc/libvirt/qemu)
+sudo ls -R -all /var/lib/libvirt/images | grep -E "^-" 						# Show .qcow2 File Attributes (/var/lib/libvirt/images)
+
+# Show .qcow2 Auctual Sizes & Locations (/var/lib/libvirt/images)
+mapfile -t qcow_array < <( sudo find /var/lib/libvirt/images/ | grep .qcow2 )
+while read -r vm; do
+  if [ ! -z "$vm" ]; then
+	sudo du -h $vm | sed 's/\/var\/lib\/libvirt\/images/./'
+  fi
+done < <( printf '%s\n' "${qcow_array[@]}")
+
+df -h --output=target,size,pcent 		# Disk Space Usage
+ip address show 						# Host Network Info (See MAC and IP addresses on devices; see if we are connected via the "bridge")
+
+sudo virt-host-validate qemu 			# Verify the configuration can run all libvirt hypervisor drivers. (secure guest support only available on some cpus)
+sudo dmesg | grep -i -e DMAR -e IOMMU 	# On the Intel CPU, verify that the VT-d is enabled.
+sudo dmesg | grep -i -e AMD-Vi 			# On the AMD CPU, verify that the AMD-Vi is enabled.
+osinfo-query os | grep "debian" 		# Get a list of the accepted Debian operating system variant names (--os-variant)
+
+EOF
+read -p "Press the enter key to continue..."
+
 #### Update and Upgrade
 sudo apt-get -y update  # Update
 sudo apt-get -y upgrade # Upgrade
@@ -21,14 +77,16 @@ sudo apt-get -y install virtinst                # A command-line tool for creati
 sudo apt-get -y install ovmf                    # Enables UEFI support for Virtual Machines. (edk2-ovmf)
 sudo apt-get -y install swtpm                   # A TPM emulator for Virtual Machines.
 sudo apt-get -y install qemu-utils              # Provides tools to create, convert, modify, and snapshot offline disk images. (qemu-img)
-#!#sudo apt-get -y install guestfs-tools           # Provides a set of extended command-line tools for managing virtual machines.
-#!#sudo apt-get -y install libosinfo-bin           # A library for managing OS information for virtualization. (libosinfo)
-#!#sudo apt-get -y install tuned                # A system tuning service for Linux.
+sudo apt-get -y install guestfs-tools           # Provides a set of extended command-line tools for managing virtual machines.
+sudo apt-get -y install libosinfo-bin           # A library for managing OS information for virtualization. (libosinfo)
+sudo apt-get -y install tuned                   # A system tuning service for Linux.
 
 # Disable Password Authentication
-sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config # Disable password login
+sudo sed -i 's/#.*PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config # Disable password login
+sudo mkdir -p ~/.ssh
 sudo touch ~/.ssh/authorized_keys
 sudo chown -R $USER:$USER ~/.ssh
+sudo chmod 700 ~/.ssh
 sudo chmod 600 ~/.ssh/authorized_keys
 read -p "Yubikey Public Key (For Next Login): " YUBIKEY; echo $YUBIKEY | sudo tee -a ~/.ssh/authorized_keys; echo "Key added to ~/.ssh/authorized_keys"
 
@@ -37,8 +95,8 @@ sudo sed -i "s/GRUB_CMDLINE_LINUX=\"/&intel_iommu=on iommu=pt/" /etc/default/gru
 sudo update-grub # Regenerate the grub configuration file
 
 #### Tune the machine for running KVM guests
-#!#sudo systemctl enable tuned --now; sleep 5 # Enable and start the TuneD service and wait 5 seconds
-#!#sudo tuned-adm profile virtual-host # This optimizes the host for running KVM guests
+sudo systemctl enable tuned --now; sleep 5 # Enable and start the TuneD service and wait 5 seconds
+sudo tuned-adm profile virtual-host # This optimizes the host for running KVM guests
 
 #### Enable systemd-networkd to manage network and create a bridge (bridge0)
 sudo mv /etc/network/interfaces /etc/network/interfaces.save # Move the interfaces file so it won't be used after systemd-networkd is set up
@@ -83,121 +141,17 @@ sudo virsh net-start nwbridge # Activate the nwbridge and set it to autostart on
 sudo virsh net-autostart nwbridge
 sudo rm ~/tmp_nwbridge.xml # Delete the nwbridge.xml file; It’s not required anymore
 
-#### Download Debian ISO, Set Timezone, & Create Preseeding File <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+#### Download Debian ISO, Set Timezone, & Create Preseeding File
 sudo mkdir -p /dc/iso/bookworm; cd /dc/iso
 sudo wget https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.7.0-amd64-netinst.iso
 
-# Set the Timezone <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Did this work????
-echo ""; ls -R -l /usr/share/zoneinfo/US 
+# Set the Timezone
+echo ""; ls -R -l /usr/share/zoneinfo/US
 echo ""; echo "See the \"/usr/share/zoneinfo/\" folder for all the valid time zone names."
 read -p "What Is Your Time Zone? (e.g. US/Arizona): " TIMEZONE
 
-# Call generate_preseed function
-$0 generate_preseed()
-
-#### Enable virtualization daemon, restart, and connect the bridge
-sudo systemctl enable libvirtd
-echo "Rebooting..."; sleep 3; sudo reboot now ################################################################### how do we deal with rebooting???????????
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Min CPU, CPU Usage, MAX CPU, Percent of CPU      Min RAM, RAM Usage, Max Ram
-
-
-mapfile -t vm_array < <( sudo virsh list --all --name )
-printf '%-15s %-12s %-3s %4s %17s %10s\n' "VM Name" "State" "CPU" "RAM (GB)" "Storage" "Storage Allocated"
-printf -- '-%.0s' {1..100}; echo ""
-while read -r vm; do
-  if [ ! -z "$vm" ]; then
-	STATE=$(sudo virsh list --all | grep " $vm " | awk '{print $3" "$4}')
-	CPU=$(sudo virsh dominfo $vm | grep "CPU" | cut -f 10 -d " ")
-    MEM=$(($(sudo virsh dominfo $vm | grep "Max memory" | cut -f 7 -d " ") / 1024 / 1024))
-    DSK=0
-    DAL=0
-    for disk in $(sudo virsh domblkinfo $vm --all | grep "vd" | awk  '{s+=$2} END {print s}'); do
-      DSK=$((DSK + disk / 1024 / 1024 / 1024))
-    done
-    for disk2 in $(sudo virsh domblkinfo $vm --all | grep "vd" | awk  '{s+=$3} END {print s}'); do
-      DAL=$((DAL + disk2 / 1024 / 1024 / 1024))
-    done
-    printf "%-15s %-12s %-3s %4s %17s %10s\n" "${vm:0:14}" "$STATE" "$CPU"  "$MEM"  "$DSK" "$DAL"
-    CPU_SUM=$((CPU_SUM + CPU))
-    MEM_SUM=$((MEM_SUM + MEM))
-    DSK_SUM=$((DSK_SUM + DSK))
-    DAL_SUM=$((DAL_SUM + DAL))
-  fi
-done < <( printf '%s\n' "${vm_array[@]}")
-
-printf -- '-%.0s' {1..100}
-printf '\n%-15s %-12s %-3s %4s %17s %10s\n' "Totals:" "" "$CPU_SUM" "$MEM_SUM" "$DSK_SUM" "$DAL_SUM"
-
-### Host Information
-echo ""; echo "sudo virsh nodeinfo"; echo "----------------------------------"; sudo virsh nodeinfo; read -p "Press Enter to Continue..."
-echo ""; echo "XML files (/etc/libvirt/qemu)"; echo "-------------------------------------------------------------"; sudo ls -all /etc/libvirt/qemu | grep -E "^-"; echo ""; read -p "Press Enter to Continue..."
-echo ""; echo ".qcow2 File Attributes (/var/lib/libvirt/images)"; echo "------------------------------------------------"; sudo ls -R -all /var/lib/libvirt/images | grep -E "^-"; echo ""; read -p "Press Enter to Continue..."
-echo ""; echo ".qcow2 Auctual Sizes & Locations (/var/lib/libvirt/images)"; echo "-----------------------------------------------"
-mapfile -t qcow_array < <( sudo find /var/lib/libvirt/images/ | grep .qcow2 )
-while read -r vm; do
-  if [ ! -z "$vm" ]; then
-	sudo du -h $vm | sed 's/\/var\/lib\/libvirt\/images/./'
-  fi
-done < <( printf '%s\n' "${qcow_array[@]}")
-echo ""; read -p "Press Enter to Continue..."
-echo ""; echo "Disk Usage"; echo "-----------------------------------------------"; df -h --output=target,size,pcent; echo ""; read -p "Press Enter to Continue..."
-echo ""; echo "Host Network Info"; echo "-----------------------------------------------"; ip address show # See mac and ip addresses on devices (see if we are connected via the "bridge")
-
-
-
-
-
-sudo virt-host-validate qemu # Verify the configuration can run all libvirt hypervisor drivers. (secure guest support only available on some cpus)
-sudo dmesg | grep -i -e DMAR -e IOMMU # On the Intel CPU, verify that the VT-d is enabled.
-sudo dmesg | grep -i -e AMD-Vi # On the AMD CPU, verify that the AMD-Vi is enabled.
-osinfo-query os | grep "debian" # Get a list of the accepted Debian operating system variant names (--os-variant)
-
-
-
-
-
-
-
-
-# Show MAC: sudo virsh domifaddr $VM_NAME --source agent | grep " e" | grep -Eo "([a-fA-F0-9]{2}:){5}[a-fA-F0-9]{2}"
-# Show IP: sudo virsh domifaddr $VM_NAME --source agent | grep " e" | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
-
-sudo virsh dominfo $VM_NAME # To query the actual memory balloon size; Shows max setting and how much has been used
-sudo virsh dommemstat --domain $VM_NAME # Memory Stat's
-
-sudo virsh vcpucount $VM_NAME # Domain vcpu count
-sudo virsh vcpuinfo $VM_NAME # Detailed domain vcpu information
-
-
-Max CPU
-(Max) RAM
-
-
-
-
-
-
-
 # Create preseed.cfg File Function
-generate_preseed() {
-	cat << EOF | sudo tee /dc/iso/bookworm/preseed.cfg
+cat << EOF | sudo tee /dc/iso/bookworm/preseed.cfg
 #Source: https://www.debian.org/releases/bookworm/example-preseed.txt
 #_preseed_V1
 #### Contents of the preconfiguration file (for bookworm)
@@ -683,4 +637,8 @@ d-i finish-install/reboot_in_progress note
 # packages and run commands in the target system.
 #d-i preseed/late_command string apt-install zsh; in-target chsh -s /bin/zsh
 EOF
-}
+
+#### Enable virtualization daemon and restart (and exit)
+sudo systemctl enable libvirtd
+echo "Rebooting..."; sleep 3; sudo reboot now
+exit 0
