@@ -11,58 +11,51 @@ fi
 cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if not already.
 
 # Give the user pertinent information about this script and how to use it.
-#cat << EOF | sudo tee ~/readme.txt
-This script configures everything to run Type 1 VMs using qemu/kvm
+cat << EOF | sudo tee ~/readme.txt
+This host (server) was configured to run Type 1 VMs using qemu/kvm
 
+Relevant Commands:
 
+#### Host Information CMDs ####
+df -h --output=target,size,pcent        # Disk Space Usage
+ip address show                         # Network Info (See MAC and IP addresses on devices; see if we are connected via the "bridge")
+sudo virt-host-validate qemu            # Verify the configuration can run all libvirt hypervisor drivers. (secure guest support only available on some cpus)
+sudo dmesg | grep -i -e DMAR -e IOMMU   # On the Intel CPU, verify that the VT-d is enabled.
+sudo dmesg | grep -i -e AMD-Vi          # On the AMD CPU, verify that the AMD-Vi is enabled.
+osinfo-query os | grep "debian"         # Get a list of the accepted Debian operating system variant names (--os-variant)
+sudo virsh nodeinfo                     # Run the following command to get info for the host machine
 
+#### File Locations ####
+/etc/libvirt/qemu                                                       # XML files
+/var/lib/libvirt/images                                                 # Qcow2 Images
 
+#### More CMDs ####
+sudo virsh list --all                                                   # List all VMs
+sudo virsh domifaddr \$VM_NAME --source agent                           # See MAC and IP of VM (only if running)
+sudo virsh dominfo \$VM_NAME                                            # General VM information
 
-########################### Contol/Verification/Information CMDs ############################
-sudo virsh nodeinfo 			# Run the following command to get info for the host machine
-sudo ls -R -all /var/lib/libvirt/images; echo ""; sudo ls -all /etc/libvirt/qemu # See the guest os's image & xml files
+#### RAM ####
+sudo virsh dommemstat --domain \$VM_NAME                                # Memory stat's
+sudo virsh setmem --domain \$VM_NAME --size 3G --config                 # Update the memory size (make sure VM is shut off)
+sudo virsh setmaxmem --domain \$VM_NAME --size 3G --config              # Update the maximum memory size (make sure VM is shut off)
 
-echo ""; sudo virsh list --all; echo ""
-read -p "Enter Full Name of Desired VM: " VM_NAME # Get a VM instance
-sudo virsh console \$VM_NAME 												# Switch to acive VM ("Ctrl + ]" or to exit)
-sudo virsh start \$VM_NAME 													# Start VM from inactive mode
-sudo virsh shutdown \$VM_NAME 												# Shutdown the new instace
-sudo virsh reboot \$VM_NAME 												# Reboot VM instace
-sudo virsh reset domain \$VM_NAME 											# Sends the reset signal (as if the reset button was pressed)
-sudo virsh destroy \$VM_NAME --graceful 									# Force a shutdown (gracefully if possible)
-sudo virsh destroy \$VM_NAME 												# Force a shutdown
-sudo virsh undefine --nvram \$VM_NAME; sudo rm /var/lib/libvirt/images/$VM_NAME.qcow2 # Remove VM (Only if it is shutdown)
-sudo virsh domifaddr \$VM_NAME --source agent 								# See MAC and IP of VM (only if running)
+#### vCPU ####
+sudo virsh vcpucount \$VM_NAME                                          # Get vcpu count
+sudo virsh vcpuinfo \$VM_NAME                                           # Get detailed domain vcpu information
+sudo virsh setvcpus \$VM_NAME <number-of-CPUs> --config                 # Change number of virtual CPUs
+sudo virsh setvcpus \$VM_NAME <max-number-of-CPUs> --maximum --config   # Change maximum number of virtual CPUs
 
-sudo virsh dominfo \$VM_NAME 												# To query the actual memory balloon size; Shows max setting and how much has been used
-sudo virsh dommemstat --domain \$VM_NAME 									# Memory stat's
-sudo virsh setmem --domain \$VM_NAME --size 3G --config 					# Update the memory size (make sure VM is shut off)
-sudo virsh setmaxmem --domain \$VM_NAME --size 3G --config 					# Update the maximum memory size (make sure VM is shut off)
+#### Disk Space ####
+sudo virsh domblkinfo $VM_NAME -all                                     # Disk Capacity, Allocation, and Physical characteristics
+du -h /var/lib/libvirt/images/${VM_IMAGE}                               # See the actual size of the image file
 
-sudo virsh vcpucount \$VM_NAME 												# Get vcpu count
-sudo virsh vcpuinfo \$VM_NAME 												# Get detailed domain vcpu information
-sudo virsh setvcpus \$VM_NAME <number-of-CPUs> --config 					# Change number of virtual CPUs
-sudo virsh setvcpus \$VM_NAME <max-number-of-CPUs> --maximum --config 		# Change maximum number of virtual CPUs
-
-sudo ls -all /etc/libvirt/qemu | grep -E "^-" 								# List XML files (/etc/libvirt/qemu)
-sudo ls -R -all /var/lib/libvirt/images | grep -E "^-" 						# Show .qcow2 File Attributes (/var/lib/libvirt/images)
-
-# Show .qcow2 Auctual Sizes & Locations (/var/lib/libvirt/images)
-mapfile -t qcow_array < <( sudo find /var/lib/libvirt/images/ | grep .qcow2 )
-while read -r vm; do
-  if [ ! -z "$vm" ]; then
-	sudo du -h $vm | sed 's/\/var\/lib\/libvirt\/images/./'
-  fi
-done < <( printf '%s\n' "${qcow_array[@]}")
-
-df -h --output=target,size,pcent 		# Disk Space Usage
-ip address show 						# Host Network Info (See MAC and IP addresses on devices; see if we are connected via the "bridge")
-
-sudo virt-host-validate qemu 			# Verify the configuration can run all libvirt hypervisor drivers. (secure guest support only available on some cpus)
-sudo dmesg | grep -i -e DMAR -e IOMMU 	# On the Intel CPU, verify that the VT-d is enabled.
-sudo dmesg | grep -i -e AMD-Vi 			# On the AMD CPU, verify that the AMD-Vi is enabled.
-osinfo-query os | grep "debian" 		# Get a list of the accepted Debian operating system variant names (--os-variant)
-
+#### Control ####
+sudo virsh console \$VM_NAME                                            # Switch to active VM ("Ctrl + ]" or to exit)
+sudo virsh start \$VM_NAME                                              # Start VM from inactive mode
+sudo virsh shutdown \$VM_NAME                                           # Shutdown the new instance
+sudo virsh reboot \$VM_NAME                                             # Reboot VM instance
+sudo virsh reset domain \$VM_NAME                                       # Sends the reset signal (as if the reset button was pressed)
+sudo virsh destroy \$VM_NAME --graceful                                 # Force a shutdown (gracefully if possible)
 EOF
 read -p "Press the enter key to continue..."
 
@@ -144,6 +137,7 @@ sudo rm ~/tmp_nwbridge.xml # Delete the nwbridge.xml file; It’s not required a
 #### Download Debian ISO, Set Timezone, & Create Preseeding File
 sudo mkdir -p /dc/iso/bookworm; cd /dc/iso
 sudo wget https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.7.0-amd64-netinst.iso
+sudo mv /dc/iso/debian-12.7.0-amd64-netinst.iso /dc/iso/debian-install.iso
 
 # Set the Timezone
 echo ""; ls -R -l /usr/share/zoneinfo/US
@@ -151,7 +145,7 @@ echo ""; echo "See the \"/usr/share/zoneinfo/\" folder for all the valid time zo
 read -p "What Is Your Time Zone? (e.g. US/Arizona): " TIMEZONE
 
 # Create preseed.cfg File Function
-cat << EOF | sudo tee /dc/iso/bookworm/preseed.cfg
+cat << EOF | sudo tee /dc/iso/preseed.cfg
 #Source: https://www.debian.org/releases/bookworm/example-preseed.txt
 #_preseed_V1
 #### Contents of the preconfiguration file (for bookworm)
