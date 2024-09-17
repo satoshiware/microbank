@@ -64,6 +64,8 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
         --os-variant debian11 \
         --disk path=/var/lib/libvirt/images/${DRIVE}/${VM_NAME:0:14}.qcow2,size=${DISKSIZE},format=qcow2,cache=none,discard=unmap \
         --tpm model='tpm-crb',type=emulator,version='2.0' \
+        --rng /dev/urandom,model=virtio \
+        --rng /dev/random,model=virtio \
         --channel type=unix,target.type=virtio,target.name=org.qemu.guest_agent.0 \
         --graphics none \
         --extra-args "auto=true hostname=\"${VM_NAME:0:14}\" domain=\"local\" console=ttyS0,115200n8 serial" \
@@ -72,13 +74,15 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
         --autostart \
         --boot uefi
 
-#alias "shutdown now" #with graceful Host Shutdown where each vm is saved state
-#alias "reboot now" #with graceful Host reboot where each vm is saved state
+    echo ""; echo "Note: When install is complete (~5 Minutes), it will shutdown (and stay there) 'till the host-server reboots or 'till it's manually started."
+    echo "Take advantage to configure a static IP in the router for this new VM."
+
 #--watchdog WATCHDOG        Configure a guest watchdog device
 #--rng RNG                  Configure a guest RNG device. Ex: --rng /dev/urandom
 #--launchSecurity sev??
 #   Enable AMD's "Secure Encrypted Virtualization" (SEV)
 #   Waiting for support for Intel's "Trust Domain Extensions" (TDX)
+# install watchdog, tune
 
 elif [[ $1 == "--shutdown" ]]; then # Freeze all VMs and shutdown the host server
     mapfile -t vm_array < <( sudo virsh list --all --name )
