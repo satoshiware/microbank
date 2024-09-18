@@ -8,7 +8,10 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    echo "You do not have enough sudo privileges!"
    exit 1
 fi
-cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if not already.
+cd ~; echo satoshi | sudo -S pwd # Enable sudo access if not already.
+
+# Disable sudo password for satoshi
+echo "satoshi ALL=(ALL) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
 
 #### Update and Upgrade
 sudo apt-get -y update
