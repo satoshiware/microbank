@@ -79,9 +79,10 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
     echo "Intel's \"Trust Domain Extensions\" (TDX) is still not availble in QEMU/KVM"
 
     echo ""; echo "Note: When install is complete (~5 Minutes), it will shutdown (and stay there) 'till the host-server reboots or 'till it's manually started."
-    echo "Take advantage to configure a static IP in the router for this new VM."
+
     echo ""; echo "CMD to boot up new VM: \"sudo virsh start ${VM_NAME:0:14}\""
-    echo "Once new VM is up and running, login (as satoshi) and run post install script:"
+    echo "Once new VM is up and running, configure its static IP in the router."
+    echo "Then login (as satoshi) and run post install script:"
     echo "    cd ~; sudo apt-get -y install git"
     echo "    git clone https://github.com/satoshiware/microbank"
     echo "    bash ~/microbank/scripts/vm_setup.sh"
@@ -122,3 +123,19 @@ else
     $0 --help
     echo "Script Version 0.02"
 fi
+
+#Name            RAM / MAX (MB)  vCPU / MAX     Disk Size (GB)
+#--------------------------------------------------------------
+#az-wallet      2048 / 4096         1 / 4       512
+#az-p2p         2048 / 4096         1 / 4       512
+#az-stratum     2048 / 4096         1 / 4       512
+#btcofaz        1024 / 4096         1 / 4       128
+#contract       1024 / 4096         1 / 4       32
+#btc-electrum   4096 / 8192         1 / 8       1024
+#btc-explorer   2048 / 8192         1 / 8       128
+#
+#*az-electrum   4096 / 8192         1 / 8       1024
+#*bitnode       4096 / 8192         1 / 8       1024
+#--------------------------------------------------------------
+#Totals         22528/53248         9 / 52      4896
+
