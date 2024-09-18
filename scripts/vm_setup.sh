@@ -29,7 +29,7 @@ sudo chown -R $USER:$USER ~/.ssh
 sudo chmod 700 ~/.ssh
 sudo chmod 600 ~/.ssh/authorized_keys
 read -p "Yubikey Public Key: " YUBIKEY; echo $YUBIKEY | sudo tee -a ~/.ssh/authorized_keys; echo "Yubikey added to ~/.ssh/authorized_keys"
-read -p "Base Host Server Public Key: " YUBIKEY; echo $YUBIKEY | sudo tee -a ~/.ssh/authorized_keys; echo "Base Host Server Key added to ~/.ssh/authorized_keys"
+read -p "Base Host Server Public Key: " HOSTKEY; echo "$HOSTKEY # Base Host Server Key" | sudo tee -a ~/.ssh/authorized_keys; echo "Base Host Server Key added to ~/.ssh/authorized_keys"
 
 #### Tune the machine for running KVM guests
 sudo systemctl enable tuned --now; sleep 5 # Enable and start the TuneD service and wait 5 seconds
