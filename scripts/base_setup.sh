@@ -86,6 +86,9 @@ sudo chmod 700 ~/.ssh
 sudo chmod 600 ~/.ssh/authorized_keys
 read -p "Yubikey Public Key (For Next Login): " YUBIKEY; echo $YUBIKEY | sudo tee -a ~/.ssh/authorized_keys; echo "Key added to ~/.ssh/authorized_keys"
 
+# Generate public/private keys (non-encrytped) for "satoshi"
+ssh-keygen -t ed25519 -f /home/satoshi/.ssh/vmkey -N "" -C ""
+
 #### Update Grub to configure I/O memory management unit (IOMMU) in pass-through mode (for AMD CPUs, IOMMU is enabled by default)
 sudo sed -i "s/GRUB_CMDLINE_LINUX=\"/&intel_iommu=on iommu=pt/" /etc/default/grub
 sudo update-grub # Regenerate the grub configuration file
