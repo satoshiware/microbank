@@ -29,7 +29,7 @@ elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (vmctl) in
         if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
             sudo rm /usr/local/sbin/vmctl
             cd ~; git clone https://github.com/satoshiware/microbank
-            bash ~/microbank/scripts/pre_fork_micro/vmctl.sh --install
+            bash ~/microbank/scripts/vmctl.sh --install
             rm -rf microbank
             exit 0
         else
