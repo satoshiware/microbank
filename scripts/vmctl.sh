@@ -150,24 +150,4 @@ fi
 #------------------------------------------------------------------------------#-----------------------------------------------------------------------------
 #Totals                                22528 53248      9      52      4896
 
-
-
-#vmctl --create_preloaded dummy          2048 8192       1      8       128              .         # 52:54:00:cc:0b:f9   192.168.2.6     BTC Blockchain Explorer
-#vmctl --create_preloaded dummy2          2048 8192       1      8       128             .        52:54:00:cc:0b:fa # 52:54:00:cc:0b:f9   192.168.2.6     BTC Blockchain Explorer
-
-#todo:
-    #add path to each one
-    #add comment on host key in authorized keys to each one
-    #update vm_setup to change sudo... not needed. update each one
-
-
-
-
-
-
-
-
-
-
-
-
+# todo: Start installing I guess
