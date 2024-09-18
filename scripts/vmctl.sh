@@ -86,6 +86,8 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
     echo "    git clone https://github.com/satoshiware/microbank"
     echo "    bash ~/microbank/scripts/vm_setup.sh"
 
+    echo ""; echo "SSH (satoshi) Host Login Key: $(sudo cat /home/satoshi/.ssh/vmkey.pub)"
+
 elif [[ $1 == "--shutdown" ]]; then # Freeze all VMs and shutdown the host server
     mapfile -t vm_array < <( sudo virsh list --all --name )
     while read -r vm; do
@@ -118,5 +120,5 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
 
 else
     $0 --help
-    echo "Script Version 0.01"
+    echo "Script Version 0.02"
 fi
