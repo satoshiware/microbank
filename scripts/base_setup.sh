@@ -10,6 +10,9 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
 fi
 cd ~; sudo pwd # Print Working Directory; have the user enable sudo access if not already.
 
+# Disable sudo password for this user
+echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
+
 # Give the user pertinent information about this script and how to use it.
 cat << EOF | sudo tee ~/readme.txt
 This host (server) was configured to run Type 1 VMs using qemu/kvm
@@ -56,6 +59,7 @@ sudo virsh shutdown \$VM_NAME                                           # Shutdo
 sudo virsh reboot \$VM_NAME                                             # Reboot VM instance
 sudo virsh reset domain \$VM_NAME                                       # Sends the reset signal (as if the reset button was pressed)
 sudo virsh destroy \$VM_NAME --graceful                                 # Force a shutdown (gracefully if possible)
+sshvm                                                                   # Alias (with no arguments) for quick ssh connection (after prompt) to any VM
 
 Note: The "vmctl" script was installed. Use this to install new VM instances.
     Execute "vmctl" to learn of its features.
@@ -88,6 +92,9 @@ read -p "Yubikey Public Key (For Next Login): " YUBIKEY; echo $YUBIKEY | sudo te
 
 # Generate public/private keys (non-encrytped) for "satoshi"
 ssh-keygen -t ed25519 -f /home/satoshi/.ssh/vmkey -N "" -C ""
+
+# Add sshvm alias for easy ssh connections to VMs
+echo $'alias sshvm=\'echo ""; sudo virsh list --all; echo ""; read -p "What vm would you like to connect to? " VM_NAME; ssh satoshi@${VM_NAME}.local -i ~/.ssh/vmkey\'' | sudo tee -a /etc/bash.bashrc
 
 #### Update Grub to configure I/O memory management unit (IOMMU) in pass-through mode (for AMD CPUs, IOMMU is enabled by default)
 sudo sed -i "s/GRUB_CMDLINE_LINUX=\"/&intel_iommu=on iommu=pt/" /etc/default/grub
@@ -145,9 +152,9 @@ echo "PATH=\"/usr/local/sbin:\$PATH\"" | sudo tee -a ~/.profile
 bash ~/microbank/scripts/vmctl.sh --install
 
 # Establish aliases for "sudo shutdown [now]" and "sudo reboot [now]"
-alias sudo='sudo '
-alias shutdown='echo "alias override: use \"vmctl --shutdown\""; echo "Manually overide aliases with the \"\\\" character before the alias cmd."'
-alias reboot='echo "alias override: use \"vmctl --reboot\""; echo "Manually overide aliases with the \"\\\" character before the alias cmd."'
+echo $'alias sudo=\'sudo \'' | sudo tee -a /etc/bash.bashrc
+echo $'alias shutdown=\'echo "alias override: use \\"vmctl --shutdown\\""; echo "Manually overide aliases with the \\"\\\\\\" character before the alias cmd."\'' | sudo tee -a /etc/bash.bashrc
+echo $'alias reboot=\'echo "alias override: use \\"vmctl --reboot\\""; echo "Manually overide aliases with the \\"\\\\\\" character before the alias cmd."\'' | sudo tee -a /etc/bash.bashrc
 
 #### Download Debian ISO, Set Timezone, & Create Preseeding File
 sudo mkdir -p /dc/iso/bookworm; cd /dc/iso
