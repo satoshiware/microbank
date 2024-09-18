@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Make sure we are not running as root, but that we have sudo privileges.
+#### Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
    exit 1
@@ -18,7 +18,10 @@ sudo apt-get -y upgrade
 sudo apt-get -y install watchdog
 sudo apt-get -y install tuned # A system tuning service for Linux.
 
-# Disable Password Authentication & configure Yubikey & Host Public Key Access
+#### Install vmctl VM control script
+echo "PATH=\"/usr/local/sbin:\$PATH\"" | sudo tee -a ~/.profile
+
+#### Disable Password Authentication & configure Yubikey & Host Public Key Access
 sudo sed -i 's/#.*PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config # Disable password login
 sudo mkdir -p ~/.ssh
 sudo touch ~/.ssh/authorized_keys
@@ -32,7 +35,7 @@ read -p "Base Host Server Public Key: " YUBIKEY; echo $YUBIKEY | sudo tee -a ~/.
 sudo systemctl enable tuned --now; sleep 5 # Enable and start the TuneD service and wait 5 seconds
 sudo tuned-adm profile virtual-guest # This optimizes the host for running KVM guests
 
-# Configure Watchdog
+#### Configure Watchdog
 cat << EOF | sudo tee /etc/watchdog.conf
 watchdog-device = /dev/watchdog
 log-dir =  /var/log/watchdog
