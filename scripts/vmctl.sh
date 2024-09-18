@@ -49,6 +49,20 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
     read -p "Virtual Disk Size (GBs; e.g. 20): " DISKSIZE
     read -p "Image file location (Relative to \"/var/lib/libvirt/images\"; e.g. \".\"): " DRIVE
 
+    $0 --create_preloaded $VM_NAME $RAM $MAXRAM $CPUS $MAXCPUS $DISKSIZE $DRIVE
+
+elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloaded values
+    VM_NAME=$2; RAM=$3; MAXRAM=$4; CPUS=$5; MAXCPUS=$6; DISKSIZE=$7; DRIVE=$8; MAC=$9
+
+    # If MAC address is defined, then format variable properly
+    if [[ ! -z $MAC ]]; then
+        MAC=",mac=$MAC"
+    fi
+
+    # Remove any previous known hosts with identical name
+    ssh-keygen -f "/home/satoshi/.ssh/known_hosts" -R "$VM_NAME.local" 2> /dev/null
+    ssh-keygen -f "/home/satoshi/.ssh/known_hosts" -R "$VM_NAME" 2> /dev/null
+
     URL_ISO="/dc/iso/debian-install.iso"
     PRESEED_CFG="/dc/iso/preseed.cfg"
 
@@ -58,7 +72,7 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
         --memory memory=${MAXRAM},currentMemory=${RAM} \
         --vcpus maxvcpus=${MAXCPUS},vcpus=${CPUS} \
         --cpu host-passthrough \
-        --network bridge=bridge0 \
+        --network bridge=bridge0$MAC \
         --location ${URL_ISO} \
         --initrd-inject ${PRESEED_CFG} \
         --os-variant debian11 \
@@ -124,18 +138,26 @@ else
     echo "Script Version 0.02"
 fi
 
-#Name            RAM / MAX (MB)  vCPU / MAX     Disk Size (GB)
-#--------------------------------------------------------------
-#az-wallet      2048 / 4096         1 / 4       512
-#az-p2p         2048 / 4096         1 / 4       512
-#az-stratum     2048 / 4096         1 / 4       512
-#btcofaz        1024 / 4096         1 / 4       128
-#contract       1024 / 4096         1 / 4       32
-#btc-electrum   4096 / 8192         1 / 8       1024
-#btc-explorer   2048 / 8192         1 / 8       128
-#
-#*az-electrum   4096 / 8192         1 / 8       1024
-#*bitnode       4096 / 8192         1 / 8       1024
-#--------------------------------------------------------------
-#Totals         22528/53248         9 / 52      4896
+#Name                    VM NAME        RAM / MAX (MB)  vCPU / MAX     Disk Size (GB)   Location    MAC     IP
+#------------------------------------------------------------------------------
+vmctl --create_preloaded az-wallet      2048 4096       1      4       512              .         # 52:54:00:14:a2:09   192.168.2.4     AZ Money Wallet Node (Pre-Fork)
+vmctl --create_preloaded az-p2p         2048 4096       1      4       512              .         # 52:54:00:9d:03:ec   192.168.2.2     AZ Money P2P Node (Pre-Fork)
+vmctl --create_preloaded az-stratum     2048 4096       1      4       512              .         # 52:54:00:d7:27:a7   192.168.2.3     AZ Money Stratum Node (Pre-Fork)
+vmctl --create_preloaded btcofaz        1024 4096       1      4       128              .         # 52:54:00:53:7b:ef   192.168.2.8     Website @ btcofaz.com
+vmctl --create_preloaded contract       1024 4096       1      4       32               .         # 52:54:00:2b:16:56   192.168.2.7     Website @ contract.btcofaz.com
+vmctl --create_preloaded btc-electrum   4096 8192       1      8       1024             .         # 52:54:00:3b:d9:4f   192.168.2.5     Bitcoin Node & Electrum Server
+vmctl --create_preloaded btc-explorer   2048 8192       1      8       128              .         # 52:54:00:cc:0b:f9   192.168.2.6     BTC Blockchain Explorer
+#------------------------------------------------------------------------------
+#Totals                                22528 53248      9      52      4896
+
+
+
+
+
+
+
+
+
+
+
 
