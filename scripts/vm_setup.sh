@@ -20,6 +20,7 @@ sudo apt-get -y upgrade
 #### Install Packages
 sudo apt-get -y install watchdog
 sudo apt-get -y install tuned # A system tuning service for Linux.
+sudo apt-get -y install curl
 
 #### Install vmctl VM control script
 echo "PATH=\"/usr/local/sbin:\$PATH\"" | sudo tee -a ~/.profile
