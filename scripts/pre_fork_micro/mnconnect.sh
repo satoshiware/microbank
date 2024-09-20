@@ -70,7 +70,7 @@ elif [[ $1 = "-o" || $1 = "--out" ]]; then # Make an outbound connection to the 
     fi
 
     # Create p2pssh@ p2p environment file and start its corresponding systemd service
-    LOCALMICROPORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+    LOCALMICROPORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
     cat << EOF | sudo tee /etc/default/p2pssh@${TMSTAMP}
 # ${CONNNAME}
 LOCAL_PORT=${LOCALMICROPORT}
