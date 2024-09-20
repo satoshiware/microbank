@@ -79,7 +79,8 @@ elif [[ $1 = "--status" ]]; then # Show/Verify status of all connections (in and
     readarray -t incomming <<< $(sudo cat /home/p2p/.ssh/authorized_keys | grep . | grep "\S")
     for line in "${incomming[@]}"; do
         hash=$(echo "$line" | grep -Go 'SHA256(Base64): .*' | cut -d " " -f 2)
-        port=$(journalctl -u ssh.service | grep $hash | tail -n 1 | grep -Go 'port.*ssh2' | cut -d " " -f 2)
+        hash=${hash::-2}; hash="${hash//+/\\+}"; hash="${hash//\//\\\/}" # Remove any potential padding characters '=' and escape the '+' & '/' characters
+        port=$(sudo journalctl -n 1 -u ssh.service -g $hash | grep -Go 'port.*ssh2' | cut -d " " -f 2)
         connected=$(ss -t -a | grep "^.*:ssh .*:$port\s\+$") # If line returned then the incomming connection is active!
         echo -n "   " | tee -a /tmp/message; echo $line | cut -d "#" -f 2 | tee -a /tmp/message
         if [[ -z $connected ]]; then
@@ -230,5 +231,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.188"
+    echo "Script Version 0.2
 fi
