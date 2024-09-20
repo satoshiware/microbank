@@ -231,5 +231,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.2
+    echo "Script Version 0.2"
 fi
