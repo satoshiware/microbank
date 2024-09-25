@@ -137,15 +137,3 @@ else
     $0 --help
     echo "Script Version 0.03"
 fi
-
-#Name                    VM NAME        RAM / MAX (MB)  vCPU / MAX     Disk Size (GB)   Location    MAC                 Description
-#------------------------------------------------------------------------------#-----------------------------------------------------------------------------
-#vmctl --create_preloaded az-wallet      2048 4096       1      4       512              .          52:54:00:14:a2:09   # AZ Money Wallet Node (Pre-Fork)
-#vmctl --create_preloaded az-p2p         2048 4096       1      4       512              .          52:54:00:9d:03:ec   # AZ Money P2P Node (Pre-Fork)
-#vmctl --create_preloaded az-stratum     2048 4096       1      4       512              .          52:54:00:d7:27:a7   # AZ Money Stratum Node (Pre-Fork)
-#vmctl --create_preloaded btcofaz        1024 4096       1      4       128              .          52:54:00:53:7b:ef   # Website @ btcofaz.com
-#vmctl --create_preloaded contract       1024 4096       1      4       32               .          52:54:00:2b:16:56   # Website @ contract.btcofaz.com
-#vmctl --create_preloaded btc-electrum   4096 8192       1      8       1024             .          52:54:00:3b:d9:4f   # Bitcoin Node & Electrum Server
-#vmctl --create_preloaded btc-explorer   2048 8192       1      8       128              .          52:54:00:cc:0b:f9   # BTC Blockchain Explorer
-#------------------------------------------------------------------------------------------------------------------------------------------------------------
-#Totals                                22528 53248      9      52      4896
