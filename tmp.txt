@@ -1,3 +1,23 @@
+sudo mdadm --zero-superblock /dev/$DISK1 /dev/$DISK2 ... /dev/$DISKn
+
+sudo mdadm --zero-superblock /dev/sda /dev/sdb /dev/sdc /dev/sdd
+
+
+sudo wipefs -a -f /dev/sda
+sudo wipefs -a -f /dev/sdb
+sudo wipefs -a -f /dev/sdc
+sudo wipefs -a -f /dev/sdd
+
+
+sudo wipefs -a -f /dev/nvme0n1
+sudo wipefs -a -f /dev/nvme3n1
+sudo wipefs -a -f /dev/nvme4n1
+
+
+
+
+
+
 # List All Drives
 lsblk
 
