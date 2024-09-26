@@ -1,8 +1,18 @@
 # List All Drives
 lsblk
 
+# Install mdadm utility to manage and monitor software RAID
+sudo apt-get -y install mdadm
+
 # Create disk partitions with type 0xfd
 sudo mdadm --zero-superblock /dev/$DISK1 /dev/$DISK2 ... /dev/$DISKn
+
+# Wipe each of all partition data <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+sudo wipefs -a /dev/$DISK1
+sudo wipefs -a /dev/$DISK2
+	|	|
+sudo wipefs -a /dev/$DISKn
+
 
 # Create RAID partition $MD (e.g. md0) with $LEVEL: 1 (Mirroring) or 5 (Striping /w Distributed Parity)
 sudo mdadm --create /dev/$MD --level=$LEVEL --raid-devices=n /dev/$DISK1 /dev/$DISK2 ... /dev/$DISKn
@@ -10,6 +20,14 @@ sudo mdadm --create /dev/$MD --level=$LEVEL --raid-devices=n /dev/$DISK1 /dev/$D
 	#sudo mdadm --stop /dev/$MD # Execute to remove raid
 	#sudo mdadm --remove /dev/$MD
 	#sudo mdadm --zero-superblock /dev/$DISK1 /dev/$DISK2 ... /dev/$DISKn
+
+
+
+
+
+sudo mdadm --create /dev/md0 --level=1 --raid-devices=3 /dev/nvme0n1 /dev/nvme3n1 /dev/nvme4n1
+
+
 
 # Create filesystem (i.e. ext4) on block device ($MD)
 sudo mkfs.ext4 /dev/$MD
