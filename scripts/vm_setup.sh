@@ -13,17 +13,17 @@ apt-get -y install tuned # A system tuning service for Linux.
 apt-get -y install curl
 
 #### Install vmctl VM control script
-echo "PATH=\"/usr/local/sbin:\$PATH\"" | tee -a ~/.profile
+echo "PATH=\"/usr/local/sbin:\$PATH\"" | tee -a home/satoshi/.profile
 
 #### Disable Password Authentication & configure Yubikey & Host Public Key Access
 sed -i 's/#.*PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config # Disable password login
-mkdir -p ~/.ssh
-touch ~/.ssh/authorized_keys
-chown -R $USER:$USER ~/.ssh
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/authorized_keys
-#read -p "Yubikey Public Key: " YUBIKEY; echo $YUBIKEY | tee -a ~/.ssh/authorized_keys; echo "Yubikey added to ~/.ssh/authorized_keys"
-#read -p "Base Host Server Public Key: " HOSTKEY; echo "$HOSTKEY # Base Host Server Key" | tee -a ~/.ssh/authorized_keys; echo "Base Host Server Key added to ~/.ssh/authorized_keys"
+mkdir -p home/satoshi/.ssh
+touch home/satoshi/.ssh/authorized_keys
+chown -R satoshi:satoshi ~/.ssh
+chmod 700 home/satoshi/.ssh
+chmod 600 home/satoshi/.ssh/authorized_keys
+echo $1 | tee -a home/satoshi/.ssh/authorized_keys # Add Yubikey to ~/.ssh/authorized_keys
+echo $2 | tee -a home/satoshi/.ssh/authorized_keys # Add Base Host Server Key to ~/.ssh/authorized_keys
 
 #### Tune the machine for running KVM guests
 systemctl enable tuned --now; sleep 5 # Enable and start the TuneD service and wait 5 seconds
@@ -38,8 +38,8 @@ priority = 1
 EOF
 sed -i 's/watchdog_module="none"/watchdog_module="i6300esb"/g' /etc/default/watchdog # Set the watchdog_module to i6300esb
 systemctl enable watchdog # Enable WDT to start on next boot
-echo ""; echo "Notes: Run \"dmesg | grep i6300\" to check the watchdog module is up and working"
-echo "       Run \"echo c > /proc/sysrq-trigger\" as root to verify the wdt will reset the machine"; echo ""
+# Note: Run "dmesg | grep i6300" to check the watchdog module is up and working
+# Note: Run "echo c > /proc/sysrq-trigger" as root to verify the wdt will reset the machine
 
-echo "Fully powering off the VM (not restart). This is important as it'll allow it to adopt the new [WDT] hardware configuration."
+#### Fully powering off the VM (not restart). This is important as it'll allow it to adopt the new [WDT] hardware configuration.
 shutdown now
