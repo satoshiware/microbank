@@ -41,6 +41,4 @@ systemctl enable watchdog # Enable WDT to start on next boot
 # Note: Run "echo c > /proc/sysrq-trigger" as root to verify the wdt will reset the machine
 
 #### Fully powering off the VM (not restart). This is important as it'll allow it to adopt the new [WDT] hardware configuration.
-(sleep 3; shutdown now)&
-echo "finished" > /dev/stdout
-exit 0
+shutdown now
