@@ -80,6 +80,7 @@ sudo apt-get -y install qemu-utils              # Provides tools to create, conv
 sudo apt-get -y install guestfs-tools           # Provides a set of extended command-line tools for managing virtual machines.
 sudo apt-get -y install libosinfo-bin           # A library for managing OS information for virtualization. (libosinfo)
 sudo apt-get -y install tuned                   # A system tuning service for Linux.
+sudo apt-get -y install jq                      # Command-line JSON processing tool
 
 # Disable Password Authentication
 sudo sed -i 's/#.*PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config # Disable password login
@@ -93,8 +94,47 @@ read -p "Yubikey Public Key (For Next Login): " YUBIKEY; echo $YUBIKEY | sudo te
 # Generate public/private keys (non-encrytped) for "satoshi"
 ssh-keygen -t ed25519 -f /home/satoshi/.ssh/vmkey -N "" -C ""
 
-# Add sshvm alias for easy ssh connections to VMs
-echo $'alias sshvm=\'echo ""; sudo virsh list --all; echo ""; read -p "What vm would you like to connect to? " VM_NAME; ssh satoshi@${VM_NAME}.local -i ~/.ssh/vmkey\'' | sudo tee -a /etc/bash.bashrc
+# Add sshvm script for easy ssh connections to VMs
+cat << EOF | sudo tee /usr/local/sbin/sshvm
+#!/bin/bash
+
+# Check for any parameter passed
+if [[ ! -z \${1} ]]; then
+    ssh satoshi@\${1}.local -i ~/.ssh/vmkey
+    exit
+fi
+
+# Fill directory with all VM names for autocompletion
+SSDWEAR=\$((1 + \$RANDOM % 100000)) # Random location to mitigate any possibility of SSD/NVME wear
+rm -rf /tmp/vmssh/\$SSDWEAR
+mkdir -p /tmp/vmssh/\$SSDWEAR
+mapfile -t array < <( sudo virsh list --all | tail --lines=+3 | awk '{print \$2}' )
+for vm in "\${array[@]}"; do
+    touch /tmp/vmssh/\$SSDWEAR/\$vm
+done
+cd /tmp/vmssh/\$SSDWEAR
+
+# Show VMs and their statuses
+echo ""
+sudo virsh list --all
+
+# Get VM of choice from user
+echo ""
+read -e -p "What vm would you like to connect to? " VM_NAME
+
+# If nothing was entered then exit
+if [[ -z \${VM_NAME} ]]; then
+    exit
+fi
+
+# SSH login via VM number or VM name
+if [[ "\$VM_NAME" =~ ^[0-9]+\$ ]]; then
+    ssh satoshi@\${array[((\${VM_NAME} - 1))]}.local -i ~/.ssh/vmkey
+else
+    ssh satoshi@\${VM_NAME}.local -i ~/.ssh/vmkey
+fi
+EOF
+sudo chmod 755 /usr/local/sbin/sshvm
 
 #### Update Grub to configure I/O memory management unit (IOMMU) in pass-through mode (for AMD CPUs, IOMMU is enabled by default)
 sudo sed -i "s/GRUB_CMDLINE_LINUX=\"/&intel_iommu=on iommu=pt/" /etc/default/grub
