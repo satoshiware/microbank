@@ -13,17 +13,16 @@ apt-get -y install tuned # A system tuning service for Linux.
 apt-get -y install curl
 
 #### Install vmctl VM control script
-echo "PATH=\"/usr/local/sbin:\$PATH\"" | tee -a home/satoshi/.profile
+echo "PATH=\"/usr/local/sbin:\$PATH\"" | tee -a /home/satoshi/.profile
 
 #### Disable Password Authentication & configure Yubikey & Host Public Key Access
 sed -i 's/#.*PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config # Disable password login
-mkdir -p home/satoshi/.ssh
-touch home/satoshi/.ssh/authorized_keys
-chown -R satoshi:satoshi ~/.ssh
-chmod 700 home/satoshi/.ssh
-chmod 600 home/satoshi/.ssh/authorized_keys
-echo $1 | tee -a home/satoshi/.ssh/authorized_keys # Add Yubikey to ~/.ssh/authorized_keys
-echo $2 | tee -a home/satoshi/.ssh/authorized_keys # Add Base Host Server Key to ~/.ssh/authorized_keys
+mkdir -p /home/satoshi/.ssh
+touch /home/satoshi/.ssh/authorized_keys
+chown -R satoshi:satoshi /home/satoshi/.ssh
+chmod 700 /home/satoshi/.ssh
+chmod 600 /home/satoshi/.ssh/authorized_keys
+echo "${1} # Base Host Server Key" | tee -a /home/satoshi/.ssh/authorized_keys # Add Base Host Server Key to /home/satoshi/.ssh/authorized_keys
 
 #### Tune the machine for running KVM guests
 systemctl enable tuned --now; sleep 5 # Enable and start the TuneD service and wait 5 seconds
@@ -42,4 +41,6 @@ systemctl enable watchdog # Enable WDT to start on next boot
 # Note: Run "echo c > /proc/sysrq-trigger" as root to verify the wdt will reset the machine
 
 #### Fully powering off the VM (not restart). This is important as it'll allow it to adopt the new [WDT] hardware configuration.
-shutdown now
+(sleep 3; shutdown now)&
+echo "finished" > /dev/stdout
+exit 0
