@@ -101,7 +101,7 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
         echo -n "."
         if [ $(sudo virsh list --all | grep "running" | grep "$VM_NAME" | wc -c) -eq 0 ]; then
             finished=1
-            echo ""; sudo virsh start $VM_NAME
+            sleep 3; echo ""; sudo virsh start $VM_NAME
         fi
     done
 
@@ -177,7 +177,7 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
         echo -n "."
         if [ $(sudo virsh list --all | grep "running" | grep "$VM_NAME" | wc -c) -eq 0 ]; then
             finished=1
-            echo ""; sudo virsh start $VM_NAME
+            sleep 3; echo ""; sudo virsh start $VM_NAME
         fi
     done
 
@@ -239,5 +239,5 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
 
 else
     $0 --help
-    echo "Script Version 0.051"
+    echo "Script Version 0.052"
 fi
