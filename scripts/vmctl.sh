@@ -195,13 +195,13 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
 
     # Write to log
     if [[ ! -f ~/vm-creation.log ]]; then
-        echo "                         VM_NAME      RAM  /  MAX (MB)      vCPU / MAX      Disk Size (GB)      Location    MAC                Description" > ~/vm-creation.log
+        echo "                         VM_NAME         RAM  /  MAX (MB)      vCPU / MAX      Disk Size (GB)      Location    MAC                Description" > ~/vm-creation.log
         echo "-----------------------------------------------------------------------------------------------------------------------------------------------------------" >> ~/vm-creation.log
     fi
     read -p "Enter description for this VM: " DESCRIPTION
     MAC=$(sudo virsh domifaddr $VM_NAME --source agent | grep -io 'e.*[0-9A-F]\{2\}\(:[0-9A-F]\{2\}\)\{5\}' | tr -s ' ' | cut -d " " -f 2)
     echo -n "vmctl --create_preloaded " >> ~/vm-creation.log
-    printf "%-12s %-7s %-13s %-6s %-8s %-19s %-11s %-18s # %-0s - $(date)\n" "${VM_NAME}" "${RAM}" "${MAXRAM}" "${CPUS}" "${MAXCPUS}" "${DISKSIZE}" "${DRIVE}" "${MAC}" "${DESCRIPTION}" >> ~/vm-creation.log
+    printf "%-15s %-7s %-13s %-6s %-8s %-19s %-11s %-18s # %-0s - $(date)\n" "${VM_NAME}" "${RAM}" "${MAXRAM}" "${CPUS}" "${MAXCPUS}" "${DISKSIZE}" "${DRIVE}" "${MAC}" "${DESCRIPTION}" >> ~/vm-creation.log
 
 elif [[ $1 == "--shutdown" ]]; then # Freeze all VMs and shutdown the host server
     mapfile -t vm_array < <( sudo virsh list --all --name )
@@ -239,5 +239,5 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
 
 else
     $0 --help
-    echo "Script Version 0.05"
+    echo "Script Version 0.051"
 fi
