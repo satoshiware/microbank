@@ -18,7 +18,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --create      Create new VM instance
       --shutdown    Freeze all VMs and shutdown the host server
       --reboot      Freeze all VMs and reboot the host server
-      --delete      Deletes a VM instance; Parameters: $VM_NAME
+      --delete      Deletes a VM instance; Parameters: \$VM_NAME
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (vmctl) in /usr/local/sbin (/satoshiware/microbank/scripts/vmctl.sh)
@@ -47,12 +47,17 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
     read -p "Number of vCPUs (e.g. 1): " CPUS
     read -p "Maximum Number of vCPUs (e.g. 4): " MAXCPUS
     read -p "Virtual Disk Size (GBs; e.g. 20): " DISKSIZE
-    read -p "Image file location (Relative to \"/var/lib/libvirt/images\"; e.g. \".\"): " DRIVE
+    cd /var/lib/libvirt/images; echo ""; echo "Image File Locations:"; echo "    ."; sudo find ./ -type l | sed 's/^.\//    /'; echo ""
+    read -p "Image File Location (Relative to \"/var/lib/libvirt/images\"; e.g. \".\"): " DRIVE
 
     $0 --create_preloaded $VM_NAME $RAM $MAXRAM $CPUS $MAXCPUS $DISKSIZE $DRIVE
 
 elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloaded values
     VM_NAME=$2; RAM=$3; MAXRAM=$4; CPUS=$5; MAXCPUS=$6; DISKSIZE=$7; DRIVE=$8; MAC=$9
+
+    # Let user know status of encrypted VM capabilities
+    echo ""; echo "TODO: AMD's \"Secure Encrypted Virtualization\" (SEV) w/ \"--launchSecurity sev\" has yet to be added to this script."
+    echo "Intel's \"Trust Domain Extensions\" (TDX) is still not availble in QEMU/KVM"
 
     # If MAC address is defined, then format variable properly
     if [[ ! -z $MAC ]]; then
@@ -89,19 +94,114 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
         --watchdog model=i6300esb,action=reset \
         --boot uefi
 
-    echo ""; echo "TODO: AMD's \"Secure Encrypted Virtualization\" (SEV) w/ \"--launchSecurity sev\" has yet to be added to this script."
-    echo "Intel's \"Trust Domain Extensions\" (TDX) is still not availble in QEMU/KVM"
+    # Wait 'till setup is finished to restart machine
+    finished=0; echo ""; echo -n "Waiting 'till \"$VM_NAME\" VM instance is done installing/shutdown to then start/continue"
+    while [[ ${finished} -eq 0 ]]; do
+        sleep 1
+        echo -n "."
+        if [ $(sudo virsh list --all | grep "running" | grep "$VM_NAME" | wc -c) -eq 0 ]; then
+            finished=1
+            echo ""; sudo virsh start $VM_NAME
+        fi
+    done
 
-    echo ""; echo "Note: When install is complete (~5 Minutes), it will shutdown (and stay there) 'till the host-server reboots or 'till it's manually started."
+    # Wait 'till new VM is finished booting
+    finished=0; echo ""; echo -n "Waiting 'till \"$VM_NAME\" VM instance is finished booting"
+    while [[ ${finished} -eq 0 ]]; do
+        sleep 1
+        echo -n "."
+        PID=$(sudo virsh -c qemu:///system qemu-agent-command $VM_NAME "{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/usr/bin/ls\",\"arg\":[],\"capture-output\":true}}" 2> /dev/null | cut -d ":" -f 3 | sed 's/}}//')
+        if [[ ! -z $PID ]]; then
+            finished=1
+            echo ""; echo "Boot Successful"
+        fi
+    done
 
-    echo ""; echo "CMD to boot up new VM: \"sudo virsh start ${VM_NAME:0:14}\""
-    echo "Once new VM is up and running, configure its static IP in the router."
-    echo "Then login (as satoshi) and run post install script:"
-    echo "    cd ~; sudo apt-get -y install git"
-    echo "    git clone https://github.com/satoshiware/microbank"
-    echo "    bash ~/microbank/scripts/vm_setup.sh"
+    # Wait here 'till user has setup a static IP for the new VM in the OPNsense/PFsense router
+    echo "This is the best time to setup a STATIC IP for the \"$VM_NAME\" VM in your OPNsense/PFsense router."
+    if [[ ! -z $MAC ]]; then
+        echo "Note: A MAC address was provided; this may be indicative you already have a STATIC IP setup."
+        read -p "Press the enter key when you're ready..."
+    else
+        read -p "Press the enter key when you're finished..."
+        read -p "Are you sure you are finished?... Press the enter key to continue..."
+        read -p "Are you REALLY sure?... Press the enter key to continue..."
+    fi
 
-    echo ""; echo "SSH (satoshi) Host Login Key: $(sudo cat /home/satoshi/.ssh/vmkey.pub)"
+    # Install git on new instance
+    PID=$(sudo virsh -c qemu:///system qemu-agent-command $VM_NAME "{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/usr/bin/apt-get\",\"arg\":[\"-y\",\"install\",\"git\"],\"capture-output\":true}}" | cut -d ":" -f 3 | sed 's/}}//')
+    finished=0; echo ""; echo -n "Installing \"git\" on the \"$VM_NAME\" VM instance"
+    while [[ ${finished} -eq 0 ]]; do
+        sleep 1
+        echo -n "."
+        STATUS=$(sudo virsh -c qemu:///system qemu-agent-command $VM_NAME "{\"execute\":\"guest-exec-status\",\"arguments\":{\"pid\":$PID}}" 2> /dev/null)
+        if [[ $(echo $STATUS | jq '.return.exited') == "true" || -z $STATUS ]]; then
+            finished=1
+            echo ""; echo $STATUS | jq -r '.return."out-data"' | base64 --decode
+            echo -n "Exit Code: "; echo $STATUS | jq '.return.exitcode'
+        fi
+    done
+
+    # Clone microbank repository from Satoshiware
+    PID=$(sudo virsh -c qemu:///system qemu-agent-command $VM_NAME "{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/usr/bin/git\",\"arg\":[\"clone\",\"https://github.com/satoshiware/microbank\",\"/home/satoshi/microbank\"],\"capture-output\":true}}" | cut -d ":" -f 3 | sed 's/}}//')
+    finished=0; echo ""; echo -n "Cloning the microbank repository from Satoshiware on the \"$VM_NAME\" VM instance"
+    while [[ ${finished} -eq 0 ]]; do
+        sleep 1
+        echo -n "."
+        STATUS=$(sudo virsh -c qemu:///system qemu-agent-command $VM_NAME "{\"execute\":\"guest-exec-status\",\"arguments\":{\"pid\":$PID}}" 2> /dev/null)
+        if [[ $(echo $STATUS | jq '.return.exited') == "true" || -z $STATUS ]]; then
+            finished=1
+            echo ""; echo $STATUS | jq -r '.return."err-data"' | base64 --decode
+            echo -n "Exit Code: "; echo $STATUS | jq '.return.exitcode'
+        fi
+    done
+
+    # Run the vm_setup.sh script (shuts down the VM when finished)
+    VMKEY=$(cat /home/satoshi/.ssh/vmkey.pub)
+    PID=$(sudo virsh -c qemu:///system qemu-agent-command $VM_NAME "{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/usr/bin/bash\",\"arg\":[\"/home/satoshi/microbank/scripts/vm_setup.sh\",\"${VMKEY}\"],\"capture-output\":true}}" | cut -d ":" -f 3 | sed 's/}}//')
+    finished=0; echo ""; echo -n "Running the \"vm_setup.sh\" script on the \"$VM_NAME\" VM instance"
+    while [[ ${finished} -eq 0 ]]; do
+        sleep 1
+        echo -n "."
+        STATUS=$(sudo virsh -c qemu:///system qemu-agent-command $VM_NAME "{\"execute\":\"guest-exec-status\",\"arguments\":{\"pid\":$PID}}" 2> /dev/null)
+        if [[ $(echo $STATUS | jq '.return.exited') == "true" || -z $STATUS ]]; then
+            finished=1
+            echo ""; echo "Shutting Down..."
+        fi
+    done
+
+    # Wait 'till shutdown is finished to restart machine
+    finished=0; echo ""; echo -n "Waiting 'till \"$VM_NAME\" VM instance is done shutting down to restart"
+    while [[ ${finished} -eq 0 ]]; do
+        sleep 1
+        echo -n "."
+        if [ $(sudo virsh list --all | grep "running" | grep "$VM_NAME" | wc -c) -eq 0 ]; then
+            finished=1
+            echo ""; sudo virsh start $VM_NAME
+        fi
+    done
+
+    # Wait 'till new VM is finished booting
+    finished=0; echo ""; echo -n "Waiting 'till \"$VM_NAME\" VM instance is finished booting"
+    while [[ ${finished} -eq 0 ]]; do
+        sleep 1
+        echo -n "."
+        PID=$(sudo virsh -c qemu:///system qemu-agent-command $VM_NAME "{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/usr/bin/ls\",\"arg\":[],\"capture-output\":true}}" 2> /dev/null | cut -d ":" -f 3 | sed 's/}}//')
+        if [[ ! -z $PID ]]; then
+            finished=1
+            echo ""; echo "Boot Successful and ALL DONE!"
+        fi
+    done
+
+    # Write to log
+    if [[ ! -f ~/vm-creation.log ]]; then
+        echo "                         VM_NAME      RAM  /  MAX (MB)      vCPU / MAX      Disk Size (GB)      Location    MAC                Description" > ~/vm-creation.log
+        echo "-----------------------------------------------------------------------------------------------------------------------------------------------------------" >> ~/vm-creation.log
+    fi
+    read -p "Enter description for this VM: " DESCRIPTION
+    MAC=$(sudo virsh domifaddr $VM_NAME --source agent | grep -io 'e.*[0-9A-F]\{2\}\(:[0-9A-F]\{2\}\)\{5\}' | tr -s ' ' | cut -d " " -f 2)
+    echo -n "vmctl --create_preloaded " >> ~/vm-creation.log
+    printf "%-12s %-7s %-13s %-6s %-8s %-19s %-11s %-18s # %-0s - $(date)\n" "${VM_NAME}" "${RAM}" "${MAXRAM}" "${CPUS}" "${MAXCPUS}" "${DISKSIZE}" "${DRIVE}" "${MAC}" "${DESCRIPTION}" >> ~/vm-creation.log
 
 elif [[ $1 == "--shutdown" ]]; then # Freeze all VMs and shutdown the host server
     mapfile -t vm_array < <( sudo virsh list --all --name )
@@ -131,9 +231,13 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
     sudo virsh destroy ${2}
     sudo virsh managedsave-remove ${2}
     sudo virsh undefine --nvram ${2}
-    sudo rm /var/lib/libvirt/images/${2}.qcow2 # Remove VM (Only if it is shutdown)
+    sudo find -L /var/lib/libvirt/images -name "${2}.qcow2" -type f -delete # Remove VM (Only if it is shutdown)
+    echo "vmctl --delete ${2} # $(date)"  >> ~/vm-creation.log # Show the deletion in the VM Creation log
+
+    echo ""; echo "Remember to remove the static IP of the \"${2}\" VM instance (if it has one) in the OPNsense/PFsense router!"
+    read -p "Press the enter key to continue..."
 
 else
     $0 --help
-    echo "Script Version 0.03"
+    echo "Script Version 0.05"
 fi
