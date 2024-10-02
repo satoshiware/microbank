@@ -211,5 +211,18 @@ bash ~/microbank/scripts/pre_fork_micro/p2pconnect.sh --install
 bash ~/microbank/scripts/send_messages.sh --install
 bash ~/microbank/scripts/dynamic_dns.sh --install
 
+# Create links (for backup purposes) to all critical files needed to restore this node
+cd ~; mkdir backup
+ln -s /home/p2p/.ssh/authorized_keys ~/backup/
+ln -s /etc/bitcoin.conf ~/backup
+ln -s /root/.ssh/known_hosts ~/backup
+ln -s /root/.ssh/p2pkey ~/backup
+ln -s /root/.ssh/p2pkey.pub ~/backup
+ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
+ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
+ln -s /etc/default/send_messages.env ~/backup
+ln -s /etc/default/dynamic_dns.env ~/backup
+ln -s /var/spool/cron/crontabs/satoshi ~/backup
+
 # Restart the machine
 sudo reboot now
