@@ -11,6 +11,7 @@ apt-get -y upgrade
 apt-get -y install watchdog
 apt-get -y install tuned # A system tuning service for Linux.
 apt-get -y install curl
+apt-get -y install rsync # Remote (& local) file synchronization tool.
 
 #### Install vmctl VM control script
 echo "PATH=\"/usr/local/sbin:\$PATH\"" | tee -a /home/satoshi/.profile
