@@ -94,6 +94,9 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
         i=$(($i+1))
     done
 
+    # Add link (for backup purposes) to the dynamic_dns.env file
+    ln -s /etc/default/dynamic_dns.env ~/backup
+
 elif [[ $1 = "--update" ]]; then # Check for an IP address change and update, log, and report to adminstrator via email accordingly (requires send_messages to be configured): RECIPIENTS_NAME  EMAIL
     # Load the root domain, key, secret, first dns record, and last known good IP address
     if [[ -f /etc/default/dynamic_dns.env ]]; then
