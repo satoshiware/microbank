@@ -182,6 +182,9 @@ EOF
     echo "# ${CONNNAME}, CONN_ID: ${TMSTAMP}, ${BANKADDRESS}:${SSHPORT}" | sudo tee -a /etc/bitcoin.conf # Add comment to the bitcoin.conf file
     echo "addnode=localhost:${LOCALMICROPORT}" | sudo tee -a /etc/bitcoin.conf # Add connection
 
+    # Add link (for backup purposes) to the new p2pssh@ environment file
+    ln -s /etc/default/p2pssh@${TMSTAMP} ~/backup
+
 elif [[ $1 = "-v" || $1 = "--view" ]]; then # See all configured connections
     # Show the contents of the Authorized Keys file (inbound)
     echo "Inbound: Authorized Keys File (/home/p2p/.ssh/authorized_keys)"; echo "------------------------------------------------------------------"; sudo cat /home/p2p/.ssh/authorized_keys
@@ -202,6 +205,7 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection: CONNECTION_
     LOCAL_PORT=$(grep -o 'LOCAL_PORT=[0-9]*' /etc/default/p2pssh@${2}* 2> /dev/null | cut -d '=' -f 2) # Get the "Local Port" that corresponds with the time stamp
 
     sudo rm /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
+    rm ~/backup/p2pssh@${2} # Remove backup link to the p2pssh@ environment file
 
     sudo sed -i "/${2}/d" /etc/bitcoin.conf 2> /dev/null # Remove the comment line containing the time stamp
     sudo sed -i "/${LOCAL_PORT}/d" /etc/bitcoin.conf 2> /dev/null # Remove the "addnode=" line containing the "LOCAL_PORT"
@@ -231,5 +235,5 @@ elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for 
 
 else
     $0 --help
-    echo "Script Version 0.2"
+    echo "Script Version 0.21"
 fi
