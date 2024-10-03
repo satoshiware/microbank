@@ -18,6 +18,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --create      Create new VM instance
       --shutdown    Freeze all VMs and shutdown the host server
       --reboot      Freeze all VMs and reboot the host server
+      --sync        Synchronize the system clock of each VM with the RTC
       --delete      Deletes a VM instance; Parameters: \$VM_NAME
 EOF
 
@@ -84,7 +85,6 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
         --disk path=/var/lib/libvirt/images/${DRIVE}/${VM_NAME:0:14}.qcow2,size=${DISKSIZE},format=qcow2,cache=none,discard=unmap \
         --tpm model='tpm-crb',type=emulator,version='2.0' \
         --rng /dev/urandom,model=virtio \
-        --rng /dev/random,model=virtio \
         --channel type=unix,target.type=virtio,target.name=org.qemu.guest_agent.0 \
         --graphics none \
         --extra-args "auto=true hostname=\"${VM_NAME:0:14}\" domain=\"local\" console=ttyS0,115200n8 serial" \
@@ -227,6 +227,21 @@ elif [[ $1 == "--reboot" ]]; then # Freeze all VMs and reboot the host server
     echo "VMs are being put into saved states..."
     echo "Restarting in 5 minutes..."
 
+elif [[ $1 == "--sync" ]]; then # Synchronize the system clock of each VM with the RTC
+    mapfile -t vm_array < <( sudo virsh list --all --name )
+    while read -r vm; do
+        PID=$(sudo virsh -c qemu:///system qemu-agent-command $vm "{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/sbin/hwclock\",\"arg\":[\"--hctosys\"],\"capture-output\":true}}" 2> /dev/null | cut -d ":" -f 3 | sed 's/}}//')
+        finished=0; echo ""; echo "Syncing the \"$vm\" VM instance system clock with the RTC."
+        while [[ ${finished} -eq 0 ]]; do
+            sleep 1
+            STATUS=$(sudo virsh -c qemu:///system qemu-agent-command $vm "{\"execute\":\"guest-exec-status\",\"arguments\":{\"pid\":$PID}}" 2> /dev/null)
+            if [[ $(echo $STATUS | jq '.return.exited') == "true" || -z $STATUS ]]; then
+                finished=1
+                echo -n "Exit Code: "; echo $STATUS | jq '.return.exitcode'; echo ""
+            fi
+        done
+    done < <( printf '%s\n' "${vm_array[@]}")
+
 elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
     sudo virsh destroy ${2}
     sudo virsh managedsave-remove ${2}
@@ -239,5 +254,5 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
 
 else
     $0 --help
-    echo "Script Version 0.052"
+    echo "Script Version 0.06"
 fi
