@@ -29,7 +29,7 @@ echo "${1} # Base Host Server Key" | tee -a /home/satoshi/.ssh/authorized_keys #
 systemctl enable tuned --now; sleep 5 # Enable and start the TuneD service and wait 5 seconds
 tuned-adm profile virtual-guest # This optimizes the host for running KVM guests
 
-#### Ensure system clock is in sync with the RCT (every 24 hours)
+#### Ensure system clock is in sync with the RTC (every 24 hours)
 (crontab -l; echo "0 0 * * * /sbin/hwclock --hctosys" ) | crontab -
 
 #### Configure Watchdog
