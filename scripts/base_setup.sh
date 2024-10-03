@@ -193,6 +193,9 @@ sudo rm ~/tmp_nwbridge.xml # Delete the nwbridge.xml file; It’s not required a
 echo "PATH=\"/usr/local/sbin:\$PATH\"" | sudo tee -a ~/.profile
 bash ~/microbank/scripts/vmctl.sh --install
 
+#### Set up clock syncing cron job (5 minutes after reboot) for the VMs
+(crontab -l; echo "@reboot sleep 300 && /usr/local/sbin/vmctl --sync" ) | crontab -
+
 # Establish aliases for "sudo shutdown [now]" and "sudo reboot [now]"
 echo $'alias sudo=\'sudo \'' | sudo tee -a /etc/bash.bashrc
 echo $'alias shutdown=\'echo "alias override: use \\"vmctl --shutdown\\""; echo "Manually overide aliases with the \\"\\\\\\" character before the alias cmd."\'' | sudo tee -a /etc/bash.bashrc
