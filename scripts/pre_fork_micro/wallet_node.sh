@@ -262,5 +262,59 @@ ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
 ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
 ln -s /var/spool/cron/crontabs/satoshi ~/backup
 
+# If "~/restore" folder is present then restore all pertinent wallet node files; assumes all files are present
+if [[ -d ~/restore ]]; then
+    # Restore ownership to files
+    sudo chown -R bitcoin:bitcoin ~/restore/wallets
+    sudo chown root:root ~/restore/passphrase
+    sudo chown root:root ~/restore/payouts.env
+    sudo chown root:root ~/restore/payouts.db
+    sudo chown root:root ~/restore/teller.env
+    sudo chown root:bitcoin ~/restore/bitcoin.conf
+    sudo chown root:root ~/restore/known_hosts
+    sudo chown root:root ~/restore/p2pkey
+    sudo chown root:root ~/restore/p2pkey.pub
+    sudo chown root:root ~/restore/send_messages.env
+    sudo chown root:root ~/restore/ssh_host_ed25519_key
+    sudo chown root:root ~/restore/ssh_host_ed25519_key.pub
+    sudo chown root:root ~/restore/p2pssh@*
+
+    # Move files to their correct locations
+    sudo systemctl stop bitcoind
+    sudo rm -rf /var/lib/bitcoin/micro/wallets
+    sudo mv -f ~/restore/wallets /var/lib/bitcoin/micro
+    sudo mv ~/restore/passphrase /root/passphrase
+    sudo mv ~/restore/payouts.env /etc/default/payouts.env
+    sudo mv ~/restore/payouts.db /var/lib/payouts.db
+    sudo mv ~/restore/teller.env /etc/default/teller.env
+    sudo mv ~/restore/bitcoin.conf /etc/bitcoin.conf
+    sudo mv ~/restore/known_hosts /root/.ssh/known_hosts
+    sudo mv ~/restore/p2pkey /root/.ssh/p2pkey
+    sudo mv ~/restore/p2pkey.pub /root/.ssh/p2pkey.pub
+    sudo mv ~/restore/send_messages.env /etc/default/send_messages.env
+    sudo mv ~/restore/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+    sudo mv ~/restore/ssh_host_ed25519_key.pub /etc/ssh/ssh_host_ed25519_key.pub
+    sudo mv ~/restore/p2pssh@* /etc/default/
+
+    # Import Cron jobs
+    while read -r line; do
+        readLine=$line
+        if [[ $readLine == *"/bin/bash"* ]]; then
+            (crontab -l; echo "$readLine") | crontab -
+            sleep 3
+        fi
+    done < ~/restore/satoshi
+
+    # Enable p2pssh service
+    sudo systemctl enable $(ls -all /etc/default/p2pssh@* | cut -d "/" -f 4) --now
+
+    # If database file is present then install sqlite3
+    if [[ -f /var/lib/payouts.db ]]; then
+        sudo apt-get -y install sqlite3; fi
+
+    # Remove the "~/restore" folder
+    cd ~; sudo rm -rf restore
+fi
+
 # Restart the machine
 sudo reboot now
