@@ -204,7 +204,7 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
     printf "%-15s %-7s %-13s %-6s %-8s %-19s %-11s %-18s # %-0s - $(date)\n" "${VM_NAME}" "${RAM}" "${MAXRAM}" "${CPUS}" "${MAXCPUS}" "${DISKSIZE}" "${DRIVE}" "${MAC}" "${DESCRIPTION}" >> ~/vm-creation.log
 
 elif [[ $1 == "--shutdown" ]]; then # Freeze all VMs and shutdown the host server
-    mapfile -t vm_array < <( sudo virsh list --all --name )
+    mapfile -t vm_array < <( sudo virsh list --all --name | tr -s '\n' )
     while read -r vm; do
         if [ ! -z "$vm" ]; then
             sudo virsh managedsave $vm 2> /dev/null # Do this to each one
@@ -216,7 +216,7 @@ elif [[ $1 == "--shutdown" ]]; then # Freeze all VMs and shutdown the host serve
     echo "Shutting down in 5 minutes..."
 
 elif [[ $1 == "--reboot" ]]; then # Freeze all VMs and reboot the host server
-    mapfile -t vm_array < <( sudo virsh list --all --name )
+    mapfile -t vm_array < <( sudo virsh list --all --name | tr -s '\n' )
     while read -r vm; do
         if [ ! -z "$vm" ]; then
             sudo virsh managedsave $vm 2> /dev/null # Do this to each one
@@ -228,7 +228,7 @@ elif [[ $1 == "--reboot" ]]; then # Freeze all VMs and reboot the host server
     echo "Restarting in 5 minutes..."
 
 elif [[ $1 == "--sync" ]]; then # Synchronize the system clock of each VM with the RTC
-    mapfile -t vm_array < <( sudo virsh list --all --name )
+    mapfile -t vm_array < <( sudo virsh list --all --name | tr -s '\n' )
     while read -r vm; do
         PID=$(sudo virsh -c qemu:///system qemu-agent-command $vm "{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/sbin/hwclock\",\"arg\":[\"--hctosys\"],\"capture-output\":true}}" 2> /dev/null | cut -d ":" -f 3 | sed 's/}}//')
         finished=0; echo ""; echo "Syncing the \"$vm\" VM instance system clock with the RTC."
@@ -254,5 +254,5 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
 
 else
     $0 --help
-    echo "Script Version 0.06"
+    echo "Script Version 0.061"
 fi
