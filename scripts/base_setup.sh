@@ -15,7 +15,8 @@ echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
 
 # Give the user pertinent information about this script and how to use it.
 cat << EOF | sudo tee ~/readme.txt
-This host (server) was configured to run Type 1 VMs using qemu/kvm
+This host (server) was configured to run Type 1 VMs using qemu/kvm. It also manages/controls the backups of the VMs
+using the the rsync utility. Everything stored or linked in the /home/satoshi directory, in each VM, will be backed up.
 
 Relevant Commands:
 
@@ -59,10 +60,10 @@ sudo virsh shutdown \$VM_NAME                                           # Shutdo
 sudo virsh reboot \$VM_NAME                                             # Reboot VM instance
 sudo virsh reset domain \$VM_NAME                                       # Sends the reset signal (as if the reset button was pressed)
 sudo virsh destroy \$VM_NAME --graceful                                 # Force a shutdown (gracefully if possible)
-sshvm                                                                   # Alias (with no arguments) for quick ssh connection (after prompt) to any VM
 
-Note: The "vmctl" script was installed. Use this to install new VM instances.
-    Execute "vmctl" to learn of its features.
+#### Scripts ####
+sshvm # Make easy and quick ssh connections to any VM.
+vmctl # Use this to install new VM instances and also to make backups or help restore backups.
 EOF
 read -p "Press the enter key to continue..."
 
@@ -129,12 +130,8 @@ if [[ -z \${VM_NAME} ]]; then
     exit
 fi
 
-# SSH login via VM number or VM name
-if [[ "\$VM_NAME" =~ ^[0-9]+\$ ]]; then
-    ssh satoshi@\${array[((\${VM_NAME} - 1))]}.local -i ~/.ssh/vmkey
-else
-    ssh satoshi@\${VM_NAME}.local -i ~/.ssh/vmkey
-fi
+# SSH login via VM Name
+ssh satoshi@\${VM_NAME}.local -i ~/.ssh/vmkey
 EOF
 sudo chmod 755 /usr/local/sbin/sshvm
 
