@@ -18,7 +18,9 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --create      Create new VM instance
       --shutdown    Freeze all VMs and shutdown the host server
       --reboot      Freeze all VMs and reboot the host server
-      --sync        Synchronize the system clock of each VM with the RTC
+      --sync        Synchronize the system clock of each VM with the RTC (used with cronjob @reboot)
+      --backup      Backup all pertinent VM files to ~/rsbakcup
+      --restore     Restore backup files to \$VM_NAME @ /home/satoshi/restore; Parameters: \$VM_NAME
       --delete      Deletes a VM instance; Parameters: \$VM_NAME
 EOF
 
@@ -227,7 +229,7 @@ elif [[ $1 == "--reboot" ]]; then # Freeze all VMs and reboot the host server
     echo "VMs are being put into saved states..."
     echo "Restarting in 5 minutes..."
 
-elif [[ $1 == "--sync" ]]; then # Synchronize the system clock of each VM with the RTC
+elif [[ $1 == "--sync" ]]; then # Synchronize the system clock of each VM with the RTC (used with cronjob @reboot)
     mapfile -t vm_array < <( sudo virsh list --all --name | tr -s '\n' )
     while read -r vm; do
         PID=$(sudo virsh -c qemu:///system qemu-agent-command $vm "{\"execute\":\"guest-exec\",\"arguments\":{\"path\":\"/sbin/hwclock\",\"arg\":[\"--hctosys\"],\"capture-output\":true}}" 2> /dev/null | cut -d ":" -f 3 | sed 's/}}//')
@@ -242,6 +244,15 @@ elif [[ $1 == "--sync" ]]; then # Synchronize the system clock of each VM with t
         done
     done < <( printf '%s\n' "${vm_array[@]}")
 
+elif [[ $1 == "--backup" ]]; then # Backup all pertinent VM files to ~/rsbakcup
+    VM_NAME=${2}
+    mkdir -p ~/rsbackup
+    rsync -caz -e "ssh -i ~/.ssh/vmkey" satoshi@${VM_NAME}.local:~/backup/ ~/rsbackup/${VM_NAME}/ --delete --copy-links --rsync-path="sudo rsync"
+
+elif [[ $1 == "--restore" ]]; then # Restore backup files to $VM_NAME @ /home/satoshi/restore; Parameters: $VM_NAME
+    VM_NAME=${2}
+    rsync -caz -e "ssh -i ~/.ssh/vmkey" ~/rsbackup/${VM_NAME}/ satoshi@${VM_NAME}.local:~/restore
+
 elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
     sudo virsh destroy ${2}
     sudo virsh managedsave-remove ${2}
@@ -254,5 +265,5 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
 
 else
     $0 --help
-    echo "Script Version 0.061"
+    echo "Script Version 0.10"
 fi
