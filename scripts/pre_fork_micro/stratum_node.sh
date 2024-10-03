@@ -346,7 +346,7 @@ $(printf '\t')"0.0.0.0:3333"
 EOF
 
 sudo chown root:ckpool /etc/ckpool.conf
-sudo chmod 440 /etc/ckpool.conf
+sudo chmod 640 /etc/ckpool.conf
 
 # Reload/Enable System Control for ckpool
 sudo systemctl daemon-reload
@@ -371,16 +371,71 @@ bash ~/microbank/scripts/send_messages.sh --install
 
 # Create links (for backup purposes) to all critical files needed to restore this node
 cd ~; mkdir backup
-ln -s /etc/bitcoin.conf ~/backup
-ln -s /root/.ssh/known_hosts ~/backup
-ln -s /root/.ssh/p2pkey ~/backup
-ln -s /root/.ssh/p2pkey.pub ~/backup
-ln -s /etc/default/send_messages.env ~/backup
-ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
-ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
-ln -s /home/stratum/.ssh/authorized_keys ~/backup
-ln -s /var/spool/cron/crontabs/satoshi ~/backup
-ln -s /var/lib/bitcoin/micro/wallets/mining/wallet.dat ~/backup
+sudo ln -s /etc/bitcoin.conf ~/backup
+sudo ln -s /etc/ckpool.conf ~/backup
+sudo ln -s /root/.ssh/known_hosts ~/backup
+sudo ln -s /root/.ssh/p2pkey ~/backup
+sudo ln -s /root/.ssh/p2pkey.pub ~/backup
+sudo ln -s /etc/default/send_messages.env ~/backup
+sudo ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
+sudo ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
+sudo ln -s /home/stratum/.ssh/authorized_keys ~/backup
+sudo ln -s /var/spool/cron/crontabs/satoshi ~/backup
+sudo ln -s /var/lib/bitcoin/micro/wallets/mining/wallet.dat ~/backup
+
+# If "~/restore" folder is present then restore all pertinent wallet node files; assumes all files are present
+if [[ -d ~/restore ]]; then
+    # Restore ownership to files
+    sudo chown root:bitcoin ~/restore/bitcoin.conf
+    sudo chown root:ckpool ~/restore/ckpool.conf
+    sudo chown root:root ~/restore/known_hosts
+    sudo chown root:root ~/restore/p2pkey
+    sudo chown root:root ~/restore/p2pkey.pub
+    sudo chown root:root ~/restore/send_messages.env
+    sudo chown root:root ~/restore/ssh_host_ed25519_key
+    sudo chown root:root ~/restore/ssh_host_ed25519_key.pub
+    sudo chown stratum:stratum ~/restore/authorized_keys
+    sudo chown root:root ~/restore/p2pssh@*
+    sudo chown -R bitcoin:bitcoin ~/restore/wallet.dat
+
+    # Restore mining wallet and make sure it will load on startup
+    sudo systemctl stop bitcoind; echo "Waiting 30 seconds for bitcoind to shutdown..."; sleep 30
+    sudo rm -rf /var/lib/bitcoin/micro/wallets
+    sudo mkdir -p /var/lib/bitcoin/micro/wallets/mining
+    sudo mv -f ~/restore/wallet.dat /var/lib/bitcoin/micro/wallets/mining
+    sudo systemctl start bitcoind; echo "Waiting 60 seconds for bitcoind to start..."; sleep 60
+    sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf loadwallet mining true
+
+    # Move files to their correct locations
+    sudo mv ~/restore/bitcoin.conf /etc/bitcoin.conf
+    sudo mv ~/restore/ckpool.conf /etc/ckpool.conf
+    sudo mv ~/restore/known_hosts /root/.ssh/known_hosts
+    sudo mv ~/restore/p2pkey /root/.ssh/p2pkey
+    sudo mv ~/restore/p2pkey.pub /root/.ssh/p2pkey.pub
+    sudo mv ~/restore/send_messages.env /etc/default/send_messages.env
+    sudo mv ~/restore/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+    sudo mv ~/restore/ssh_host_ed25519_key.pub /etc/ssh/ssh_host_ed25519_key.pub
+    sudo mv ~/restore/authorized_keys /home/stratum/.ssh/authorized_keys
+    sudo mv ~/restore/p2pssh@* /etc/default/
+
+    # Add backup links to the restored p2pssh@* files
+    sudo ln -s /etc/default/p2pssh@* ~/backup
+
+    # Import Cron jobs
+    while read -r line; do
+        readLine=$line
+        if [[ $readLine == *"/bin/bash"* ]]; then
+            (crontab -l | grep -v -F "$readLine"; echo "$readLine") | crontab -
+            sleep 3
+        fi
+    done < ~/restore/satoshi
+
+    # Enable p2pssh service
+    sudo systemctl enable $(ls -all /etc/default/p2pssh@* | cut -d "/" -f 4) --now
+
+    # Remove the "~/restore" folder
+    cd ~; sudo rm -rf restore
+fi
 
 # Restart the machine
 sudo reboot now
