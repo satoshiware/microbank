@@ -245,12 +245,14 @@ elif [[ $1 == "--sync" ]]; then # Synchronize the system clock of each VM with t
     done < <( printf '%s\n' "${vm_array[@]}")
 
 elif [[ $1 == "--backup" ]]; then # Backup all pertinent VM files to ~/rsbakcup
-    mkdir -p ~/rsbackup
+    mkdir -p ~/rsbackup; echo ""
 
     mapfile -t vm_array < <( sudo virsh list --all --name | tr -s '\n' )
     while read -r vm; do
-        rsync -caz -e "ssh -i ~/.ssh/vmkey" satoshi@${vm}.local:~/backup/ ~/rsbackup/${vm}/ --delete --copy-links --rsync-path="sudo rsync"
+        echo -n "."
+        rsync -caz -e "ssh -i ~/.ssh/vmkey" satoshi@${vm}.local:~/backup/ ~/rsbackup/${vm}/ --delete --copy-links --rsync-path="sudo rsync" 2> /dev/null
     done < <( printf '%s\n' "${vm_array[@]}")
+    echo "Done!"; echo ""
 
 elif [[ $1 == "--restore" ]]; then # Restore backup files to $VM_NAME @ /home/satoshi/restore; Parameters: $VM_NAME
     VM_NAME=${2}
@@ -268,5 +270,5 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
 
 else
     $0 --help
-    echo "Script Version 0.11"
+    echo "Script Version 0.111"
 fi
