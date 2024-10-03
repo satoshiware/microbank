@@ -248,19 +248,19 @@ bash ~/microbank/scripts/send_messages.sh --install
 
 # Create links (for backup purposes) to all critical files needed to restore this node
 cd ~; mkdir backup
-ln -s /var/lib/bitcoin/micro/wallets ~/backup
-ln -s /root/passphrase ~/backup
-ln -s /etc/default/payouts.env ~/backup
-ln -s /var/lib/payouts.db ~/backup
-ln -s /etc/default/teller.env ~/backup
-ln -s /etc/bitcoin.conf ~/backup
-ln -s /root/.ssh/known_hosts ~/backup
-ln -s /root/.ssh/p2pkey ~/backup
-ln -s /root/.ssh/p2pkey.pub ~/backup
-ln -s /etc/default/send_messages.env ~/backup
-ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
-ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
-ln -s /var/spool/cron/crontabs/satoshi ~/backup
+sudo ln -s /var/lib/bitcoin/micro/wallets ~/backup
+sudo ln -s /root/passphrase ~/backup
+sudo ln -s /etc/default/payouts.env ~/backup
+sudo ln -s /var/lib/payouts.db ~/backup
+sudo ln -s /etc/default/teller.env ~/backup
+sudo ln -s /etc/bitcoin.conf ~/backup
+sudo ln -s /root/.ssh/known_hosts ~/backup
+sudo ln -s /root/.ssh/p2pkey ~/backup
+sudo ln -s /root/.ssh/p2pkey.pub ~/backup
+sudo ln -s /etc/default/send_messages.env ~/backup
+sudo ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
+sudo ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
+sudo ln -s /var/spool/cron/crontabs/satoshi ~/backup
 
 # If "~/restore" folder is present then restore all pertinent wallet node files; assumes all files are present
 if [[ -d ~/restore ]]; then
@@ -280,7 +280,7 @@ if [[ -d ~/restore ]]; then
     sudo chown root:root ~/restore/p2pssh@*
 
     # Move files to their correct locations
-    sudo systemctl stop bitcoind
+    sudo systemctl stop bitcoind; echo "Waiting 30 seconds for bitcoind to shutdown..."; sleep 30
     sudo rm -rf /var/lib/bitcoin/micro/wallets
     sudo mv -f ~/restore/wallets /var/lib/bitcoin/micro
     sudo mv ~/restore/passphrase /root/passphrase
@@ -296,11 +296,14 @@ if [[ -d ~/restore ]]; then
     sudo mv ~/restore/ssh_host_ed25519_key.pub /etc/ssh/ssh_host_ed25519_key.pub
     sudo mv ~/restore/p2pssh@* /etc/default/
 
+    # Add backup links to the restored p2pssh@* files
+    sudo ln -s /etc/default/p2pssh@* ~/backup
+
     # Import Cron jobs
     while read -r line; do
         readLine=$line
         if [[ $readLine == *"/bin/bash"* ]]; then
-            (crontab -l; echo "$readLine") | crontab -
+            (crontab -l | grep -v -F "$readLine"; echo "$readLine") | crontab -
             sleep 3
         fi
     done < ~/restore/satoshi
