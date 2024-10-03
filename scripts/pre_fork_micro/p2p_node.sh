@@ -213,16 +213,64 @@ bash ~/microbank/scripts/dynamic_dns.sh --install
 
 # Create links (for backup purposes) to all critical files needed to restore this node
 cd ~; mkdir backup
-ln -s /home/p2p/.ssh/authorized_keys ~/backup/
-ln -s /etc/bitcoin.conf ~/backup
-ln -s /root/.ssh/known_hosts ~/backup
-ln -s /root/.ssh/p2pkey ~/backup
-ln -s /root/.ssh/p2pkey.pub ~/backup
-ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
-ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
-ln -s /etc/default/send_messages.env ~/backup
-ln -s /etc/default/dynamic_dns.env ~/backup
-ln -s /var/spool/cron/crontabs/satoshi ~/backup
+sudo ln -s /home/p2p/.ssh/authorized_keys ~/backup/
+sudo ln -s /etc/bitcoin.conf ~/backup
+sudo ln -s /root/.ssh/known_hosts ~/backup
+sudo ln -s /root/.ssh/p2pkey ~/backup
+sudo ln -s /root/.ssh/p2pkey.pub ~/backup
+sudo ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
+sudo ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
+sudo ln -s /etc/default/send_messages.env ~/backup
+sudo ln -s /etc/default/dynamic_dns.env ~/backup
+sudo ln -s /var/spool/cron/crontabs/satoshi ~/backup
+
+# If "~/restore" folder is present then restore all pertinent wallet node files; assumes all files are present
+if [[ -d ~/restore ]]; then
+    # Restore ownership to files
+    sudo chown root:bitcoin ~/restore/bitcoin.conf
+    sudo chown root:root ~/restore/known_hosts
+    sudo chown root:root ~/restore/p2pkey
+    sudo chown root:root ~/restore/p2pkey.pub
+    sudo chown root:root ~/restore/send_messages.env
+    sudo chown root:root ~/restore/dynamic_dns.env
+    sudo chown root:root ~/restore/ssh_host_ed25519_key
+    sudo chown root:root ~/restore/ssh_host_ed25519_key.pub
+    sudo chown p2p:p2p ~/restore/authorized_keys ~/backup
+    sudo chown root:root ~/restore/p2pssh@*
+
+    # Move files to their correct locations
+    sudo mv ~/restore/bitcoin.conf /etc/bitcoin.conf
+    sudo mv ~/restore/known_hosts /root/.ssh/known_hosts
+    sudo mv ~/restore/p2pkey /root/.ssh/p2pkey
+    sudo mv ~/restore/p2pkey.pub /root/.ssh/p2pkey.pub
+    sudo mv ~/restore/send_messages.env /etc/default/send_messages.env
+    sudo mv ~/restore/dynamic_dns.env /etc/default/dynamic_dns.env
+    sudo mv ~/restore/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+    sudo mv ~/restore/ssh_host_ed25519_key.pub /etc/ssh/ssh_host_ed25519_key.pub
+    sudo mv ~/restore/authorized_keys /home/p2p/.ssh/authorized_keys
+    sudo mv ~/restore/p2pssh@* /etc/default/
+
+    # Add backup links to the restored p2pssh@* files
+    sudo ln -s /etc/default/p2pssh@* ~/backup
+
+    # Import Cron jobs
+    while read -r line; do
+        readLine=$line
+        if [[ $readLine == *"/bin/bash"* ]]; then
+            (crontab -l | grep -v -F "$readLine"; echo "$readLine") | crontab -
+            sleep 3
+        fi
+    done < ~/restore/satoshi
+
+    # Enable p2pssh services
+    mapfile -t p2pssh_array < <( ls -all /etc/default/p2pssh@* | cut -d "/" -f 4 )
+    while read -r p2pssh; do
+        sudo systemctl enable $p2pssh --now
+    done < <( printf '%s\n' "${p2pssh_array[@]}")
+
+    # Remove the "~/restore" folder
+    cd ~; sudo rm -rf restore
+fi
 
 # Restart the machine
 sudo reboot now
