@@ -82,6 +82,7 @@ sudo apt-get -y install libosinfo-bin           # A library for managing OS info
 sudo apt-get -y install tuned                   # A system tuning service for Linux.
 sudo apt-get -y install jq                      # Command-line JSON processing tool
 sudo apt-get -y install rsync                   # Remote (& local) file synchronization tool. The host coordinates the backing up of important files for each instance.
+sudo apt-get -y install systemd-timesyncd       # Install "Simplified" Network Time Protocol (NTP) Client
 
 # Disable Password Authentication
 sudo sed -i 's/#.*PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config # Disable password login
