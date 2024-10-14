@@ -195,6 +195,9 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
         fi
     done
 
+    # Load the "globals.env" file to /home/satoshi
+    rsync -caz -e "ssh -i ~/.ssh/vmkey" ~/globals.env satoshi@${VM_NAME}.local:~/globals.env
+
     # Write to log
     if [[ ! -f ~/vm-creation.log ]]; then
         echo "                         VM_NAME         RAM  /  MAX (MB)      vCPU / MAX      Disk Size (GB)      Location    MAC                Description" > ~/vm-creation.log
@@ -270,5 +273,5 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
 
 else
     $0 --help
-    echo "Script Version 0.111"
+    echo "Script Version 0.12"
 fi
