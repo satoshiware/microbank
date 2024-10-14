@@ -62,8 +62,8 @@ tar -xzf ${BTC_CORE_SOURCE##*/}
 rm ${BTC_CORE_SOURCE##*/}
 
 # Install Binaries
-sudo install -m 0755 -o root -g root -t /usr/bin bitcoin-install/bin/*
-rm -rf bitcoin-install
+sudo install -m 0755 -o root -g root -t /usr/bin bitcoin-*/bin/*
+rm -rf bitcoin-*
 
 # Prepare Service Configuration
 cat << EOF | sudo tee /etc/systemd/system/bitcoind.service
@@ -211,15 +211,6 @@ if [[ -d ~/restore ]]; then
     # Remove the "~/restore" folder
     cd ~; sudo rm -rf restore
 fi
-
-# Grant access via UFW to the JSON RPC / REST API and ZEROMQ for the IP range defined in the globals.env file
-for IP in "${BTC_NODE_JSON_RPC_UFW_ACCESS[@]}"; do
-   sudo ufw allow from $IP to any port 8332
-done
-
-for IP in "${BTC_NODE_ZEROMQ_UFW_ACCESS[@]}"; do
-   sudo ufw allow from $IP to any port 29000
-done
 
 # Restart the machine
 sudo reboot now
