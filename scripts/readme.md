@@ -9,11 +9,12 @@ pre_fork_micro(folder)
 	Scipts to setup and operate a new microcurrency during the distribution period.
 
 bitcoin_node.sh
-	Installs a bitcoin node
-
-bitnode.sh
-	Command line utility to simplify the interface with the Bitcoin node.
-
+	Installs a Full Indexed Bitcoin Node.
+	Be sure to forward the P2P port 8333 on the router to this Virtual Machine
+    JSON RPC Authentication:
+        user: satoshi
+        pass: satoshi
+		
 lightning_node.sh
 	Installs a lightning node
 
