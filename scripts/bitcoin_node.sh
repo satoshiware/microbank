@@ -37,11 +37,6 @@ Management:
         pass: satoshi
 
     Command to allow ZeroMQ (ZMQ) connection access on port 29000: "sudo ufw allow from \$IP to any port 29000"
-
-Hardware VM Recommendation:
-    CPU:        4 vCore Min / 8 vCore Max
-    RAM:        2GB Min / 8GB Max
-    Storage:    2TB
 EOF
 read -p "Press the enter key to continue..."
 
