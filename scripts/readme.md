@@ -4,6 +4,7 @@ To execute any of these scripts, login as a sudo user (that is not root) and exe
     cd ~; git clone https://github.com/satoshiware/microbank
     bash ./microbank/scripts/$SCRIPT_NAME.sh
     rm -rf microbank
+	rm globals.env
 
 pre_fork_micro(folder)
     Scipts to setup and operate a new microcurrency during the distribution period.
