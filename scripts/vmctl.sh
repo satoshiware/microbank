@@ -22,6 +22,11 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --backup      Backup all pertinent VM files to ~/rsbakcup
       --restore     Restore backup files to \$VM_NAME @ /home/satoshi/restore; Parameters: \$VM_NAME
       --delete      Deletes a VM instance; Parameters: \$VM_NAME
+
+    Development Options:
+      --dev-backup  Make Backup of .qcow2 image; Parameters: \$VM_NAME
+      --dev-restore Restore the backup of .qcow2 image; Parameters: \$VM_NAME
+      --dev-delete  Delete the backup of .qcow2 image; Parameters: \$VM_NAME
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (vmctl) in /usr/local/sbin (/satoshiware/microbank/scripts/vmctl.sh)
@@ -271,7 +276,20 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
     echo ""; echo "Remember to remove the static IP of the \"${2}\" VM instance (if it has one) in the OPNsense/PFsense router!"
     read -p "Press the enter key to continue..."
 
+elif [[ $1 == "--dev-backup" ]]; then # Make Backup of .qcow2 image; Parameters: $VM_NAME
+    sudo virsh shutdown ${VM_NAME}; sleep 10
+    sudo cp $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2) $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2).bak; sleep 3
+    sudo virsh start ${VM_NAME}
+
+elif [[ $1 == "--dev-restore" ]]; then # Restore the backup of .qcow2 image; Parameters: $VM_NAME
+    sudo virsh shutdown ${VM_NAME}; sleep 10
+    sudo cp $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2.bak) $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2); sleep 3
+    sudo virsh start ${VM_NAME}
+
+elif [[ $1 == "--dev-delete" ]]; then # Delete the backup of .qcow2 image; Parameters: $VM_NAME
+    sudo rm $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2).bak
+
 else
     $0 --help
-    echo "Script Version 0.12"
+    echo "Script Version 0.13"
 fi
