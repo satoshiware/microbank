@@ -13,20 +13,21 @@ fi
 if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
-      --help        Display this help message and exit
-      --install     Install (or upgrade) this script (vmctl) in /usr/local/sbin (/satoshiware/microbank/scripts/vmctl.sh)
-      --create      Create new VM instance
-      --shutdown    Freeze all VMs and shutdown the host server
-      --reboot      Freeze all VMs and reboot the host server
-      --sync        Synchronize the system clock of each VM with the RTC (used with cronjob @reboot)
-      --backup      Backup all pertinent VM files to ~/rsbakcup
-      --restore     Restore backup files to \$VM_NAME @ /home/satoshi/restore; Parameters: \$VM_NAME
-      --delete      Deletes a VM instance; Parameters: \$VM_NAME
+      --help            Display this help message and exit
+      --install         Install (or upgrade) this script (vmctl) in /usr/local/sbin (/satoshiware/microbank/scripts/vmctl.sh)
+      --create          Create new VM instance
+      --shutdown        Freeze all VMs and shutdown the host server
+      --reboot          Freeze all VMs and reboot the host server
+      --sync            Synchronize the system clock of each VM with the RTC (used with cronjob @reboot)
+      --backup          Backup all pertinent VM files to ~/rsbakcup
+      --restore         Restore backup files to \$VM_NAME @ /home/satoshi/restore; Parameters: \$VM_NAME
+      --delete          Deletes a VM instance; Parameters: \$VM_NAME
 
     Development Options:
-      --dev-backup  Make Backup of .qcow2 image; Parameters: \$VM_NAME
-      --dev-restore Restore the backup of .qcow2 image; Parameters: \$VM_NAME
-      --dev-delete  Delete the backup of .qcow2 image; Parameters: \$VM_NAME
+      --dev-backup      Make Backup of .qcow2 image; Parameters: \$VM_NAME
+      --dev-restore     Restore the backup of .qcow2 image; Parameters: \$VM_NAME
+      --dev-delete      Delete the backup of .qcow2 image; Parameters: \$VM_NAME
+      --dev-show-baks   Show all development backups
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (vmctl) in /usr/local/sbin (/satoshiware/microbank/scripts/vmctl.sh)
@@ -277,17 +278,23 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
     read -p "Press the enter key to continue..."
 
 elif [[ $1 == "--dev-backup" ]]; then # Make Backup of .qcow2 image; Parameters: $VM_NAME
+    VM_NAME=${2}
     sudo virsh shutdown ${VM_NAME}; sleep 10
     sudo cp $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2) $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2).bak; sleep 3
     sudo virsh start ${VM_NAME}
 
 elif [[ $1 == "--dev-restore" ]]; then # Restore the backup of .qcow2 image; Parameters: $VM_NAME
+    VM_NAME=${2}
     sudo virsh shutdown ${VM_NAME}; sleep 10
     sudo cp $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2.bak) $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2); sleep 3
     sudo virsh start ${VM_NAME}
 
 elif [[ $1 == "--dev-delete" ]]; then # Delete the backup of .qcow2 image; Parameters: $VM_NAME
+    VM_NAME=${2}
     sudo rm $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2).bak
+
+elif [[ $1 == "--dev-show-baks" ]]; then # Show all development backups
+    sudo find -L /var/lib/libvirt/images -name *.qcow2.bak
 
 else
     $0 --help
