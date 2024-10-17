@@ -22,8 +22,10 @@ FYI:
     Bitcoin configuratijon: /etc/bitcoin.conf
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
 
+	JSON RPC & REST API connections on port 8332 are allowed from any local IP.
+    JSON RPC Password for user satoshi is "satoshi"
+	
 Management:
-    Command to allow incomming node P2P connection on port 8333: "sudo ufw allow from \$IP to any port 8333"
     Make permanent P2P outbound connection:
         btc addnode \$ADDRESS:\$PORT "add"
             ":\$PORT" is not necessary for the default port 8333
@@ -31,12 +33,7 @@ Management:
             ":\$PORT" is not necessary for the default port 8333
             "\$NAME" and "\${DESCRIPTION}" add desired info' as part of the connections' comment heading
 
-    Command to allow an incomming JSON RPC & REST API connection on port 8332: "sudo ufw allow from \$IP to any port 8332"
-    JSON RPC Authentication:
-        user: satoshi
-        pass: satoshi
-
-    Command to allow ZeroMQ (ZMQ) connection access on port 29000: "sudo ufw allow from \$IP to any port 29000"
+    Command to allow ZeroMQ (ZMQ) connection access on port 29000: 'sudo ufw allow from \$IP to any port 29000 comment "\$DESCRIPTION"'
 EOF
 read -p "Press the enter key to continue..."
 
@@ -128,10 +125,8 @@ dbcache=1024
 server=1
 # Accept public REST requests (runs on same port as JSON-RPC).
 rest=1
-# Bind to given address to listen for JSON-RPC connections. This option is ignored unless -rpcallowip is also passed. Port is optional and overrides -rpcport. Use [host]:port notation for IPv6. This option can be specified multiple times. (default: 127.0.0.1 and ::1 i.e., localhost)
+# Bind to given address to listen for JSON-RPC connections. This option is ignored unless -rpcallowip is also passed. This option can be specified multiple times. (default: 127.0.0.1 and ::1)
 rpcbind=0.0.0.0
-# Username (satoshi) and hashed password (satoshi) for JSON-RPC connections. RPC clients connect using rpcuser=<USERNAME>/rpcpassword=<PASSWORD> arguments.
-rpcauth=satoshi:170f4d25565cfe8cbd3ab1c81ad25610\$a8327a4d2241c121e0cd88d1b693cdc6aa3dfbcebb6b863545d090f5d7fa614b
 # Allow JSON-RPC connections from specified source.
 rpcallowip=$(hostname -I | cut -d " " -f 1)/24
 # Set the number of threads to service RPC calls (default = 4)
@@ -140,6 +135,159 @@ rpcthreads=16
 rpcworkqueue=32
 # Number of seconds after which an uncompleted RPC call will time out (default = 30)
 rpcservertimeout=60
+
+# Username (satoshi) and hashed password (satoshi) for JSON-RPC connections. RPC clients connect using rpcuser=<USERNAME>/rpcpassword=<PASSWORD> arguments.
+rpcauth=satoshi:170f4d25565cfe8cbd3ab1c81ad25610\$a8327a4d2241c121e0cd88d1b693cdc6aa3dfbcebb6b863545d090f5d7fa614b
+# Allow users to access any RPC unless they are listed in an `rpcwhitelist` entry
+rpcwhitelistdefault=0
+# Set a whitelist to filter incoming RPC calls for satoshi
+rpcwhitelist=satoshi:getnetworkinfo,getwalletinfo,getbestblockhash
+
+    getbestblockhash
+    getblock
+    getblockchaininfo
+    getblockcount
+    getblockfilter
+    getblockhash
+    getblockheader
+    getblockstats
+    getchaintips
+    getchaintxstats
+    getdifficulty
+    getmempoolancestors
+    getmempooldescendants
+    getmempoolentry
+    getmempoolinfo
+    getrawmempool
+    gettxout
+    gettxoutproof
+    gettxoutsetinfo
+  ??preciousblock
+    verifytxoutproof
+    getmemoryinfo
+    getrpcinfo
+    help
+    uptime
+
+Generating RPCs
+    generateblock
+    generatetoaddress
+    generatetodescriptor
+*Mining RPCs
+    getblocktemplate
+    getmininginfo
+    getnetworkhashps
+  ??prioritisetransaction
+  ??submitblock
+  ??submitheader
+
+*Network RPCs
+    getaddednodeinfo
+    getconnectioncount
+    getnettotals
+    getnetworkinfo
+    getnodeaddresses
+    getpeerinfo
+    listbanned
+Rawtransactions RPCs
+    analyzepsbt
+    combinepsbt
+    combinerawtransaction
+    converttopsbt
+    createpsbt
+    createrawtransaction ********
+    decodepsbt
+    decoderawtransaction *******
+    decodescript *******
+    finalizepsbt
+    fundrawtransaction
+    getrawtransaction *******
+    joinpsbts
+    sendrawtransaction *************
+    signrawtransactionwithkey
+    testmempoolaccept *******
+    utxoupdatepsbt
+Util RPCs
+    createmultisig ********
+    deriveaddresses
+    estimatesmartfee *******
+    getdescriptorinfo
+    getindexinfo
+    signmessagewithprivkey
+    validateaddress  ********
+    verifymessage ********
+Wallet RPCs
+    abandontransaction
+    abortrescan
+    addmultisigaddress
+    *backupwallet
+    bumpfee
+    *createwallet
+    *dumpprivkey
+    *dumpwallet
+    *encryptwallet
+    getaddressesbylabel
+    getaddressinfo
+    *getbalance
+    *getbalances
+    *getnewaddress
+    getrawchangeaddress
+    getreceivedbyaddress
+    getreceivedbylabel
+    gettransaction
+    getunconfirmedbalance
+    *getwalletinfo
+    importaddress
+    importdescriptors
+    importmulti
+    importprivkey
+    importprunedfunds
+    importpubkey
+    importwallet
+    keypoolrefill
+    listaddressgroupings
+    listlabels
+    listlockunspent
+    listreceivedbyaddress
+    listreceivedbylabel
+    listsinceblock
+    listtransactions
+    *listunspent
+    *listwalletdir
+    *listwallets
+    *loadwallet
+    *lockunspent
+    psbtbumpfee
+    removeprunedfunds
+    rescanblockchain
+    send
+    sendmany
+    sendtoaddress
+    sethdseed
+    setlabel
+    settxfee
+    setwalletflag
+    *signmessage
+    *signrawtransactionwithwallet
+    *unloadwallet
+    *upgradewallet
+    walletcreatefundedpsbt
+    *walletlock
+    *walletpassphrase
+    *walletpassphrasechange
+    walletprocesspsbt
+
+
+
+
+
+	
+
+
+
+
+
+
 
 # [zeromq]
 # Enable publishing of block hashes
@@ -154,6 +302,8 @@ zmqpubrawtx=tcp://localhost:29000
 zmqpubsequence=tcp://localhost:29000
 
 # [network]
+# Whitelist P2P peers connecting from the given IP addresses
+whitelist=$(hostname -I | cut -d " " -f 1)/24
 # Add a node IP address "addnode=\$ADDRESS" to connect to and to keep the connection open.
 EOF
 sudo chown root:bitcoin /etc/bitcoin.conf
@@ -161,7 +311,7 @@ sudo chmod 640 /etc/bitcoin.conf
 
 # Configure bitcoind's Log Files; Prevents them from Filling up the Partition
 cat << EOF | sudo tee /etc/logrotate.d/bitcoin
-/var/lib/bitcoin/debug.log {
+/var/log/bitcoin/debug.log {
 $(printf '\t')create 660 root bitcoin
 $(printf '\t')daily
 $(printf '\t')rotate 14
@@ -184,6 +334,8 @@ sudo chmod 660 -R /var/log/bitcoin
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow ssh # Open Default SSH Port
+sudo ufw allow 8333 # Open P2P node connections on port 8333
+sudo ufw allow from \$IP to any port 8332 # Open JSON RPC connections on port 8332 from the local network only <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 sudo ufw --force enable # Enable Firewall @ Boot and Start it now!
 
 # Reload/Enable System Control for new processes
