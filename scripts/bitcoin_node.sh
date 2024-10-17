@@ -22,8 +22,10 @@ FYI:
     Bitcoin configuratijon: /etc/bitcoin.conf
     The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
 
-	JSON RPC & REST API connections on port 8332 are allowed from any local IP.
+    JSON RPC & REST API connections on port 8332 are allowed from any local IP.
     JSON RPC Password for user satoshi is "satoshi"
+	
+	Also, ZeroMQ (ZMQ) connection access on port 29000 is allowed from any local IP.
 	
 Management:
     Make permanent P2P outbound connection:
@@ -32,8 +34,6 @@ Management:
         echo -e "# \$NAME, \${DESCRIPTION}\naddnode=\$ADDRESS:\$PORT" | sudo tee -a /etc/bitcoin.conf
             ":\$PORT" is not necessary for the default port 8333
             "\$NAME" and "\${DESCRIPTION}" add desired info' as part of the connections' comment heading
-
-    Command to allow ZeroMQ (ZMQ) connection access on port 29000: 'sudo ufw allow from \$IP to any port 29000 comment "\$DESCRIPTION"'
 EOF
 read -p "Press the enter key to continue..."
 
@@ -128,7 +128,7 @@ rest=1
 # Bind to given address to listen for JSON-RPC connections. This option is ignored unless -rpcallowip is also passed. This option can be specified multiple times. (default: 127.0.0.1 and ::1)
 rpcbind=0.0.0.0
 # Allow JSON-RPC connections from specified source.
-rpcallowip=$(hostname -I | cut -d " " -f 1)/24
+rpcallowip=$(hostname -I | cut -d "." -f 1,2,3).0/24
 # Set the number of threads to service RPC calls (default = 4)
 rpcthreads=16
 # Set the depth of the work queue to service RPC calls (default = 16)
@@ -141,153 +141,10 @@ rpcauth=satoshi:170f4d25565cfe8cbd3ab1c81ad25610\$a8327a4d2241c121e0cd88d1b693cd
 # Allow users to access any RPC unless they are listed in an `rpcwhitelist` entry
 rpcwhitelistdefault=0
 # Set a whitelist to filter incoming RPC calls for satoshi
-rpcwhitelist=satoshi:getnetworkinfo,getwalletinfo,getbestblockhash
-
-    getbestblockhash
-    getblock
-    getblockchaininfo
-    getblockcount
-    getblockfilter
-    getblockhash
-    getblockheader
-    getblockstats
-    getchaintips
-    getchaintxstats
-    getdifficulty
-    getmempoolancestors
-    getmempooldescendants
-    getmempoolentry
-    getmempoolinfo
-    getrawmempool
-    gettxout
-    gettxoutproof
-    gettxoutsetinfo
-  ??preciousblock
-    verifytxoutproof
-    getmemoryinfo
-    getrpcinfo
-    help
-    uptime
-
-Generating RPCs
-    generateblock
-    generatetoaddress
-    generatetodescriptor
-*Mining RPCs
-    getblocktemplate
-    getmininginfo
-    getnetworkhashps
-  ??prioritisetransaction
-  ??submitblock
-  ??submitheader
-
-*Network RPCs
-    getaddednodeinfo
-    getconnectioncount
-    getnettotals
-    getnetworkinfo
-    getnodeaddresses
-    getpeerinfo
-    listbanned
-Rawtransactions RPCs
-    analyzepsbt
-    combinepsbt
-    combinerawtransaction
-    converttopsbt
-    createpsbt
-    createrawtransaction ********
-    decodepsbt
-    decoderawtransaction *******
-    decodescript *******
-    finalizepsbt
-    fundrawtransaction
-    getrawtransaction *******
-    joinpsbts
-    sendrawtransaction *************
-    signrawtransactionwithkey
-    testmempoolaccept *******
-    utxoupdatepsbt
-Util RPCs
-    createmultisig ********
-    deriveaddresses
-    estimatesmartfee *******
-    getdescriptorinfo
-    getindexinfo
-    signmessagewithprivkey
-    validateaddress  ********
-    verifymessage ********
-Wallet RPCs
-    abandontransaction
-    abortrescan
-    addmultisigaddress
-    *backupwallet
-    bumpfee
-    *createwallet
-    *dumpprivkey
-    *dumpwallet
-    *encryptwallet
-    getaddressesbylabel
-    getaddressinfo
-    *getbalance
-    *getbalances
-    *getnewaddress
-    getrawchangeaddress
-    getreceivedbyaddress
-    getreceivedbylabel
-    gettransaction
-    getunconfirmedbalance
-    *getwalletinfo
-    importaddress
-    importdescriptors
-    importmulti
-    importprivkey
-    importprunedfunds
-    importpubkey
-    importwallet
-    keypoolrefill
-    listaddressgroupings
-    listlabels
-    listlockunspent
-    listreceivedbyaddress
-    listreceivedbylabel
-    listsinceblock
-    listtransactions
-    *listunspent
-    *listwalletdir
-    *listwallets
-    *loadwallet
-    *lockunspent
-    psbtbumpfee
-    removeprunedfunds
-    rescanblockchain
-    send
-    sendmany
-    sendtoaddress
-    sethdseed
-    setlabel
-    settxfee
-    setwalletflag
-    *signmessage
-    *signrawtransactionwithwallet
-    *unloadwallet
-    *upgradewallet
-    walletcreatefundedpsbt
-    *walletlock
-    *walletpassphrase
-    *walletpassphrasechange
-    walletprocesspsbt
-
-
-
-
-
-	
-
-
-
-
-
-
+rpcwhitelist=satoshi:getbestblockhash,getblock,getblockchaininfo,getblockcount,getblockfilter,getblockhash,getblockheader,getblockstats,getchaintips,getchaintxstats,getdifficulty,getmempoolancestors,getmempooldescendants
+rpcwhitelist=satoshi:getmempoolentry,getmempoolinfo,getrawmempool,gettxout,gettxoutproof,gettxoutsetinfo,verifytxoutproof,getmemoryinfo,getrpcinfo,help,uptime,getblocktemplate,getmininginfo,getnetworkhashps,getaddednodeinfo
+rpcwhitelist=satoshi:getconnectioncount,getnettotals,getnetworkinfo,getnodeaddresses,getpeerinfo,listbanned,combinerawtransaction,createrawtransaction,decoderawtransaction,decodescript,getrawtransaction,sendrawtransaction
+rpcwhitelist=satoshi:signrawtransactionwithkey,testmempoolaccept,createmultisig,deriveaddresses,estimatesmartfee,getdescriptorinfo,signmessagewithprivkey,validateaddress,verifymessage,submitblock,submitheader,getindexinfo
 
 # [zeromq]
 # Enable publishing of block hashes
@@ -303,7 +160,7 @@ zmqpubsequence=tcp://localhost:29000
 
 # [network]
 # Whitelist P2P peers connecting from the given IP addresses
-whitelist=$(hostname -I | cut -d " " -f 1)/24
+whitelist=$(hostname -I | cut -d "." -f 1,2,3).0/24
 # Add a node IP address "addnode=\$ADDRESS" to connect to and to keep the connection open.
 EOF
 sudo chown root:bitcoin /etc/bitcoin.conf
@@ -335,7 +192,8 @@ sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow ssh # Open Default SSH Port
 sudo ufw allow 8333 # Open P2P node connections on port 8333
-sudo ufw allow from \$IP to any port 8332 # Open JSON RPC connections on port 8332 from the local network only <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+sudo ufw allow from $(hostname -I | cut -d "." -f 1,2,3).0/24 to any port 8332 # Open JSON RPC connections on port 8332 from the local network only
+sudo ufw allow from $(hostname -I | cut -d "." -f 1,2,3).0/24 to any port 29000 # Open ZeroMQ (ZMQ) connection access on port 29000 from the local network only
 sudo ufw --force enable # Enable Firewall @ Boot and Start it now!
 
 # Reload/Enable System Control for new processes
