@@ -126,7 +126,7 @@ sudo chmod 640 /etc/bitcoin.conf
 
 # Configure bitcoind's Log Files; Prevents them from Filling up the Partition
 cat << EOF | sudo tee /etc/logrotate.d/bitcoin
-/var/lib/bitcoin/micro/debug.log {
+/var/log/bitcoin/micro/debug.log {
 $(printf '\t')create 660 root bitcoin
 $(printf '\t')daily
 $(printf '\t')rotate 14
