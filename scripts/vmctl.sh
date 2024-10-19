@@ -62,7 +62,7 @@ elif [[ $1 == "--create" ]]; then # Create new VM instance
     $0 --create_preloaded $VM_NAME $RAM $MAXRAM $CPUS $MAXCPUS $DISKSIZE $DRIVE
 
 elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloaded values
-    VM_NAME=$2; RAM=$3; MAXRAM=$4; CPUS=$5; MAXCPUS=$6; DISKSIZE=$7; DRIVE=$8; MAC=$9
+    VM_NAME=$2; VM_NAME=${VM_NAME:0:14}; RAM=$3; MAXRAM=$4; CPUS=$5; MAXCPUS=$6; DISKSIZE=$7; DRIVE=$8; MAC=$9
 
     # Let user know status of encrypted VM capabilities
     echo ""; echo "TODO: AMD's \"Secure Encrypted Virtualization\" (SEV) w/ \"--launchSecurity sev\" has yet to be added to this script."
@@ -82,7 +82,7 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
 
     sudo virt-install \
         --connect=qemu:///system \
-        --name ${VM_NAME:0:14} \
+        --name ${VM_NAME} \
         --memory memory=${MAXRAM},currentMemory=${RAM} \
         --vcpus maxvcpus=${MAXCPUS},vcpus=${CPUS} \
         --cpu host-passthrough \
@@ -90,12 +90,12 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
         --location ${URL_ISO} \
         --initrd-inject ${PRESEED_CFG} \
         --os-variant debian11 \
-        --disk path=/var/lib/libvirt/images/${DRIVE}/${VM_NAME:0:14}.qcow2,size=${DISKSIZE},format=qcow2,cache=none,discard=unmap \
+        --disk path=/var/lib/libvirt/images/${DRIVE}/${VM_NAME}.qcow2,size=${DISKSIZE},format=qcow2,cache=none,discard=unmap \
         --tpm model='tpm-crb',type=emulator,version='2.0' \
         --rng /dev/urandom,model=virtio \
         --channel type=unix,target.type=virtio,target.name=org.qemu.guest_agent.0 \
         --graphics none \
-        --extra-args "auto=true hostname=\"${VM_NAME:0:14}\" domain=\"local\" console=ttyS0,115200n8 serial" \
+        --extra-args "auto=true hostname=\"${VM_NAME}\" domain=\"local\" console=ttyS0,115200n8 serial" \
         --console pty,target_type=serial \
         --noautoconsole \
         --autostart \
@@ -298,5 +298,5 @@ elif [[ $1 == "--dev-show-baks" ]]; then # Show all development backups
 
 else
     $0 --help
-    echo "Script Version 0.13"
+    echo "Script Version 0.131"
 fi
