@@ -52,17 +52,16 @@ elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (vmctl) in
 elif [[ $1 == "--create" ]]; then # Create new VM instance
     read -p "Guest OS Name (No Spaces; 14 Char's MAX): " VM_NAME
     read -p "Amount of RAM (Mbytes; e.g. 4096): " RAM
-    read -p "Maximum Amount of RAM (Mbytes; e.g. 8192): " MAXRAM
-    read -p "Number of vCPUs (e.g. 1): " CPUS
-    read -p "Maximum Number of vCPUs (e.g. 4): " MAXCPUS
+    read -p "Maximum Amount of RAM (Mbytes; e.g. 4096): " MAXRAM
+    read -p "Number of vCPUs (e.g. 4): " CPUS
     read -p "Virtual Disk Size (GBs; e.g. 20): " DISKSIZE
     cd /var/lib/libvirt/images; echo ""; echo "Image File Locations:"; echo "    ."; sudo find ./ -type l | sed 's/^.\//    /'; echo ""
     read -p "Image File Location (Relative to \"/var/lib/libvirt/images\"; e.g. \".\"): " DRIVE
 
-    $0 --create_preloaded $VM_NAME $RAM $MAXRAM $CPUS $MAXCPUS $DISKSIZE $DRIVE
+    $0 --create_preloaded $VM_NAME $RAM $MAXRAM $CPUS $DISKSIZE $DRIVE
 
 elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloaded values
-    VM_NAME=$2; VM_NAME=${VM_NAME:0:14}; RAM=$3; MAXRAM=$4; CPUS=$5; MAXCPUS=$6; DISKSIZE=$7; DRIVE=$8; MAC=$9
+    VM_NAME=$2; VM_NAME=${VM_NAME:0:14}; RAM=$3; MAXRAM=$4; CPUS=$5; DISKSIZE=$6; DRIVE=$7; MAC=$8
 
     # Let user know status of encrypted VM capabilities
     echo ""; echo "TODO: AMD's \"Secure Encrypted Virtualization\" (SEV) w/ \"--launchSecurity sev\" has yet to be added to this script."
@@ -84,7 +83,7 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
         --connect=qemu:///system \
         --name ${VM_NAME} \
         --memory memory=${MAXRAM},currentMemory=${RAM} \
-        --vcpus maxvcpus=${MAXCPUS},vcpus=${CPUS} \
+        --vcpus maxvcpus=${CPUS},vcpus=${CPUS} \
         --cpu host-passthrough \
         --network bridge=bridge0$MAC \
         --location ${URL_ISO} \
@@ -206,13 +205,13 @@ elif [[ $1 == "--create_preloaded" ]]; then # Create new VM instance w/ preloade
 
     # Write to log
     if [[ ! -f ~/vm-creation.log ]]; then
-        echo "                         VM_NAME         RAM  /  MAX (MB)      vCPU / MAX      Disk Size (GB)      Location    MAC                Description" > ~/vm-creation.log
-        echo "-----------------------------------------------------------------------------------------------------------------------------------------------------------" >> ~/vm-creation.log
+        echo "                         VM_NAME         RAM  /  MAX (MB)      vCPU      Disk Size (GB)      Location    MAC                Description" > ~/vm-creation.log
+        echo "-----------------------------------------------------------------------------------------------------------------------------------------------------" >> ~/vm-creation.log
     fi
     read -p "Enter description for this VM: " DESCRIPTION
     MAC=$(sudo virsh domifaddr $VM_NAME --source agent | grep -io 'e.*[0-9A-F]\{2\}\(:[0-9A-F]\{2\}\)\{5\}' | tr -s ' ' | cut -d " " -f 2)
     echo -n "vmctl --create_preloaded " >> ~/vm-creation.log
-    printf "%-15s %-7s %-13s %-6s %-8s %-19s %-11s %-18s # %-0s - $(date)\n" "${VM_NAME}" "${RAM}" "${MAXRAM}" "${CPUS}" "${MAXCPUS}" "${DISKSIZE}" "${DRIVE}" "${MAC}" "${DESCRIPTION}" >> ~/vm-creation.log
+    printf "%-15s %-7s %-13s %-9s %-19s %-11s %-18s # %-0s - $(date)\n" "${VM_NAME}" "${RAM}" "${MAXRAM}" "${CPUS}" "${DISKSIZE}" "${DRIVE}" "${MAC}" "${DESCRIPTION}" >> ~/vm-creation.log
 
 elif [[ $1 == "--shutdown" ]]; then # Freeze all VMs and shutdown the host server
     mapfile -t vm_array < <( sudo virsh list --all --name | tr -s '\n' )
@@ -298,5 +297,5 @@ elif [[ $1 == "--dev-show-baks" ]]; then # Show all development backups
 
 else
     $0 --help
-    echo "Script Version 0.131"
+    echo "Script Version 0.132"
 fi
