@@ -22,6 +22,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --backup          Backup all pertinent VM files to ~/rsbakcup
       --restore         Restore backup files to \$VM_NAME @ /home/satoshi/restore; Parameters: \$VM_NAME
       --delete          Deletes a VM instance; Parameters: \$VM_NAME
+      --increase        Increase the size of a qcow2 image; Parameters: \$VM_NAME, $SIZE_GB
 
     Development Options:
       --dev-backup      Make Backup of .qcow2 image; Parameters: \$VM_NAME
@@ -276,6 +277,53 @@ elif [[ $1 == "--delete" ]]; then # Deletes a VM instance; Parameters: $VM_NAME
     echo ""; echo "Remember to remove the static IP of the \"${2}\" VM instance (if it has one) in the OPNsense/PFsense router!"
     read -p "Press the enter key to continue..."
 
+elif [[ $1 == "--increase" ]]; then # Increase the size of a qcow2 image; Parameters: $VM_NAME, $SIZE_GB
+    VM_NAME=${2}; SIZE_GB=${3}
+    if [[ -z $VM_NAME || -z $SIZE_GB ]]; then
+        echo ""; echo "Error! Not all variables (VM_NAME & SIZE_GB) have proper assignments"
+        exit 1;
+    fi
+
+    # Info' for the user
+    echo ""; echo "VM Name: $VM_NAME"
+    echo "New Size: $SIZE_GB"
+    echo "Available Disk Space: $(df -h ~/ | tail -n 1 | tr -s ' ' | cut -d " " -f 4)"
+    echo "Image Size: $(du -h $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2))"
+    echo "Verify \"Disk Space\" is larger than current \"Image Size\" before continuing this operation!"
+    echo "   Note: Even though \"sudo fstrim -a\" runs weekly, running it again, now, may decrease the size of the qcow2 image."
+    echo ""; read -p "Press the enter key to continue..."
+
+    # Issue the shutdown command and then wait 'till the VM is fully off.
+    sudo virsh shutdown $VM_NAME
+    finished=0; echo -n "Waiting 'till \"$VM_NAME\" VM instance is done shutting down"
+    while [[ ${finished} -eq 0 ]]; do
+        sleep 1
+        echo -n "."
+        if [ $(sudo virsh list --all | grep "running" | grep "$VM_NAME" | wc -c) -eq 0 ]; then
+            finished=1
+            sleep 3; echo ""; echo ""
+        fi
+    done
+
+    # Verify the filesystem
+    sudo virt-filesystems --long -h --all -a $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2)
+
+    # Make backup of qcow2 image in the home directory (~/) and then use this backup to increase the image size
+    FILE=$(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2)
+    sudo mv $FILE ~/${VM_NAME}.qcow2
+    sudo qemu-img create -f qcow2 -o preallocation=metadata $FILE ${SIZE_GB}G
+    sudo virt-resize --expand /dev/sda3 ~/${VM_NAME}.qcow2 $FILE
+    sudo guestfish -d "$VM_NAME" -i << EOF
+        list-filesystems
+        lvresize-free /dev/${VM_NAME}-vg/root 100
+        resize2fs /dev/${VM_NAME}-vg/root
+EOF
+    sudo virsh start $VM_NAME
+
+    # Post info' for the user
+    echo ""; echo "Backup image of qcow2 file was stored in home directory."
+    echo "Verify the VM works as intended before deleting this backup!"
+
 elif [[ $1 == "--dev-backup" ]]; then # Make Backup of .qcow2 image; Parameters: $VM_NAME
     VM_NAME=${2}
     sudo virsh shutdown ${VM_NAME}; sleep 10
@@ -297,5 +345,5 @@ elif [[ $1 == "--dev-show-baks" ]]; then # Show all development backups
 
 else
     $0 --help
-    echo "Script Version 0.132"
+    echo "Script Version 0.14"
 fi
