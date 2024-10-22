@@ -263,6 +263,8 @@ elif [[ $1 == "--backup" ]]; then # Backup all pertinent VM files to ~/rsbakcup
     done < <( printf '%s\n' "${vm_array[@]}")
     echo "Done!"; echo ""
 
+    sudo cp /etc/libvirt/qemu/*.xml ~/rsbackup
+
 elif [[ $1 == "--restore" ]]; then # Restore backup files to $VM_NAME @ /home/satoshi/restore; Parameters: $VM_NAME
     VM_NAME=${2}
     rsync -caz -e "ssh -i ~/.ssh/vmkey" ~/rsbackup/${VM_NAME}/ satoshi@${VM_NAME}.local:~/restore
@@ -345,5 +347,5 @@ elif [[ $1 == "--dev-show-baks" ]]; then # Show all development backups
 
 else
     $0 --help
-    echo "Script Version 0.14"
+    echo "Script Version 0.141"
 fi
