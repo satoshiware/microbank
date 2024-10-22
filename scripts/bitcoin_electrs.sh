@@ -32,7 +32,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get -y install --only-upgrade openssh-se
 sudo apt-get -y upgrade
 
 # Install Packages
-sudo apt-get -y install ufw clang psmisc
+sudo apt-get -y install ufw clang psmisc prometheus
 curl https://sh.rustup.rs -sSf | sh -s -- -y
 export PATH=$PATH:~/.cargo/bin
 
