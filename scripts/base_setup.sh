@@ -16,7 +16,21 @@ echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo EDITOR='tee -a' visudo
 # Give the user pertinent information about this script and how to use it.
 cat << EOF | sudo tee ~/readme.txt
 This host (server) was configured to run Type 1 VMs using qemu/kvm. It also manages/controls the backups of the VMs
-using the the rsync utility. Everything stored or linked in the /home/satoshi directory, in each VM, will be backed up.
+using the the rsync utility. Everything stored or linked in the /home/satoshi/backup directory, in each VM, will be backed up.
+
+"Max memory" (i.e. just "memory") and "current memory" ("max memory" minus the balloon) for most practical purpose
+should just be the same. The memory can still be changed (up or down) without the balloon (i.e. the balloon completely
+deflated) by shutting down the VM and modifying the XML configuration. If there will ever be a need to change
+the amount of memory frequently or without any downtime, then it may be worth considering inflating the balloon as
+desired (i.e. "max memory" > "current memory"). Because we must avoid overprovisioning RAM from the host to all VMs,
+it's best give each VM the exact needed amount of RAM (as much as possible) and not much more. Execute the "free -m"
+command to see how many MBs of RAM are in the "free" column.
+
+Changing the amount of vCPUs while the VM is running (i.e. live) is beyond our needs. Also, it requires guest OS
+involvment to make live changes. It's best to only update the vCPU count in the XML configuration and then restart the
+VM. In other words, just keep the number of vCPUs and MAX vCPUs the same! The amount of vCPU granted to each VM can
+be overprovisioned quite generously without any problems; however, it's still a good practice to not be unnecessarily
+excessive.
 
 Relevant Commands:
 
@@ -30,28 +44,32 @@ osinfo-query os | grep "debian"         # Get a list of the accepted Debian oper
 sudo virsh nodeinfo                     # Run the following command to get info for the host machine
 
 #### File Locations ####
-/etc/libvirt/qemu                                                       # XML files
-/var/lib/libvirt/images                                                 # Qcow2 Images
+/etc/libvirt/qemu                                                      # XML files
+/var/lib/libvirt/images                                                # Qcow2 Images
 
 #### More CMDs ####
-sudo virsh list --all                                                   # List all VMs
+sudo virsh list --all                                                  # List all VMs
+sudo virsh edit \$VM_NAME                                               # Bring up the VM's xml file in the text edititor
 sudo virsh domifaddr \$VM_NAME --source agent                           # See MAC and IP of VM (only if running)
 sudo virsh dominfo \$VM_NAME                                            # General VM information
 
 #### RAM ####
 sudo virsh dommemstat --domain \$VM_NAME                                # Memory stat's
-sudo virsh setmem --domain \$VM_NAME --size 3G --config                 # Update the memory size (make sure VM is shut off)
-sudo virsh setmaxmem --domain \$VM_NAME --size 3G --config              # Update the maximum memory size (make sure VM is shut off)
+sudo virsh setmem --domain \$VM_NAME --size \${AMOUNT_GB}G --config      # Update the memory size in the VM's XML file (reboot necessary for changes to take effect)
+sudo virsh setmem --domain \$VM_NAME --size \${AMOUNT_GB}G --live        # Update the memory size while it's running (no changes to xml; reboot necessary)
+sudo virsh setmaxmem --domain \$VM_NAME --size \${AMOUNT_GB}G --config   # Update the maximum memory size in XML (reboot necessary for changes to take effect)
+free -m                                                                # See how much RAM is available on the host (works on VMs as well)
 
 #### vCPU ####
 sudo virsh vcpucount \$VM_NAME                                          # Get vcpu count
 sudo virsh vcpuinfo \$VM_NAME                                           # Get detailed domain vcpu information
-sudo virsh setvcpus \$VM_NAME <number-of-CPUs> --config                 # Change number of virtual CPUs
-sudo virsh setvcpus \$VM_NAME <max-number-of-CPUs> --maximum --config   # Change maximum number of virtual CPUs
+sudo virsh setvcpus \$VM_NAME <number-of-CPUs> --config                 # Change number of virtual CPUs in the VM's XML file (reboot necessary for changes to take effect)
+sudo virsh setvcpus \$VM_NAME <max-number-of-CPUs> --maximum --config   # Change maximum number of virtual CPUs in the VM's XML file (reboot necessary for changes to take effect)
 
 #### Disk Space ####
-sudo virsh domblkinfo \$VM_NAME -all                                     # Disk Capacity, Allocation, and Physical characteristics
-du -h /var/lib/libvirt/images/\${VM_IMAGE}                               # See the actual size of the image file
+sudo virsh domblkinfo \$VM_NAME --all                                   # Disk Capacity, Allocation, and Physical characteristics
+du -h \$(sudo find -L /var/lib/libvirt/images -name \${VM_NAME}.qcow2)   # See the actual size of the image file
+vmctl --increase \$VM_NAME, \$SIZE_GB                                    # Custome routine to help increase the qcow2 image size
 
 #### Control ####
 sudo virsh console \$VM_NAME                                            # Switch to active VM ("Ctrl + ]" or to exit)
