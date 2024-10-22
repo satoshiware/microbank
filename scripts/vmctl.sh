@@ -288,7 +288,7 @@ elif [[ $1 == "--increase" ]]; then # Increase the size of a qcow2 image; Parame
 
     # Info' for the user
     echo ""; echo "VM Name: $VM_NAME"
-    echo "New Size: $SIZE_GB"
+    echo "New Size: ${SIZE_GB}G"
     echo "Available Disk Space: $(df -h ~/ | tail -n 1 | tr -s ' ' | cut -d " " -f 4)"
     echo "Image Size: $(du -h $(sudo find -L /var/lib/libvirt/images -name ${VM_NAME}.qcow2))"
     echo "Verify \"Disk Space\" is larger than current \"Image Size\" before continuing this operation!"
@@ -347,5 +347,5 @@ elif [[ $1 == "--dev-show-baks" ]]; then # Show all development backups
 
 else
     $0 --help
-    echo "Script Version 0.142"
+    echo "Script Version 0.143"
 fi
