@@ -22,7 +22,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --backup          Backup all pertinent VM files to ~/rsbakcup
       --restore         Restore backup files to \$VM_NAME @ /home/satoshi/restore; Parameters: \$VM_NAME
       --delete          Deletes a VM instance; Parameters: \$VM_NAME
-      --increase        Increase the size of a qcow2 image; Parameters: \$VM_NAME, $SIZE_GB
+      --increase        Increase the size of a qcow2 image; Parameters: \$VM_NAME, \$SIZE_GB
 
     Development Options:
       --dev-backup      Make Backup of .qcow2 image; Parameters: \$VM_NAME
@@ -347,5 +347,5 @@ elif [[ $1 == "--dev-show-baks" ]]; then # Show all development backups
 
 else
     $0 --help
-    echo "Script Version 0.141"
+    echo "Script Version 0.142"
 fi
