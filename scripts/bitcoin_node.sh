@@ -147,6 +147,10 @@ rpcwhitelist=satoshi:getbestblockhash,getblock,getblockchaininfo,getblockcount,g
 # Do not load the wallet and disable wallet RPC calls.
 disablewallet=1
 
+# [debug]
+# Enable RPC logging
+debug=rpc
+
 # [zeromq]
 # Enable publishing of block hashes
 zmqpubhashblock=tcp://localhost:29000
