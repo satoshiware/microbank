@@ -320,6 +320,7 @@ elif [[ $1 == "--increase" ]]; then # Increase the size of a qcow2 image; Parame
         lvresize-free /dev/${VM_NAME}-vg/root 100
         resize2fs /dev/${VM_NAME}-vg/root
 EOF
+    sudo chmod 600 $FILE
     sudo virsh start $VM_NAME
 
     # Post info' for the user
@@ -347,5 +348,5 @@ elif [[ $1 == "--dev-show-baks" ]]; then # Show all development backups
 
 else
     $0 --help
-    echo "Script Version 0.143"
+    echo "Script Version 0.144"
 fi
