@@ -50,13 +50,56 @@ btc_electrs.sh
         RAM:        2GB Min / 8GB Max
         Storage:    2TB
 
-    # Need to rebuild with updated spec's....move these comments to globals.env when done....
-    # Reverse proxy port 80 (http) & 443 (https) to btc-electrum server to the http port 3000
-    #   http://btc-electrum.btcofaz.com | https://btc-electrum.btcofaz.com
-    # Reverse proxy port 50001 to btc-electrum server to port 50001 (jsonrpc)
-    #   ssl://btc-electrum.btcofaz.com:50001
-    # Port forwarded 50002 (Without SSL) to btc-electrum server to port 50001 (jsonrpc)
-    # Where's the log file? Check/Update /var/log link.
+    
+	
+	
+	
+	
+	
+	
+	
+	debugging connection to the bitcoin node
+	disable wallet
+	whitelist
+
+
+with wallet enabled.... it will work. Yes, it does work. I had to wait a while, but it worked!!!!
+with wallet disabled... it will not load?? Can you confirm one 
+
+
+
+Get promethous up and running to monitor the details... we need eys
+	are we sure it is the same port????
+
+
+cat << EOF | sudo tee -a /etc/prometheus/prometheus.yml
+  - job_name: electrs
+    static_configs:
+      - targets: ['localhost:4224']
+EOF
+
+
+sudo systemctl restart prometheus
+
+
+
+
+getnetworkinfo user=satoshi
+2024-10-22T22:14:07Z [rpc] ThreadRPCServer method=getblockchaininfo user=satoshi
+2024-10-22T22:14:07Z [rpc] ThreadRPCServer method=getblockchaininfo user=satoshi
+2024-10-22T22:14:07Z [rpc] ThreadRPCServer method=getbestblockhash user=satoshi
+2024-10-22T22:14:08Z [rpc] ThreadRPCServer method=getblockheader user=satoshi
+2024-10-22T22:14:09Z [rpc] ThreadRPCServer method=getblockhash 
+
+
+
+
+
+
+
+    
+    
+	# Where's the log file? Check/Update /var/log link.
     # --electrum-announce - announce the electrum server on the electrum p2p server discovery network.
     # --electrum-hosts <json> - a json map of the public hosts where the electrum server is reachable, in the server.features format.
 
