@@ -45,63 +45,21 @@ btc_electrs.sh
     JSON RPC for electrs connections on port 50001 from any IP. #### Configure SSL forwarding @ the Reverse Proxy! ####
     Prometheus monitoring connection access on port 4224 is allowed from any local IP.
 
+    The initial sync is very RAM and DISK hungry! TEMPORARILY increase the RAM (e.g. 32 GB) and PERMANENTLY make the
+    disk drive x4 the Blockchain size. Run the "sudo fstrim -a" when finished to return unused space back to the VM Host.
+    The viewpoints provided into the progress of the initial sync and operation of electrs are minimal. You can view the
+    log on the bitcoin node to ensure rpc commands are going through. Also, the size and contents of the /var/lib/electrs
+    directory, on this VM, can be observed indicating progress. Note: Near sync completion the rocks DB will be compacted
+    and size will be reduced by more than 50%. See ~/readme.txt on the VM for more doable activities.
+
+    Note: Use the following command to see if there are any messages indicating the guest OS has ever killed the electrs
+    process for low memory resources
+        sudo dmesg -T | egrep -i 'killed process'
+
     Hardware VM Recommendation:
-        CPU:        4 vCore Min / 8 vCore Max
-        RAM:        2GB Min / 8GB Max
-        Storage:    2TB
-
-    
-	
-	
-	
-	
-	
-	
-	
-	debugging connection to the bitcoin node
-	disable wallet
-	whitelist
-
-
-with wallet enabled.... it will work. Yes, it does work. I had to wait a while, but it worked!!!!
-with wallet disabled... it will not load?? Can you confirm one 
-
-
-
-Get promethous up and running to monitor the details... we need eys
-	are we sure it is the same port????
-
-
-cat << EOF | sudo tee -a /etc/prometheus/prometheus.yml
-  - job_name: electrs
-    static_configs:
-      - targets: ['localhost:4224']
-EOF
-
-
-sudo systemctl restart prometheus
-
-
-
-
-getnetworkinfo user=satoshi
-2024-10-22T22:14:07Z [rpc] ThreadRPCServer method=getblockchaininfo user=satoshi
-2024-10-22T22:14:07Z [rpc] ThreadRPCServer method=getblockchaininfo user=satoshi
-2024-10-22T22:14:07Z [rpc] ThreadRPCServer method=getbestblockhash user=satoshi
-2024-10-22T22:14:08Z [rpc] ThreadRPCServer method=getblockheader user=satoshi
-2024-10-22T22:14:09Z [rpc] ThreadRPCServer method=getblockhash 
-
-
-
-
-
-
-
-    
-    
-	# Where's the log file? Check/Update /var/log link.
-    # --electrum-announce - announce the electrum server on the electrum p2p server discovery network.
-    # --electrum-hosts <json> - a json map of the public hosts where the electrum server is reachable, in the server.features format.
+        CPU:        8
+        RAM:        16GB
+        Storage:    2048GB (NVMEs w/ RAID; x4 Blockchain Size)
 
 lightning_node.sh
     Installs a lightning node
