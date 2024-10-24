@@ -68,9 +68,18 @@ HTTP server is available on port 13000 from any IP #### Configure HTTPS forwardi
     JSON RPC for electrs connections on port 51001 from any IP. #### Configure SSL forwarding @ the Reverse Proxy! ####
 
 Connect to prometheus for monitoring via port forwarding:
-    ssh -L 9090:localhost:9090 -L 9100:localhost:9100 -L 14224:localhost:14224 satoshi@btc-electrum -i ~/.ssh/Yubikey
+    ssh -L 9090:localhost:9090 -L 9100:localhost:9100 -L 4224:localhost:4224 satoshi@btc-electrum -i ~/.ssh/Yubikey
     It can be reached on the browser @ http://localhost:9090
     Relevant prometheus commands: daemon*
+
+
+													3001 	192.168.2.5 	3000 (HBCI) 	Bitcoin Electrs HTTP Server (non-encrypted) 	
+			WAN 	TCP 	* 	* 	WAN address 	13001 	192.168.2.6 	13000 	AZ-Money Electrs HTTP Server (non-encrypted) 	
+			WAN 	TCP 	* 	* 	WAN address 	50002 	192.168.2.6 	50001 	Bitcoin Electrs Server (non-encrypted) 	
+			WAN 	TCP 	* 	* 	WAN address 	51002 	192.168.2.6 	51001 	AZ-Money Electrs Server (non-encrypted) 
+			
+			For the HTTP, The AZ-Money addresses show bc1....
+			magic bytes?? Genesis Hash... What do those mean
 
 EOF
 read -p "Press the enter key to continue..."
