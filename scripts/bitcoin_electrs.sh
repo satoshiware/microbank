@@ -56,8 +56,8 @@ echo $YUBIKEY | sudo tee -a ~/.ssh/authorized_keys
 
 # Download electrs, Compile, and Install
 cd ~; git clone https://github.com/Blockstream/electrs
-git checkout new-index
-cd electrs; cargo clean; cargo build --locked --release
+cd electrs
+cargo clean; cargo build --locked --release
 sudo install -m 0755 -o root -g root -t /usr/bin ~/electrs/target/release/electrs
 cd ~; rm -rf electrs
 
@@ -71,6 +71,7 @@ After=network-online.target
 WorkingDirectory=/var/lib/electrs
 # Prefix address search enabled: --address-search
 # Indexing of provably unspendable outputs enabled: --index-unspendables
+# Perform compaction during initial sync (slower but less disk space required): --index-unspendables
 # Use JSONRPC instead of importing blk*.dat files. Required for remote connections: --jsonrpc-import
 # Prepend log lines with a timestamp: --timestamp
 # Increase logging verbosity: -v
@@ -88,6 +89,7 @@ ExecStart=/usr/bin/electrs \
     -vvvv \
     --address-search \
     --index-unspendables \
+    --initial-sync-compaction \
     --jsonrpc-import \
     --timestamp \
     --daemon-rpc-addr $BTC_NODE_IP:8332 \
@@ -102,9 +104,9 @@ ExecStart=/usr/bin/electrs \
 
 Type=simple
 KillMode=process
-TimeoutSec=60
+TimeoutSec=240
 Restart=always
-RestartSec=60
+RestartSec=30
 
 Environment="RUST_BACKTRACE=1"
 LimitNOFILE=1048576
@@ -122,6 +124,7 @@ PrivateTmp=true
 ProtectSystem=full
 NoNewPrivileges=true
 MemoryDenyWriteExecute=true
+PrivateDevices=true
 
 [Install]
 WantedBy=multi-user.target
