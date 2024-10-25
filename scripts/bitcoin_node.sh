@@ -130,11 +130,11 @@ rpcbind=0.0.0.0
 rpcallowip=$(hostname -I | cut -d "." -f 1,2,3).0/24
 
 # Set the number of threads to service RPC calls (default = 4)
-rpcthreads=16
+rpcthreads=32
 # Set the depth of the work queue to service RPC calls (default = 16)
-rpcworkqueue=32
+rpcworkqueue=128
 # Number of seconds after which an uncompleted RPC call will time out (default = 30)
-rpcservertimeout=60
+rpcservertimeout=240
 
 # Username (satoshi) and hashed password (satoshi) for JSON-RPC connections. RPC clients connect using rpcuser=<USERNAME>/rpcpassword=<PASSWORD> arguments.
 rpcauth=satoshi:170f4d25565cfe8cbd3ab1c81ad25610\$a8327a4d2241c121e0cd88d1b693cdc6aa3dfbcebb6b863545d090f5d7fa614b
