@@ -84,9 +84,6 @@ elif [[ $1 = "--generate" ]]; then # (Re)Generate(s) the environment file (w/ ne
     read -p "Sender email (e.g. satoshi@btcofaz.com): "; echo "SENDER_EMAIL=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
     read -p "Sender SMS phone (add country prefix; no spaces) (e.g. \"14809198257\"): "; echo "SENDER_SMS_PHONE=\"$REPLY\"" | sudo tee -a /etc/default/send_messages.env > /dev/null
 
-    # Add link (for backup purposes) to the send_messages.env file
-    ln -s /etc/default/send_messages.env ~/backup
-
 elif [[ $1 = "--text" ]]; then # Send Text: PHONE  MESSAGE
     PHONE=$2; MESSAGE=$3
 
