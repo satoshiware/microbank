@@ -80,7 +80,7 @@ EOF
     sudo systemctl enable p2pssh@${TMSTAMP} --now
 	
 	# Add link (for backup purposes) to the new p2pssh@ environment file
-    ln -s /etc/default/p2pssh@${TMSTAMP} ~/backup
+    sudo ln -s /etc/default/p2pssh@${TMSTAMP} ~/backup
 
     # Add the outbound connection to Bitcoin Core (micro) and update bitcoin.conf to be reestablish automatically upon restart or boot up
     sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf addnode localhost:${LOCALMICROPORT} "add"
@@ -118,7 +118,7 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection: CONNECTION_
     LOCAL_PORT=$(grep -o 'LOCAL_PORT=[0-9]*' /etc/default/p2pssh@${2}* 2> /dev/null | cut -d '=' -f 2) # Get the "Local Port" that corresponds with the time stamp
 
     sudo rm /etc/default/p2pssh@${2}* 2> /dev/null # Remove corresponding environmental files
-	rm ~/backup/p2pssh@${2} # Remove backup link to the p2pssh@ environment file
+	sudo rm ~/backup/p2pssh@${2} # Remove backup link to the p2pssh@ environment file
 
     sudo sed -i "/${2}/d" /root/.ssh/known_hosts 2> /dev/null # Remove the comment line containing the time stamp from the known_hosts
     sudo sed -i "/${2}/d" /etc/bitcoin.conf 2> /dev/null # Remove the comment line containing the time stamp from the bitcoin.conf
