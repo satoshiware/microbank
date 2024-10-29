@@ -38,28 +38,33 @@ bitcoin_wallet_node.sh
         wallu - Facilitate wallet activities including the loading of Satoshi Coins
         send_messages - Send emails or texts
 
-btc_electrs.sh
+bitccoin_electrs.sh
     Installs an electrum server (electrs by Blockstream) for bitcoin.
+    Original Documentation (ElectrumX): https://electrumx-spesmilo.readthedocs.io
+    Repository (electrs): https://github.com/romanz/electrs
+    Repository (electrs Blockstream Fork): https://github.com/Blockstream/electrs
 
-    HTTP server is available on port 3000 from any IP #### Configure HTTPS forwarding @ the Reverse Proxy! ####
-    JSON RPC for electrs connections on port 50001 from any IP. #### Configure SSL forwarding @ the Reverse Proxy! ####
-    Prometheus monitoring connection access on port 4224 is allowed from any local IP.
-
-    The initial sync is very RAM and DISK hungry! TEMPORARILY increase the RAM (e.g. 32 GB) and PERMANENTLY make the
-    disk drive x4 the Blockchain size. Run the "sudo fstrim -a" when finished to return unused space back to the VM Host.
-    The viewpoints provided into the progress of the initial sync and operation of electrs are minimal. You can view the
-    log on the bitcoin node to ensure rpc commands are going through. Also, the size and contents of the /var/lib/electrs
-    directory, on this VM, can be observed indicating progress. Note: Near sync completion the rocks DB will be compacted
-    and size will be reduced by more than 50%. See ~/readme.txt on the VM for more doable activities.
-
-    Note: Use the following command to see if there are any messages indicating the guest OS has ever killed the electrs
-    process for low memory resources
+    The initial sync is very RAM and DISK hungry! TEMPORARILY increase the RAM until synced and then run the
+    "sudo fstrim -a" command when finished to return unused space back to the VM Host. If resources become
+    too low, the guest OS may kill electrs. Use the following command to verify if it has ever been killed.
         sudo dmesg -T | egrep -i 'killed process'
+    Use the following commands to view the system journal for electrs
+        sudo journalctl -a -u electrs # Show the entire electrs journal
+        sudo journalctl -f -a -u electrs # Continually follow latest updates
+    During the compacting phases of the initial sync, verify changes in the "disk usage" of the electrs directory
+        sudo du -h /var/lib/electrs
+    Once sync is finished the ports will become active
+        sudo ss -tulpn # Show active ports
+
+    Once sync is complete, set up the router/firewall accordingly
+        Port forward 50001 to port 50001 on the electrs server for non-encrypted JSON-RPC external communications.
+        Using the HA Proxy, configure a TCP SSL reverse proxy from port 50002 to port 50001 for encrypted JSON-RPC communications.
+        Setup HTTP(S) reverse proxy from 80(http)/443(https) to port 3000 using the subdomain of choice (e.g. btc-electrum.btcofaz.com).
 
     Hardware VM Recommendation:
         CPU:        8
         RAM:        16GB
-        Storage:    2048GB (NVMEs w/ RAID; x4 Blockchain Size)
+        Storage:    3072GB (NVMEs w/ RAID; x6 Blockchain Size)
 
 lightning_node.sh
     Installs a lightning node
