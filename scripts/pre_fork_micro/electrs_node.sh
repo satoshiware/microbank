@@ -38,27 +38,18 @@ FYI:
     The "sudo systemctl status electrs" command shows the status of the electrs daemon.
     The "sudo journalctl (-f) -a -u electrs" command shows the electrs journal.
 
-Management:
-    Make permanent P2P outbound connection:
-        btc addnode \$ADDRESS:\$PORT "add"
-            ":\$PORT" is not necessary for the default port 19333
-        echo -e "# \$NAME, \${DESCRIPTION}\naddnode=\$ADDRESS:\$PORT" | sudo tee -a /etc/bitcoin.conf
-            ":\$PORT" is not necessary for the default port 19333
-            "\$NAME" and "\${DESCRIPTION}" add desired info' as part of the connections' comment heading
-
 Ports:
-    HTTP Server: 13000 from any IP
+    HTTP (electrs) Server: 13000 from any IP
     JSON RPC (electrs): 51001 from any IP
-    Prometheus monitoring: 4224 from the localhost
+    Prometheus (electrs) monitoring: 4224 from the localhost
     JSON RPC (bitcoind): 19332 from any local IP
-    ZeroMQ (ZMQ) Access: 29000 from any local IP
+    ZeroMQ (ZMQ; bitcoind) Access: 29000 from any local IP
 
-Connect to prometheus monitoring daemon via port forwarding:
-    ssh -L 9090:localhost:9090 satoshi@$(hostname) -i \$HOME\.ssh\Yubikey
+Connect to prometheus monitoring daemon (for electrs) via port forwarding:
+    ssh -L 9090:localhost:9090 satoshi@$(hostname).local -i \$HOME\.ssh\Yubikey
     It can be reached on the browser @ http://localhost:9090
     Relevant prometheus commands: daemon*, mempool*, tip_height, elect*, query*
 EOF
-read -p "Press the enter key to continue..."
 
 # Create .ssh folder and authorized_keys file if it does not exist
 if ! [ -f ~/.ssh/authorized_keys ]; then
@@ -309,6 +300,7 @@ WorkingDirectory=/var/lib/electrs
 # Maximum number of utxos [default: 500] to process per address (applies to both electrum & http api). Lookups for addresses with more utxos will fail: --utxos-limit 500
 # Number of JSONRPC requests [default: 4] to send in parallel: --daemon-parallelism 4
 # Select RPC logging option: --electrum-rpc-logging full
+# Welcome banner for the Electrum server, shown in the console to clients: --electrum-banner "Welcome to electrs-esplora $MICROCURRENCY $(electrs -V | cut -d " " -f 4)"
 ExecStart=/usr/bin/electrs \
     -vvvv \
     --address-search \
@@ -324,7 +316,8 @@ ExecStart=/usr/bin/electrs \
     --electrum-txs-limit 500 \
     --utxos-limit 500 \
     --daemon-parallelism 4 \
-    --electrum-rpc-logging full
+    --electrum-rpc-logging full \
+    --electrum-banner "Welcome to electrs-esplora $MICROCURRENCY $(electrs -V | cut -d " " -f 4)"
 
 Type=simple
 KillMode=process
@@ -378,6 +371,39 @@ sudo systemctl enable electrs
 
 # Install the micronode connect utility (mnconnect.sh)
 bash ~/microbank/scripts/pre_fork_micro/mnconnect.sh --install
+
+# Create links (for backup purposes) to all critical files needed to restore this node
+cd ~; mkdir backup
+sudo ln -s /etc/bitcoin.conf ~/backup
+sudo ln -s /root/.ssh/known_hosts ~/backup
+sudo ln -s /root/.ssh/p2pkey ~/backup
+sudo ln -s /root/.ssh/p2pkey.pub ~/backup
+
+# If "~/restore" folder is present then restore all pertinent wallet node files; assumes all files are present
+if [[ -d ~/restore ]]; then
+    # Restore ownership to files
+    sudo chown root:bitcoin ~/restore/bitcoin.conf
+    sudo chown root:root ~/restore/known_hosts
+    sudo chown root:root ~/restore/p2pkey
+    sudo chown root:root ~/restore/p2pkey.pub
+    sudo chown root:root ~/restore/p2pssh@*
+
+    # Move files to their correct locations
+    sudo mv ~/restore/bitcoin.conf /etc/bitcoin.conf
+    sudo mv ~/restore/known_hosts /root/.ssh/known_hosts
+    sudo mv ~/restore/p2pkey /root/.ssh/p2pkey
+    sudo mv ~/restore/p2pkey.pub /root/.ssh/p2pkey.pub
+    sudo mv ~/restore/p2pssh@* /etc/default/
+
+    # Add backup links to the restored p2pssh@* files
+    sudo ln -s /etc/default/p2pssh@* ~/backup
+
+    # Enable p2pssh service
+    sudo systemctl enable $(ls -all /etc/default/p2pssh@* | cut -d "/" -f 4) --now
+
+    # Remove the "~/restore" folder
+    cd ~; sudo rm -rf restore
+fi
 
 # Restart the machine
 sudo reboot now
