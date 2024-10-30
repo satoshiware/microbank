@@ -83,12 +83,30 @@ EOF
 # Authorize Yubikey login for satoshi
 echo $YUBIKEY | sudo tee -a ~/.ssh/authorized_keys
 
-# Download electrs, Compile, and Install
+# Download electrs, Compile, and Install !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! source the variable az-money !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 cd ~; git clone https://github.com/satoshiware/electrs
 cd electrs
+#sed -i -r -e "s/bitcoin =*(.+)/bitcoin = { version = \"0.31\", git = \"https:\/\/github.com\/satoshiware\/rust-bitcoin\", branch = \"az-money\", tag = \"60318c4\" }/g" ~/electrs/Cargo.toml # Find line with "bitcoin =" and replace it
+#sed -i -r -e "s/bitcoin =*(.+)/bitcoin = { git = \"https:\/\/github.com\/rust-bitcoin\/rust-bitcoin\", tag = \"bitcoin-0.31.2\" }/g" ~/electrs/Cargo.toml # Find line with "bitcoin =" and replace it
+ sed -i -r -e "s/bitcoin =*(.+)/bitcoin = { path = \"/home/satoshi/bitcoin-0.31.2\" }/g" ~/electrs/Cargo.toml # Find line with "bitcoin =" and replace it
+cargo generate-lockfile ################################################################## testing to generate new lockfile
 cargo clean; cargo build --locked --release
 sudo install -m 0755 -o root -g root -t /usr/bin ~/electrs/target/release/electrs
 cd ~; rm -rf electrs
+
+
+bitcoin = { version = "0.31", features = ["serde"] }
+
+warning: skipping duplicate package `embedded` found at `/home/satoshi/.cargo/git/checkouts/rust-bitcoin-731ea3c87fee0908/77a8f07/hashes/embedded`
+    Updating crates.io index
+error: failed to select a version for the requirement `bitcoin_hashes = "^0.15.0"`
+candidate versions found which didn't match: 0.14.0, 0.13.0, 0.12.0, ...
+location searched: crates.io index
+required by package `bitcoin v0.33.0-alpha (https://github.com/satoshiware/rust-bitcoin?branch=az-money#77a8f076)`
+    ... which satisfies git dependency `bitcoin` of package `electrs v0.4.1 (/home/satoshi/electrs)`
+perhaps a crate was updated and forgotten to be re-vendored?
+
+
 
 # Install rpcauth Utility
 sudo mkdir -p /usr/share/python
