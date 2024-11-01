@@ -74,44 +74,14 @@ EOF
 # Authorize Yubikey login for satoshi
 echo $YUBIKEY | sudo tee -a ~/.ssh/authorized_keys
 
-# Download electrs, Compile, and Install !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! source the variable az-money !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Download electrs, Compile, and Install
 cd ~; git clone https://github.com/satoshiware/electrs
 cd electrs
-sed -i -r -e "s/bitcoin =*(.+)/bitcoin = { git = \"https:\/\/github.com\/satoshiware\/rust-bitcoin\", branch = \"az-money-0.31.2
-
-adivina
-\" }/g" ~/electrs/Cargo.toml # Find line with "bitcoin =" and replace it
-#sed -i -r -e "s/bitcoin =*(.+)/bitcoin = { git = \"https:\/\/github.com\/rust-bitcoin\/rust-bitcoin\", tag = \"bitcoin-0.31.2\", features = [\"serde\"] }/g" ~/electrs/Cargo.toml # Find line with "bitcoin =" and replace it
+sed -i -r -e "s/bitcoin =*(.+)/bitcoin = { git = \"https:\/\/github.com\/satoshiware\/rust-bitcoin\", branch = \"$RUST_BTC_MICRO_BRANCH\", features = [\"serde\"] }/g" ~/electrs/Cargo.toml # Find line with "bitcoin =" and replace it
 cargo generate-lockfile
 cargo clean; cargo build --locked --release
 sudo install -m 0755 -o root -g root -t /usr/bin ~/electrs/target/release/electrs
 cd ~; rm -rf electrs
-
-
-acd2c47
-acd2c47d792477158f48de43a578a6d2886ca
-
-# Destroy it back to 0.31.2
-# Test it out. 
-# Make some changes.
-# Throughly test it out.
-# Button it up and reinstall!!!!
-
-
-
-a5650d88b78e8524444733bbc00499857d5421b9
-
-
-
-
-
-
-
-
-
-
-
-
 
 # Install rpcauth Utility
 sudo mkdir -p /usr/share/python
