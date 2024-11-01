@@ -31,7 +31,7 @@ FYI:
     The "/var/lib/electrs" directory contains debug logs, rocks DB, etc.
     The electrs' log files can be viewed with this file: "/var/log/electrs/debug.log" (links to /var/lib/electrs/mainnet/newindex/txstore/LOG)
     The "sudo systemctl status electrs" command shows the status of the electrs daemon.
-    The "sudo journalctl (-f) -a -u electrs" command shows the electrs journal.
+    The "sudo journalctl -f -a -u electrs" command shows the electrs journal.
 
 Ports:
     HTTP (electrs) Server: 13000 from any IP
