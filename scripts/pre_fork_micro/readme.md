@@ -7,7 +7,7 @@ To execute any of these scripts, login as a sudo user (that is not root) and exe
     cd ~; git clone https://github.com/satoshiware/microbank
     bash ./microbank/scripts/pre_fork_micro/$SCRIPT_NAME.sh
     rm -rf ~/microbank # After reboot, delete the microbank folder from the home directory.
-	sudo reboot now
+    sudo reboot now
 
 # cross-compile_micro.sh
 This file generates the binanries (and sha 256 checksums) for bitcoin core (microcurrency edition)
@@ -75,21 +75,41 @@ Utility script(s) installed:
     stmutility.sh
     send_messages.sh
 
-# electrs_node.sh ######## Still under active development: Add electrs (Rust) https://github.com/romanz/electrs, update readme information and comments ########
-This script installs a "electrs" micronode (within a cluster).
-The electrs server indexes the entire Bitcoin blockchain, and the resulting index enables fast queries for any given user wallet,
-allowing the user to keep real-time track of balances and transaction history.
-To run this script, you'll need the Bitcoin Core micronode download URL (tar.gz file) with its SHA 256 Checksum and
-you'll also need the electrs binaries (tar.gz file) with its SHA 256 Checksum to continue.
+# electrs_node.sh
+    Installs a full microcurrency node and an electrum server (electrs by Blockstream) to to accompany it.
 
-Recommended Hardware:
-    Rasperry Pi Compute Module 4: CM4008000 (w/ Compute Blade)
-    8GB RAM
-    M.2 PCI SSD 1TB
-    Netgear 5 Port Switch (PoE+ @ 120W)
+    Microcurrency Node: Used to provide a whitelisted JSON-RPC inteferace on the private network to provide the backend for the electrum
+    server and other services (e.g. microcurrency blockchain explorer).
 
-Utility script(s) installed:
-    mnconnect.sh
+    Electrum Server:
+        Original Documentation (ElectrumX): https://electrumx-spesmilo.readthedocs.io
+        Repository (electrs): https://github.com/romanz/electrs
+        Repository (electrs Blockstream Fork): https://github.com/Blockstream/electrs
+        The Repository https://github.com/satoshiware/rust-bitcoin is a forked with newly created branches to support individual
+            microcurrencies (two for each; including one for bech32). The install script will override the electrs/Cargo.toml
+            file to use the respective branch on the forked rust-bitcoin in the Satoshiware repository.
+
+    If resources become too low, the guest OS may kill bitcoind or electrs. The following command to verify if something has been killed.
+        sudo dmesg -T | egrep -i 'killed process'
+    Use the following commands to view the system journal for electrs
+        sudo journalctl -a -u electrs # Show the entire electrs journal
+        sudo journalctl -f -a -u electrs # Continually follow latest updates
+    During the compacting phases of the initial sync, verify changes in the "disk usage" of the electrs directory
+        sudo du -h /var/lib/electrs
+    Once sync is finished the ports will become active
+        sudo ss -tulpn # Show active ports
+
+    Once sync is complete, set up the router/firewall accordingly
+        Port forward 51001 to port 51001 on the electrs server for non-encrypted JSON-RPC external communications.
+        Using the HA Proxy, configure a TCP SSL reverse proxy from port 51002 to port 51001 for encrypted JSON-RPC communications.
+        Setup HTTP(S) reverse proxy from 80(http)/443(https) to port 13000 using the subdomain of choice (e.g. btc-electrum.btcofaz.com).
+
+    mnconnect.sh utility script has been installed. It's used to connect to the microcurrency p2p node.
+
+    Hardware VM Recommendation:
+        CPU:        8
+        RAM:        8GB
+        Storage:    1024GB (NVMEs w/ RAID)
 
 # stratum_remote.sh
 This script will create a remote mining access point to stratum node (within a cluster).
