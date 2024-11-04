@@ -9,7 +9,7 @@ To execute any of these scripts, login as a sudo user (that is not root) and exe
 pre_fork_micro(folder)
     Scipts to setup and operate a new microcurrency during the distribution period.
 
-bitcoin_node.sh
+# bitcoin_node.sh
     Installs a Full Indexed Bitcoin Node.
     Be sure to forward the P2P port 8333 on the router to this Virtual Machine.
 
@@ -21,7 +21,7 @@ bitcoin_node.sh
         RAM:        8GB
         Storage:    2TB (NVMEs w/ RAID)
 
-bitcoin_wallet_node.sh
+# bitcoin_wallet_node.sh
     Installs a Pruned Bitcoin Node that connects only to our Local Full Bitcoin Node.
     Used to load Satoshi Coins, redeem private keys, watch balances, receive mining rewards,
     and receive extra proceeds from btcpay & lightning channels.
@@ -38,7 +38,7 @@ bitcoin_wallet_node.sh
         wallu - Facilitate wallet activities including the loading of Satoshi Coins
         send_messages - Send emails or texts
 
-bitccoin_electrs.sh
+# bitccoin_electrs.sh
     Installs an electrum server (electrs by Blockstream) for bitcoin.
     Original Documentation (ElectrumX): https://electrumx-spesmilo.readthedocs.io
     Repository (electrs): https://github.com/romanz/electrs
@@ -66,7 +66,19 @@ bitccoin_electrs.sh
         RAM:        16GB
         Storage:    3072GB (NVMEs w/ RAID; x6 Blockchain Size)
 
-lightning_node.sh
+# bitcoin_explorer.sh
+	Installs a bitcoin blockchain explorer.
+	It requires a bitcoin full node and bitcoin electrum server for its data.
+
+	HTTP Port: 3002
+	The BTC Explorer is configured to operate with a reverse proxy.
+
+	Hardware VM Recommendation:
+        CPU:        4
+        RAM:        4GB
+        Storage:    128GB (NVMEs w/ RAID)
+
+# lightning_node.sh
     Installs a lightning node
 
 stratum_server.sh
