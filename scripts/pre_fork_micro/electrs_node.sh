@@ -148,15 +148,6 @@ sudo useradd --system --shell=/sbin/nologin bitcoin
 # Wrap the Bitcoin CLI Binary with its Runtime Configuration
 echo "alias btc=\"sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf\"" | sudo tee -a /etc/bash.bashrc # Reestablish alias @ boot
 
-# Generate Strong Bitcoin RPC Password
-BTCRPCPASSWD=$(openssl rand -base64 16)
-BTCRPCPASSWD=${BTCRPCPASSWD//\//0} # Replace '/' characters with '0'
-BTCRPCPASSWD=${BTCRPCPASSWD//+/1} # Replace '+' characters with '1'
-BTCRPCPASSWD=${BTCRPCPASSWD//=/} # Replace '=' characters with ''
-echo $BTCRPCPASSWD | sudo tee /root/rpcpasswd
-BTCRPCPASSWD="" # Erase from memory
-sudo chmod 400 /root/rpcpasswd
-
 # Generate Bitcoin Configuration File with the Appropriate Permissions
 cat << EOF | sudo tee /etc/bitcoin.conf
 # [core]
@@ -182,8 +173,8 @@ rpcworkqueue=128
 # Number of seconds after which an uncompleted RPC call will time out (default = 30)
 rpcservertimeout=240
 
-# Username (satoshi) and hashed password for JSON-RPC connections. RPC clients connect using rpcuser=<USERNAME>/rpcpassword=\$(sudo cat /root/rpcpasswd) arguments.
-$(rpcauth satoshi $(sudo cat /root/rpcpasswd) | grep 'rpcauth')
+# Username (satoshi) and hashed password for JSON-RPC connections. RPC clients connect using rpcuser=satoshi/rpcpassword=satoshi arguments.
+$(rpcauth satoshi satoshi | grep 'rpcauth')
 # Allow users to access any RPC unless they are listed in an rpcwhitelist entry
 rpcwhitelistdefault=0
 # Set a whitelist to filter incoming RPC calls for satoshi
@@ -282,7 +273,7 @@ WorkingDirectory=/var/lib/electrs
 # Directory where the index will be stored: --db-dir /var/lib/electrs
 # HTTP server 'addr:port' to listen on: --http-addr 0.0.0.0:13000
 # JSON RPC for electrs will listen to all IPs on port 50001: --electrum-rpc-addr 0.0.0.0:51001
-# Bitcoin JSON RPC authentication: --cookie satoshi:\$(sudo cat /root/rpcpasswd)
+# Bitcoin JSON RPC authentication: --cookie satoshi:satoshi
 # Maximum number of transactions [default: 500] returned (does not apply for the http api). Lookups with more results will fail: --electrum-txs-limit 500
 # Maximum number of utxos [default: 500] to process per address (applies to both electrum & http api). Lookups for addresses with more utxos will fail: --utxos-limit 500
 # Number of JSONRPC requests [default: 4] to send in parallel: --daemon-parallelism 4
@@ -299,7 +290,7 @@ ExecStart=/usr/bin/electrs \
     --db-dir /var/lib/electrs \
     --http-addr 0.0.0.0:13000 \
     --electrum-rpc-addr 0.0.0.0:51001 \
-    --cookie satoshi:$(sudo cat /root/rpcpasswd) \
+    --cookie satoshi:satoshi \
     --electrum-txs-limit 500 \
     --utxos-limit 500 \
     --daemon-parallelism 4 \
