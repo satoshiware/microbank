@@ -111,6 +111,18 @@ Utility script(s) installed:
         RAM:        8GB
         Storage:    1024GB (NVMEs w/ RAID)
 
+# blockchain_explorer.sh <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	Installs a microcurrency blockchain explorer.
+	It requires a microcurrency full node and microcurrency electrum server for its data.
+
+	HTTP Port: 3002
+	The Microcurrency Explorer is configured to operate with a reverse proxy.
+
+	Hardware VM Recommendation:
+        CPU:        4
+        RAM:        4GB
+        Storage:    128GB (NVMEs w/ RAID)
+		
 # stratum_remote.sh
 This script will create a remote mining access point to stratum node (within a cluster).
 This way, mining operation can be on seperate networks from the mining (stratum) node.
