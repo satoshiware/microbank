@@ -274,8 +274,8 @@ WorkingDirectory=/var/lib/electrs
 # HTTP server 'addr:port' to listen on: --http-addr 0.0.0.0:13000
 # JSON RPC for electrs will listen to all IPs on port 50001: --electrum-rpc-addr 0.0.0.0:51001
 # Bitcoin JSON RPC authentication: --cookie satoshi:satoshi
-# Maximum number of transactions [default: 500] returned (does not apply for the http api). Lookups with more results will fail: --electrum-txs-limit 500
-# Maximum number of utxos [default: 500] to process per address (applies to both electrum & http api). Lookups for addresses with more utxos will fail: --utxos-limit 500
+# Maximum number of transactions [default: 500] returned (does not apply for the http api). Lookups with more results will fail: --electrum-txs-limit 50000
+# Maximum number of utxos [default: 500] to process per address (applies to both electrum & http api). Lookups for addresses with more utxos will fail: --utxos-limit 50000
 # Number of JSONRPC requests [default: 4] to send in parallel: --daemon-parallelism 4
 # Select RPC logging option: --electrum-rpc-logging full
 # Welcome banner for the Electrum server, shown in the console to clients: --electrum-banner "Welcome to electrs-esplora $MICROCURRENCY $(electrs -V | cut -d " " -f 4)"
@@ -291,8 +291,8 @@ ExecStart=/usr/bin/electrs \
     --http-addr 0.0.0.0:13000 \
     --electrum-rpc-addr 0.0.0.0:51001 \
     --cookie satoshi:satoshi \
-    --electrum-txs-limit 500 \
-    --utxos-limit 500 \
+    --electrum-txs-limit 50000 \
+    --utxos-limit 50000 \
     --daemon-parallelism 4 \
     --electrum-rpc-logging full \
     --electrum-banner "Welcome to electrs-esplora $MICROCURRENCY $(electrs -V | cut -d " " -f 4)"
