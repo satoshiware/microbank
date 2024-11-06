@@ -43,6 +43,7 @@ cd ~; git clone https://github.com/satoshiware/btc-rpc-explorer
 cd btc-rpc-explorer
 git checkout $BTC_RPC_EXPLORER_MICRO_BRANCH
 sudo npm -g install # Installs module in /usr/local/lib/node_modules/btc-rpc-explorer
+sudo mkdir -p /usr/local/lib/node_modules/btc-rpc-explorer/public/txt/mining-pools-configs/AZC
 
 # Create /var/lib directory (used to store cache fore btc-rpc-explorer)
 sudo mkdir -p /var/lib/btc-rpc-explorer
@@ -59,7 +60,7 @@ cat << EOF | sudo tee -a /etc/btc-rpc-explorer/.env
 BTCEXP_SECURE_SITE=true
 
 # Set the active coin
-BTCEXP_COIN=AZC
+BTCEXP_COIN=$MICRO_COIN
 
 # Bind to any ipv4 for the http server on port 3002 (NO COMMENT ALLOWED FOLLOWING BTC_HOST EXPRESSION)
 BTCEXP_HOST=0.0.0.0
@@ -84,7 +85,7 @@ BTCEXP_PRIVACY_MODE=true
 BTCEXP_FILESYSTEM_CACHE_DIR=/var/lib/btc-rpc-explorer/cache
 
 # Set default currency to SATS
-BTCEXP_DISPLAY_CURRENCY=sat
+BTCEXP_DISPLAY_CURRENCY=$MICRO_COIN
 
 # Show local time instead of UTC
 BTCEXP_UI_TIMEZONE=local
