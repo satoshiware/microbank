@@ -111,7 +111,7 @@ Utility script(s) installed:
         RAM:        8GB
         Storage:    1024GB (NVMEs w/ RAID)
 
-# blockchain_explorer.sh <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# blockchain_explorer.sh
 	Installs a microcurrency blockchain explorer.
 	It requires a microcurrency full node and microcurrency electrum server for its data.
 
