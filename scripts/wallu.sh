@@ -26,16 +26,26 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
 
       --balances    Show balances for the Satoshi Coins, Mining, and Bank wallets
 
-      --send        Send funds (coins) from the Bank wallet <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< make it work for all the wallets, BUT BE CAREFUL with SATOSHI COINS WALLET!!!!
-                    Parameters: ADDRESS  AMOUNT  (PRIORITY)
-                        Note: Same notes under --transfer routine
-      --bump        Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-      --scoins      Create new address to receive funds into the Satoshi Coins wallet
+      --send        Send funds (coins) from the (bank | mining | satoshi_coins) wallet
+                    Parameters: ADDRESS  AMOUNT  WALLET  (PRIORITY)
+						Note: PRIORITY is optional (default = NORMAL). It helps determine the fee rate. 
+							  It can be set to NOW, NORMAL (6 hours), ECONOMICAL (1 day), or CHEAPSKATE (1 week).
+                        Note: Enter '.' for the amount to empty the wallet completly (NORMAL priority is enforced)
+						Note: DON'T USE with the satoshi_coins wallet; it may invalidate your Satoshi Coins' chain!!!
+							  
+      --bump        Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank and mining wallets only)
       --mining      Create new address to receive funds into the Mining wallet
       --bank        Create new address to receive funds into the Bank wallet
-      --recent      Show recent (last 50) Bank wallet transactions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      --recent      Show recent (last 50) Bank wallet transactions
+
+	  ####################### Satoshi Coins ###############################
+	  --scoins      Create new address to receive funds into the Satoshi Coins wallet
+	  --create		Start new Satoshi Coins' chain: NAME_OF_BANK_OPERATION
+	  --load		Load Satoshi Coins: TXID_SATOSHI_COIN_CHAIN_TIP  AMOUNT_PER_COIN
+	  --destory		Bring a Satoshi Coins' chain to an end: TXID_SATOSHI_COIN_CHAIN_TIP
+	  --log			Show log (/var/log/satoshicoins)
 EOF
-elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (wallu) in /usr/local/sbin (Repository: /satoshiware/microbank/scripts/pre_fork_micro/wallu.sh)
+elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (wallu) in /usr/local/sbin (Repository: /satoshiware/microbank/scripts/wallu.sh)
     echo "Installing this script (wallu) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/wallu ]; then
         echo "This script (wallu) already exists in /usr/local/sbin!"
@@ -80,40 +90,31 @@ elif [[ $1 = "--email" ]]; then # Email (send out) the wallet update (requires s
 elif [[ $1 = "--balances" ]]; then # Show balances for the Satoshi Coins, Mining, and Bank wallets
     echo ""
     cat << EOF
-    Satoshi Coins Wallet:
-        Unconfirmed Balance:    $($BTC -rpcwallet=satoshi_coins getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
-        Trusted Balance:        $($BTC -rpcwallet=satoshi_coins getbalance)
+    Bank Wallet:
+        Unconfirmed Balance:    $($BTC -rpcwallet=bank getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
+        Trusted Balance:        $($BTC -rpcwallet=bank getbalance)
 
     Mining Wallet:
         Unconfirmed Balance:    $($BTC -rpcwallet=mining getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
         Trusted Balance:        $($BTC -rpcwallet=mining getbalance)
         Immature Balance:       $($BTC -rpcwallet=mining getbalances | jq '.mine.immature' | awk '{printf("%.8f", $1)}')
 
-    Bank Wallet:
-        Unconfirmed Balance:    $($BTC -rpcwallet=bank getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
-        Trusted Balance:        $($BTC -rpcwallet=bank getbalance)
+    Satoshi Coins Wallet:
+        Unconfirmed Balance:    $($BTC -rpcwallet=satoshi_coins getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
+        Trusted Balance:        $($BTC -rpcwallet=satoshi_coins getbalance)
 EOF
     echo ""
 
-elif [[ $1 = "--send" ]]; then # Send funds (coins) from the Bank wallet
-    ADDRESS="${2,,}"; AMOUNT=$3; PRIORITY=${4,,}; TRANSFER=$5
-
-    # Is it an internal transfer
-    if [[ $TRANSFER == "INTERNAL" ]]; then
-        wallet="mining"
-    elif [[ $TRANSFER == "SWEEP" ]]; then
-        wallet="import"
-    else
-        wallet="bank"
-    fi
+elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | satoshi_coins) wallet
+    ADDRESS="${2,,}"; AMOUNT=$3; WALLET=${4,,}; PRIORITY=${5,,} # Parameters: ADDRESS  AMOUNT  WALLET  (PRIORITY)
 
     # Input Checking
-    if [[ -z $ADDRESS || -z $AMOUNT ]]; then
+    if [[ -z $ADDRESS || -z $AMOUNT || -z $WALLET ]]; then
         echo "Error! Insufficient Parameters!"; exit 1
     elif ! [[ $($BTC validateaddress $ADDRESS | jq '.isvalid') == "true" ]]; then
-        echo "Error! Address provided is not correct or Bitcoin Core (microcurrency mode) is down!"; exit 1
+        echo "Error! Address provided is not correct or Bitcoin Core is down!"; exit 1
     elif [[ $AMOUNT == "." ]]; then # Should we send it all?
-        AMOUNT=$($BTC -rpcwallet=$wallet getbalance) # Get the full amount
+        AMOUNT=$($BTC -rpcwallet=$WALLET getbalance) # Get the full amount
         if [[ ! $PRIORITY == "now" ]]; then PRIORITY="normal"; fi # Override priority if set too low
         SEND_ALL=", \"subtract_fee_from_outputs\": [0]" # Extra option for send command in order to empty the Bank wallet completly
     elif ! [[ $AMOUNT =~ ^[0-9]+\.?[0-9]*$ ]]; then
@@ -126,9 +127,9 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the Bank wallet
 
     # Determine paramters that govern fee rate
     if [[ $PRIORITY == "now" ]]; then
-        TARGET=1; ESTIMATION="conservative"
+        TARGET=6; ESTIMATION="conservative"
     elif [[ -z $PRIORITY || $PRIORITY == "normal" ]]; then
-        TARGET=12; ESTIMATION="economical"
+        TARGET=36; ESTIMATION="economical"
     elif [[ $PRIORITY == "economical" ]]; then
         TARGET=144; ESTIMATION="economical"
     elif [[ $PRIORITY == "cheapskate" ]]; then
@@ -137,10 +138,10 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the Bank wallet
         echo "Error! Priority could not be determined!"; exit 1
     fi
 
-    $UNLOCK; $MINING_UNLOCK; $BTC -rpcwallet=$wallet send "{\"$ADDRESS\": $AMOUNT}" $TARGET $ESTIMATION null "{\"replaceable\": true${SEND_ALL}}"
+    $UNLOCK; $MINING_UNLOCK; $BTC -rpcwallet=$WALLET send "{\"$ADDRESS\": $AMOUNT}" $TARGET $ESTIMATION null "{\"replaceable\": true${SEND_ALL}}"
 
-elif [[ $1 = "--bump" ]]; then # Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed
-    WALLETS=("bank" "mining" "import"); bump_flag=""
+elif [[ $1 = "--bump" ]]; then # Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank and mining wallets only)
+    WALLETS=("bank" "mining"); bump_flag=""
     for wallet in "${WALLETS[@]}"; do
         readarray -t TXS < <($BTC -rpcwallet=$wallet listtransactions "*" 40 0 false | jq -r '.[] | .confirmations, .txid, .category')
         for ((i = 0 ; i < ${#TXS[@]} ; i = i + 3)); do
@@ -153,17 +154,14 @@ elif [[ $1 = "--bump" ]]; then # Bumps the fee of all (recent) outgoing transact
 
     if [[ -z $bump_flag ]]; then echo "Looks like there is nothing to bump!"; fi
 
-elif [[ $1 = "--scoins" ]]; then # Create new address to receive funds into the Satoshi Coins wallet
-    echo ""; $BTC -rpcwallet=satoshi_coins getnewaddress; echo ""
-
 elif [[ $1 = "--mining" ]]; then # Create new address to receive funds into the Mining wallet
     echo ""; $BTC -rpcwallet=mining getnewaddress; echo ""
 
 elif [[ $1 = "--bank" ]]; then # Create new address to receive funds into the Bank wallet
     echo ""; $BTC -rpcwallet=bank getnewaddress; echo ""
 
-elif [[ $1 = "--recent" ]]; then # Show recent (last 40) Bank wallet transactions
-    readarray -t TXS < <($BTC -rpcwallet=bank listtransactions "*" 40 0 false | jq -r '.[] | .category, .amount, .confirmations, .time, .address, .txid')
+elif [[ $1 = "--recent" ]]; then # Show recent (last 50) Bank wallet transactions
+    readarray -t TXS < <($BTC -rpcwallet=bank listtransactions "*" 50 0 false | jq -r '.[] | .category, .amount, .confirmations, .time, .address, .txid')
 
     # Get data from the blockchain
     data=""
@@ -188,7 +186,34 @@ elif [[ $1 = "--recent" ]]; then # Show recent (last 40) Bank wallet transaction
     echo "---------  ---------------  ---------  ---------------  ------------------------------------------  ----------------------------------------------------------------"
     awk -F ';' '{printf("%7s    %-15.8f  %-8s  %15s   %s  %s\n", $1, $2, $3, $4, $5, $6)}' <<< ${data%?}
 
+############################# Satoshi Coins ###############################
+elif [[ $1 = "--scoins" ]]; then # Create new address to receive funds into the Satoshi Coins wallet
+    echo ""; $BTC -rpcwallet=satoshi_coins getnewaddress; echo ""
+	
+elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain: NAME_OF_BANK_OPERATION
+    NAME_OF_BANK_OPERATION="${2,,}"
+
+    # Input Checking
+    if [[ -z $NAME_OF_BANK_OPERATION ]]; then
+        echo "Error! Insufficient Parameters!"; exit 1
+	fi
+	
+	HEXSTRING="0F45Da565432"
+	btc -rpcwallet=testing -named send estimate_mode=economical conf_target=50 \
+	outputs="[{\"$(btc -rpcwallet=testing getnewaddress)\":1},{\"$(btc -rpcwallet=testing getnewaddress)\":1},{\"$(btc -rpcwallet=testing getnewaddress)\":1},{\"data\":\"$HEXSTRING\"}]" \
+	options="{\"change_position\":0,\"replaceable\":true}"
+	
+elif [[ $1 = "--load" ]]; then # Load Satoshi Coins: TXID_SATOSHI_COIN_CHAIN_TIP  AMOUNT_PER_COIN
+
+elif [[ $1 = "--destory" ]]; then # Bring a Satoshi Coins' chain to an end: TXID_SATOSHI_COIN_CHAIN_TIP
+
+elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins)
+	  		
+	  			
+	  
+
+
 else
     $0 --help
-    echo "Script Version 0.1"
+    echo "Script Version 0.2"
 fi
