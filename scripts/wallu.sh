@@ -452,8 +452,8 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
         done
 
         # Create a transaction with two inputs where the utxo for the Satoshi Coins' chain tip is used as the second one.
-        OUTPUT=$(btc -rpcwallet=satoshi_coins -named send estimate_mode=economical conf_target=$TARGET \
-        outputs="[{\"$ADDRESS_FOR_REMAINING_WALLET_BALANCE\":$(btc -rpcwallet=satoshi_coins getbalance)}]" \
+        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send estimate_mode=economical conf_target=$TARGET \
+        outputs="[{\"$ADDRESS_FOR_REMAINING_WALLET_BALANCE\":$($BTC -rpcwallet=satoshi_coins getbalance)}]" \
         options="{\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$D_TXID\",\"vout\":$D_VOUT,\"sequence\":4294967293},{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}],\"subtract_fee_from_outputs\":[0]}")
 
         # Check for valid TXID; if valid, output to log.
@@ -463,42 +463,46 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
         else
             echo $OUTPUT; exit 1
         fi
+    else
+        echo "Aborted!"
     fi
 
 elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi Coins' chain tip transaction stat's
     cat /var/log/satoshi_coins/log; echo ""
 
-    # Get the tip of the Satoshi Coins' Chain
-    TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/satoshi_coins/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
-    TXID_SATOSHI_COIN_CHAIN_TIP=${TXID_SATOSHI_COIN_CHAIN_TIP:5}
+    # Get the last transacation on the latest Satoshi Coins' chain
+    LAST_TXID=$(tac /var/log/satoshi_coins/log | grep -m 1 -E "NEW_CHAIN|LOAD|DELETE_CHAIN" | cut -d " " -f 2)
+    LAST_TXID=${LAST_TXID:5}
 
-    # Verify the Chain Tip's TXID output @ index 0 has NOT been spent
-    if [[ -z $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep $TXID_SATOSHI_COIN_CHAIN_TIP -A 1 | grep "vout\": 0") ]]; then
-        echo "Error! The Chain Tip's TXID output @ index 0 has been spent!"
-    fi
-    echo "UTXO Count: $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep -c txid)"
+    # Report the number of utxos in the "satoshi_coins" wallet
+    echo "The \"satoshi_coins\" Wallet UTXO Count: $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep -c txid)"
 
     # Report if there is an active chain or not
     if [[ $(( $(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log") )) -eq 0 ]]; then
         echo "There is no active chain..."
     else
-        echo "Chain Tip: $TXID_SATOSHI_COIN_CHAIN_TIP"
+        echo "Current Chain Tip: $LAST_TXID"
+
+        # Verify the Chain Tip's TXID output @ index 0 has NOT been spent
+        if [[ -z $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep $LAST_TXID -A 1 | grep "vout\": 0") ]]; then
+            echo "Error! The Chain Tip's TXID output @ index 0 has been spent!"
+        fi
     fi
 
     # Show Chain Tip's TX Details
     echo "Chain Tip's TX Details:"
-    $BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | grep -m 1 amount
-    $BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | grep -m 1 fee
-    $BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq \
+    $BTC -rpcwallet=satoshi_coins gettransaction $LAST_TXID | grep -m 1 amount
+    $BTC -rpcwallet=satoshi_coins gettransaction $LAST_TXID | grep -m 1 fee
+    $BTC -rpcwallet=satoshi_coins gettransaction $LAST_TXID | jq \
         'del(.amount, .fee, .blockhash, .blockindex, .blocktime, .txid, .walletconflicts, .time, .hex, .timereceived, .details)' | tr -d '()[]{},' | sed '/^\s*$/d'
-    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq -r .hex) | jq \
+    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $LAST_TXID | jq -r .hex) | jq \
         'del(.txid, .hash, .version, .locktime, .vout, .vin[].scriptSig, .vin[].txinwitness)' | tr -d '()[]{},' | sed '/^\s*$/d'
     echo "  \"vout\":"
-    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq -r .hex) | jq .vout | jq \
+    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $LAST_TXID | jq -r .hex) | jq .vout | jq \
         'del(.[].scriptPubKey.asm, .[].scriptPubKey.desc, .[].scriptPubKey.hex, .[].scriptPubKey.type)' | tr -d '()[]{},' | sed '/scriptPubKey"/d' | sed '/^\s*$/d' | sed 's/^/  /'
-    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq -r .hex) | grep nulldata -B 3 | grep "asm\|nulldata"
+    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $LAST_TXID | jq -r .hex) | grep nulldata -B 3 | grep "asm\|nulldata"
 
 else
     $0 --help
-    echo "Script Version 0.24"
+    echo "Script Version 0.25"
 fi
