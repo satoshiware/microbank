@@ -26,27 +26,25 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
 
       --balances    Show balances for the Satoshi Coins, Mining, and Bank wallets
 
-      --send        Send funds (coins) from the (bank | mining | satoshi_coins) wallet
+      --send        Send funds (coins) from the (bank | mining) wallet
                     Parameters: ADDRESS  AMOUNT  WALLET  (PRIORITY)
                         Note: PRIORITY is optional (default = NORMAL). It helps determine the fee rate.
                               It can be set to NOW, NORMAL (6 hours), ECONOMICAL (1 day), or CHEAPSKATE (1 week).
                         Note: Enter '.' for the amount to empty the wallet completly (NORMAL priority is enforced)
-                        Note: DON'T USE with the satoshi_coins wallet; it may invalidate your Satoshi Coins' chain!!!
 
       --bump        Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank and mining wallets only)
       --mining      Create new address to receive funds into the Mining wallet
       --bank        Create new address to receive funds into the Bank wallet
-      --recent      Show recent (last 50) Bank wallet transactions
+      --recent      Show recent (last 50) bank wallet transactions
 
-      ####################### Satoshi Coins ###############################
+    Satoshi Coins:
       --scoins      Create new address to receive funds into the Satoshi Coins wallet
-      --create      Start new Satoshi Coins' chain: NAME_OF_BANK_OPERATION  (PRIORITY)
+      --create      Start new Satoshi Coins' chain (consolidates into single utxo): "NAME_OF_BANK_OPERATION"  (PRIORITY)
       --load        Load Satoshi Coins: AMOUNT_PER_COIN  (PRIORITY)
       --destroy     Bring the current Satoshi Coins' chain to an end: ADDRESS_FOR_REMAINING_WALLET_BALANCE  (PRIORITY)
-                        Note: PRIORITY is optional (default = NORMAL). It helps determine the fee rate.
-                        Options: NOW, NORMAL (6 hours), ECONOMICAL (1 day), or CHEAPSKATE (1 week).
       --log         Show log (/var/log/satoshicoins/log)
 EOF
+
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (wallu) in /usr/local/sbin (Repository: /satoshiware/microbank/scripts/wallu.sh)
     echo "Installing this script (wallu) in /usr/local/sbin/"
     if [ -f /usr/local/sbin/wallu ]; then
@@ -127,6 +125,11 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | sa
         SEND_ALL=""
     fi
 
+    # The wallet satoshi_coins is not allowed here!
+    if [[ $WALLET == *"satoshi_coins"* ]]; then
+        echo "Error! The wallet \"satoshi_coins\" is not allowed here!"; exit 1
+    fi
+
     # Determine paramters that govern fee rate
     if [[ $PRIORITY == "now" ]]; then
         TARGET=6; ESTIMATION="conservative"
@@ -192,7 +195,7 @@ elif [[ $1 = "--recent" ]]; then # Show recent (last 50) Bank wallet transaction
 elif [[ $1 = "--scoins" ]]; then # Create new address to receive funds into the Satoshi Coins wallet
     echo ""; $BTC -rpcwallet=satoshi_coins getnewaddress; echo ""
 
-elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain
+elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain (consolidates into single utxo)
     NAME_OF_BANK_OPERATION="${2^^}"; PRIORITY=${3,,} # Parameters: NAME_OF_BANK_OPERATION  (PRIORITY)
 
     HEXSTRING="5341544f53484920434f494e533a20" # ASCII HEX: "SATOSHI COINS: "
@@ -237,7 +240,7 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain
         # Check for valid TXID; if valid, output to log.
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
-            echo "NEW_CHAIN: \"$NAME_OF_BANK_OPERATION\" TXID:$TXID DATA:$HEXSTRING TIME:$(date +%s)" | sudo tee -a /var/log/$WALLET/log
+            echo "NEW_CHAIN: \"$NAME_OF_BANK_OPERATION\" TXID:$TXID DATA:$HEXSTRING TIME:$(date +%s)" | sudo tee -a /var/log/satoshi_coins/log
         else
             echo $OUTPUT; exit 1
         fi
@@ -252,7 +255,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     fi
 
     # Get the tip of the Satoshi Coins' Chain
-    TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/$WALLET/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
+    TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/satoshi_coins/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
     TXID_SATOSHI_COIN_CHAIN_TIP=${TXID_SATOSHI_COIN_CHAIN_TIP:5}
     if ! [[ ${#TXID_SATOSHI_COIN_CHAIN_TIP} -eq 64 && "$TXID_SATOSHI_COIN_CHAIN_TIP" =~ ^[0-9a-fA-F]+$ ]]; then
         echo "Error! Invalid Chain tip TXID (${TXID_SATOSHI_COIN_CHAIN_TIP})!"; exit 1
@@ -397,7 +400,7 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
     fi
 
     # Get the tip of the Satoshi Coins' Chain
-    TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/$WALLET/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
+    TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/satoshi_coins/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
     TXID_SATOSHI_COIN_CHAIN_TIP=${TXID_SATOSHI_COIN_CHAIN_TIP:5}
     if ! [[ ${#TXID_SATOSHI_COIN_CHAIN_TIP} -eq 64 && "$TXID_SATOSHI_COIN_CHAIN_TIP" =~ ^[0-9a-fA-F]+$ ]]; then
         echo "Error! Invalid Chain tip TXID (${TXID_SATOSHI_COIN_CHAIN_TIP})!"; exit 1
@@ -461,12 +464,13 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
 
 elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log)
     cat /var/log/satoshi_coins/log
+    ## find all txids and make sure they are confirmed....
     ############ get the latest chain tip ############## Show the latest chaintip
         ###### and show some stats on it ###################
 
 else
     $0 --help
-    echo "Script Version 0.2"
+    echo "Script Version 0.22"
 fi
 
 
