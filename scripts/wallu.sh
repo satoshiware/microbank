@@ -307,15 +307,17 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         read -p "Enter the next coin's public address (or type 'done' to stop): " user_input # Prompt the user for input
 
         # Allow the user to type 'done' to stop input
-        if [ "$user_input" == "done" ]; then
+        if [[ "$user_input" == "done" ]]; then
             break
+		elif [[ -z "$user_input" ]]; then
+			continue
         fi
 
         # Convert the input to lowercase
         user_input=$(echo "$user_input" | tr 'A-Z' 'a-z')
 
         # Check if the coin address is valid (bech32)
-        if [[ $($BTC validateaddress $user_input | jq .isvalid) != "true" ]]; then
+        if [[ $($BTC validateaddress $user_input 2> /dev/null | jq .isvalid ) != "true" ]]; then
             echo "Error: Invalid address!"; continue
         fi
 
@@ -504,5 +506,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.25"
+    echo "Script Version 0.26"
 fi
