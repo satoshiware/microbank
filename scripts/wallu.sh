@@ -42,7 +42,11 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --create      Start new Satoshi Coins' chain (consolidates into single utxo): "NAME_OF_BANK_OPERATION"  (PRIORITY)
       --load        Load Satoshi Coins: AMOUNT_PER_COIN  (PRIORITY)
       --destroy     Bring the current Satoshi Coins' chain to an end: ADDRESS_FOR_REMAINING_WALLET_BALANCE  (PRIORITY)
-      --log         Show log (/var/log/satoshicoins/log)
+      --log         Show log (/var/log/satoshicoins/log) and Satoshi Coins' chain tip transaction stat's
+
+        Sample Chains:
+            Satoshiware: 95a5b1a0787614d293907c871ac2b1f418d8ab415e7776793362e0e7579b000b
+            BBOQC: c3709e664bc6bf2d93d2eddaa715a7add8403365894826ede584191c3db1bad6
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (wallu) in /usr/local/sbin (Repository: /satoshiware/microbank/scripts/wallu.sh)
@@ -342,15 +346,14 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     # Calculate total (in $ATS)
     TOTAL=$(( (COIN_COUNT * AMOUNT_PER_COIN) + FEE_TOTAL ))
 
-    echo "Summary:"
+    echo ""; echo "Summary:"
     echo "    Wallet Balance: $BALANCE \$ATS"
     echo "    Number of Coins: ${#coins[@]}"
     echo "    \$ATS per Coin: $AMOUNT_PER_COIN \$ATS"
     echo "    TX Estimated Weight (Max Block Size = 4,000,000 Units): $WEIGHT Units"
     echo "    Estimated Fee: $FEE_TOTAL \$ATS"
     echo "    Total: $TOTAL \$ATS"
-    echo "    Previous Chain Tip Confirmations: $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq .confirmations)"
-    echo ""
+    echo "    Confirmations of Previous Chain Tip: $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq .confirmations)"; echo ""
 
     # Verify there is enough satoshis in the wallet
     if [[ $TOTAL -gt $BALANCE ]]; then
@@ -379,7 +382,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
             echo "LOAD: TXID:$TXID TIME:$(date +%s) \$ATS:$TOTAL" | sudo tee -a /var/log/satoshi_coins/log
             for address in "${!coins[@]}"; do # log each coin
-                echo "    $address: $AMOUNT_PER_COIN" | sudo tee -a /var/log/satoshi_coins/log
+                echo "    $address: $AMOUNT_PER_COIN BTC" | sudo tee -a /var/log/satoshi_coins/log
             done
         else
             echo $OUTPUT; exit 1
@@ -462,23 +465,40 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
         fi
     fi
 
-elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log)
-    cat /var/log/satoshi_coins/log
-    ## find all txids and make sure they are confirmed....
-    ############ get the latest chain tip ############## Show the latest chaintip
-        ###### and show some stats on it ###################
+elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi Coins' chain tip transaction stat's
+    cat /var/log/satoshi_coins/log; echo ""
+
+    # Get the tip of the Satoshi Coins' Chain
+    TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/satoshi_coins/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
+    TXID_SATOSHI_COIN_CHAIN_TIP=${TXID_SATOSHI_COIN_CHAIN_TIP:5}
+
+    # Verify the Chain Tip's TXID output @ index 0 has NOT been spent
+    if [[ -z $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep $TXID_SATOSHI_COIN_CHAIN_TIP -A 1 | grep "vout\": 0") ]]; then
+        echo "Error! The Chain Tip's TXID output @ index 0 has been spent!"
+    fi
+    echo "UTXO Count: $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep -c txid)"
+
+    # Report if there is an active chain or not
+    if [[ $(( $(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log") )) -eq 0 ]]; then
+        echo "There is no active chain..."
+    else
+        echo "Chain Tip: $TXID_SATOSHI_COIN_CHAIN_TIP"
+    fi
+
+    # Show Chain Tip's TX Details
+    echo "Chain Tip's TX Details:"
+    $BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | grep -m 1 amount
+    $BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | grep -m 1 fee
+    $BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq \
+        'del(.amount, .fee, .blockhash, .blockindex, .blocktime, .txid, .walletconflicts, .time, .hex, .timereceived, .details)' | tr -d '()[]{},' | sed '/^\s*$/d'
+    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq -r .hex) | jq \
+        'del(.txid, .hash, .version, .locktime, .vout, .vin[].scriptSig, .vin[].txinwitness)' | tr -d '()[]{},' | sed '/^\s*$/d'
+    echo "  \"vout\":"
+    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq -r .hex) | jq .vout | jq \
+        'del(.[].scriptPubKey.asm, .[].scriptPubKey.desc, .[].scriptPubKey.hex, .[].scriptPubKey.type)' | tr -d '()[]{},' | sed '/scriptPubKey"/d' | sed '/^\s*$/d' | sed 's/^/  /'
+    $BTC decoderawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq -r .hex) | grep nulldata -B 3 | grep "asm\|nulldata"
 
 else
     $0 --help
-    echo "Script Version 0.23"
+    echo "Script Version 0.24"
 fi
-
-
-
-##CHAIN: 95a5b1a0787614d293907c871ac2b1f418d8ab415e7776793362e0e7579b000b - Satoshiware
-##CHAIN: c3709e664bc6bf2d93d2eddaa715a7add8403365894826ede584191c3db1bad6 - BBOQC
-
-
-##            echo "   DATE: $(date)" | sudo tee -a /var/log/satoshi_coins/log
-##            echo "   ASCII DATA: \"$(echo $HEXSTRING | awk '{for(i=1;i<=length;i+=2) printf "%c", strtonum("0x"substr($0,i,2));}')\"" | sudo tee -a /var/log/satoshi_coins/log
-            # Log "create "name" txid, blockheight, Regular time!!!! It's logging, but should it be different ????????????????????????????????????????????????????????????????????????
