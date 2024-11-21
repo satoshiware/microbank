@@ -41,8 +41,8 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       ####################### Satoshi Coins ###############################
       --scoins      Create new address to receive funds into the Satoshi Coins wallet
       --create      Start new Satoshi Coins' chain: NAME_OF_BANK_OPERATION  (PRIORITY)
-      --load        Load Satoshi Coins: TXID_SATOSHI_COIN_CHAIN_TIP  AMOUNT_PER_COIN  (PRIORITY)
-      --destory     Bring a Satoshi Coins' chain to an end: TXID_SATOSHI_COIN_CHAIN_TIP
+      --load        Load Satoshi Coins: AMOUNT_PER_COIN  (PRIORITY)
+      --destroy     Bring the current Satoshi Coins' chain to an end: ADDRESS_FOR_REMAINING_WALLET_BALANCE  (PRIORITY)
                         Note: PRIORITY is optional (default = NORMAL). It helps determine the fee rate.
                         Options: NOW, NORMAL (6 hours), ECONOMICAL (1 day), or CHEAPSKATE (1 week).
       --log         Show log (/var/log/satoshicoins/log)
@@ -195,16 +195,11 @@ elif [[ $1 = "--scoins" ]]; then # Create new address to receive funds into the 
 elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain
     NAME_OF_BANK_OPERATION="${2^^}"; PRIORITY=${3,,} # Parameters: NAME_OF_BANK_OPERATION  (PRIORITY)
 
-    # Constants
-    NAME_OF_BANK_OPERATION="HELLO WORLD" # Uncomment for testing purposes ###################################?????????????
-    #HEXSTRING="5341544f53484920434f494e533a20" # ASCII HEX: "SATOSHI COINS: " ##############################?????????????
-    HEXSTRING="544553543a20" # ASCII HEX: "TEST: " ##########################################################?????????????
-    #WALLET="satoshi_coins" #################################################################################?????????????
-    WALLET="testing" ########################################################################################?????????????
+    HEXSTRING="5341544f53484920434f494e533a20" # ASCII HEX: "SATOSHI COINS: "
 
     # Make sure satoshi coins' log file and corresponding directory exist
-    sudo mkdir -p /var/log/$WALLET
-    sudo touch /var/log/$WALLET/log
+    sudo mkdir -p /var/log/satoshi_coins
+    sudo touch /var/log/satoshi_coins/log
 
     # Input Checking
     if [[ -z $NAME_OF_BANK_OPERATION ]]; then
@@ -225,9 +220,9 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain
     fi
 
     # Verify there is no active chain
-    if [[ $(($(grep -c "NEW_CHAIN" "/var/log/$WALLET/log") - $(grep -c "DELETE_CHAIN" "/var/log/$WALLET/log"))) -ne 0 ]]; then
+    if [[ $(($(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log"))) -ne 0 ]]; then
         echo "Error! There is already an active chain!"
-        tail /var/log/$WALLET/log -n 1
+        tail /var/log/satoshi_coins/log -n 1
         exit 1
     fi
 
@@ -235,8 +230,8 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain
     read -p "Creating new Chain: \"$NAME_OF_BANK_OPERATION\". Would you like to continue? (y|n): "
     if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
         HEXSTRING="${HEXSTRING}$(echo -n $NAME_OF_BANK_OPERATION | od -An -tx1 | sed 's/ //g' | sed ':a;N;$!ba;s/\n//g')"
-        OUTPUT=$($BTC -rpcwallet=$WALLET -named send estimate_mode=economical conf_target=$TARGET \
-        outputs="[{\"$($BTC -rpcwallet=$WALLET getnewaddress)\":$($BTC -rpcwallet=$WALLET getbalance)},{\"data\":\"$HEXSTRING\"}]" \
+        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send estimate_mode=economical conf_target=$TARGET \
+        outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":$($BTC -rpcwallet=satoshi_coins getbalance)},{\"data\":\"$HEXSTRING\"}]" \
         options="{\"change_position\":0,\"replaceable\":true,\"subtract_fee_from_outputs\":[0]}")
 
         # Check for valid TXID; if valid, output to log.
@@ -249,34 +244,27 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain
     fi
 
 elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
-    TXID_SATOSHI_COIN_CHAIN_TIP=$2; AMOUNT_PER_COIN=$3; PRIORITY=${4,,} # Parameters: TXID_SATOSHI_COIN_CHAIN_TIP  AMOUNT_PER_COIN  (PRIORITY)
-
-    # Constants
-    TXID_SATOSHI_COIN_CHAIN_TIP="bb43455dcb8f1b872cd25de7640299134412dd01944d3133ce50a5e5f2de299e" #############################################??????
-    AMOUNT_PER_COIN=10000  #####################################################################################################################??????
-    #WALLET="satoshi_coins" ####################################################################################################################??????
-    WALLET="testing" ###########################################################################################################################??????
+    AMOUNT_PER_COIN=$2; PRIORITY=${3,,} # Parameters: AMOUNT_PER_COIN  (PRIORITY)
 
     # Input Checking
-    if [[ -z $TXID_SATOSHI_COIN_CHAIN_TIP || -z $AMOUNT_PER_COIN ]]; then
+    if [[ -z $AMOUNT_PER_COIN ]]; then
         echo "Error! Insufficient Parameters!"; exit 1
     fi
+
+    # Get the tip of the Satoshi Coins' Chain
+    TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/$WALLET/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
+    TXID_SATOSHI_COIN_CHAIN_TIP=${TXID_SATOSHI_COIN_CHAIN_TIP:5}
     if ! [[ ${#TXID_SATOSHI_COIN_CHAIN_TIP} -eq 64 && "$TXID_SATOSHI_COIN_CHAIN_TIP" =~ ^[0-9a-fA-F]+$ ]]; then
-        echo "Error! Invalid Chain tip TXID! Please enter a valid 64-character hex string."; exit 1
+        echo "Error! Invalid Chain tip TXID (${TXID_SATOSHI_COIN_CHAIN_TIP})!"; exit 1
     fi
 
-    # Verify there is an active chain
-    if [[ $(($(grep -c "NEW_CHAIN" "/var/log/$WALLET/log") - $(grep -c "DELETE_CHAIN" "/var/log/$WALLET/log"))) -eq 0 ]]; then
-        echo "Error! There is already no active chain!"; exit 1
-    fi
-
-    # Verify TXID is a valid chain tip
-    if [[ -z $(tac /var/log/$WALLET/log | grep -m 1 -E "NEW_CHAIN|LOAD" | grep $TXID_SATOSHI_COIN_CHAIN_TIP) ]]; then
-        echo "Error! The TXID given is not a valid Chain Tip!"; ##exit 1
+    # Check the logs to verify the chain is active
+    if [[ $(($(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log"))) -eq 0 ]]; then
+        echo "Error! There is no active chain!"; exit 1
     fi
 
     # Verify TXID has an unspent utxo on the first output
-    if [[ -z $($BTC -rpcwallet=$WALLET listunspent 0 | grep $TXID_SATOSHI_COIN_CHAIN_TIP -A 1 | grep "vout\": 0") ]]; then
+    if [[ -z $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep $TXID_SATOSHI_COIN_CHAIN_TIP -A 1 | grep "vout\": 0") ]]; then
         echo "Error! The Chain Tip TXID has no unspent utxo @ index 0!"; exit 1
     fi
 
@@ -332,14 +320,8 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         coins["$user_input"]=1 # Store the valid input in the associative array (key is the input string)
     done
 
-    # Show all valid unique inputs
-    echo ""; echo ""; echo "All valid unique coin addresses: "
-    for address in "${!coins[@]}"; do
-        echo "    $address"
-    done; echo ""
-
     # Get wallet balance (in $ATS)
-    BALANCE=$(awk -v balance="$($BTC -rpcwallet=$WALLET getbalance)" 'BEGIN {printf("%.0f", balance * 100000000)}' </dev/null)
+    BALANCE=$(awk -v balance="$($BTC -rpcwallet=satoshi_coins getbalance)" 'BEGIN {printf("%.0f", balance * 100000000)}' </dev/null)
 
     # Get Fee Rate (BTC / kB) from full node !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   satoshi:satoshi@192.168.2.12:8332 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     FEE_RATE=$(curl -s --data-binary "{\"jsonrpc\":\"2.0\",\"id\":\"SCEstimateSmartFee\",\"method\":\"estimatesmartfee\",\"params\":[$TARGET]}" -H 'content-type:text/plain;' satoshi:satoshi@192.168.2.12:8332 | jq '.result.feerate')
@@ -347,7 +329,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
           ############ how can we verifiy that we got something back... error if naddad ################# can we still send without specifying the feerate????????????????????????
 
     # Calculate Weight
-    UTXO_COUNT=$($BTC -rpcwallet=$WALLET listunspent 0 | grep txid | wc -l)
+    UTXO_COUNT=$($BTC -rpcwallet=satoshi_coins listunspent 0 | grep txid | wc -l)
     COIN_COUNT=${#coins[@]}
     WEIGHT=$(( ((10 + (UTXO_COUNT * 41) + (COIN_COUNT * 34)) * 4) + (UTXO_COUNT * 105) ))
 
@@ -358,13 +340,13 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     TOTAL=$(( (COIN_COUNT * AMOUNT_PER_COIN) + FEE_TOTAL ))
 
     echo "Summary:"
-    echo "    Wallet Balance: $BALANCE"
+    echo "    Wallet Balance: $BALANCE \$ATS"
     echo "    Number of Coins: ${#coins[@]}"
-    echo "    \$ATS per Coin: $AMOUNT_PER_COIN"
-    echo "    TX Estimated Weight (Max Block Size = 4,000,000 Units): $WEIGHT"
-    echo "    Estimated Fee (\$ATS): $FEE_TOTAL"
-    echo "    Total \$ATS: $TOTAL"
-    echo "    Previous Chain Tip Confirmations: $($BTC -rpcwallet=$WALLET gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq .confirmations)"
+    echo "    \$ATS per Coin: $AMOUNT_PER_COIN \$ATS"
+    echo "    TX Estimated Weight (Max Block Size = 4,000,000 Units): $WEIGHT Units"
+    echo "    Estimated Fee: $FEE_TOTAL \$ATS"
+    echo "    Total: $TOTAL \$ATS"
+    echo "    Previous Chain Tip Confirmations: $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq .confirmations)"
     echo ""
 
     # Verify there is enough satoshis in the wallet
@@ -375,32 +357,112 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     # Verify it's a go with the user; prepare and send the transaction.
     read -p "Would you like to continue? (y|n): "
     if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
-		# Create string of coin outputs
-		COIN_OUTPUTS=""
-		for address in "${coins[@]}"; do
-			COIN_OUTPUTS+=",{\"$address\":$AMOUNT_PER_COIN}"
-		done
+        # Convert $AMOUNT_PER_COIN from SATS to BTC
+        AMOUNT_PER_COIN=$(awk -v sats="$AMOUNT_PER_COIN" 'BEGIN {printf("%.8f", sats / 100000000)}' </dev/null)
 
-		# Send & capture the output to $OUTPUT
-        OUTPUT=$($BTC -rpcwallet=$WALLET -named send estimate_mode=economical conf_target=$TARGET \
-        outputs="[{\"$($BTC -rpcwallet=$WALLET getnewaddress)\":0.0001}$COIN_OUTPUTS]" \
+        # Create string of coin outputs
+        COIN_OUTPUTS=""
+        for address in "${!coins[@]}"; do
+            COIN_OUTPUTS+=",{\"$address\":$AMOUNT_PER_COIN}"
+        done
+
+        # Send & capture the output to $OUTPUT
+        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send estimate_mode=economical conf_target=$TARGET \
+        outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":0.0001}$COIN_OUTPUTS]" \
         options="{\"change_position\":0,\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}]}")
 
         # Check for valid TXID; if valid, output to log.
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
-            echo "LOAD: TXID:$TXID \$ATS:$TOTAL TIME:$(date +%s)" | sudo tee -a /var/log/$WALLET/log
+            echo "LOAD: TXID:$TXID \$ATS:$TOTAL TIME:$(date +%s)" | sudo tee -a /var/log/satoshi_coins/log
+            for address in "${!coins[@]}"; do # log each coin
+                echo "    $address: $AMOUNT_PER_COIN" | sudo tee -a /var/log/satoshi_coins/log
+            done
         else
             echo $OUTPUT; exit 1
         fi
     fi
 
-elif [[ $1 = "--destory" ]]; then # Bring a Satoshi Coins' chain to an end: TXID_SATOSHI_COIN_CHAIN_TIP
+elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an end
+    ADDRESS_FOR_REMAINING_WALLET_BALANCE=$2; PRIORITY=${3,,} # Parameters: ADDRESS_FOR_REMAINING_WALLET_BALANCE (PRIORITY)
+
+    # Input Checking
+    if [[ -z $ADDRESS_FOR_REMAINING_WALLET_BALANCE ]]; then
+        echo "Error! Insufficient Parameters!"; exit 1
+    fi
+
+    # Validate address ADDRESS_FOR_REMAINING_WALLET_BALANCE
+    if [[ $($BTC validateaddress $ADDRESS_FOR_REMAINING_WALLET_BALANCE | jq '.isvalid') != "true" ]]; then
+        echo "Error! Address provided is not valid!"; exit 1
+    fi
+
+    # Get the tip of the Satoshi Coins' Chain
+    TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/$WALLET/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
+    TXID_SATOSHI_COIN_CHAIN_TIP=${TXID_SATOSHI_COIN_CHAIN_TIP:5}
+    if ! [[ ${#TXID_SATOSHI_COIN_CHAIN_TIP} -eq 64 && "$TXID_SATOSHI_COIN_CHAIN_TIP" =~ ^[0-9a-fA-F]+$ ]]; then
+        echo "Error! Invalid Chain tip TXID (${TXID_SATOSHI_COIN_CHAIN_TIP})!"; exit 1
+    fi
+
+    # Check the logs to verify there is active chain to destroy
+    if [[ $(( $(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log") )) -eq 0 ]]; then
+        echo "Error! There is no active chain to destroy!"; exit 1
+    fi
+
+    # Verify TXID has an unspent utxo on the first output
+    if [[ -z $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep $TXID_SATOSHI_COIN_CHAIN_TIP -A 1 | grep "vout\": 0") ]]; then
+        echo "Error! The Chain Tip TXID has no unspent utxo @ index 0! It's already destroyed!"; exit 1
+    fi
+
+    # Make sure there are at least two utxos (two are required to create a transaction that "destroys" a chain)
+    if [[ $($BTC -rpcwallet=satoshi_coins listunspent 0 | grep txid | wc -l) -lt 2 ]]; then
+        echo "Error! Not enough utxos in Satoshi Coins' wallet! Needs at least two"; exit 1
+    fi
+
+    # Determine paramters that govern fee rate
+    if [[ $PRIORITY == "now" ]]; then
+        TARGET=6; ESTIMATION="conservative"
+    elif [[ -z $PRIORITY || $PRIORITY == "normal" ]]; then
+        TARGET=36; ESTIMATION="economical"
+    elif [[ $PRIORITY == "economical" ]]; then
+        TARGET=144; ESTIMATION="economical"
+    elif [[ $PRIORITY == "cheapskate" ]]; then
+        TARGET=1008; ESTIMATION="economical"
+    else
+        echo "Error! Priority could not be determined!"; exit 1
+    fi
+
+    # Verify it's a go with the user; prepare and send the transaction.
+    read -p "WARNING! You are about to destory an active Satoshi Coins' chain! Would you like to continue? (yes|n): "
+    if [[ "${REPLY,,}" = "yes" ]]; then
+        # Find the first utxo that does not represent the Satoshi Coins' chain
+        txids=($($BTC -rpcwallet=satoshi_coins listunspent 0 | jq -r '.[].txid'))
+        vouts=($($BTC -rpcwallet=satoshi_coins listunspent 0 | jq -r '.[].vout'))
+        for i in "${!txids[@]}"; do
+            if [[ ${vouts[$i]} -ne 0 || $TXID_SATOSHI_COIN_CHAIN_TIP != ${txids[$i]} ]]; then
+                D_TXID=${txids[$i]}
+                D_VOUT=${vouts[$i]}
+                break;
+            fi
+        done
+
+        # Create a transaction with two inputs where the utxo for the Satoshi Coins' chain tip is used as the second one.
+        OUTPUT=$(btc -rpcwallet=satoshi_coins -named send estimate_mode=economical conf_target=$TARGET \
+        outputs="[{\"$ADDRESS_FOR_REMAINING_WALLET_BALANCE\":$(btc -rpcwallet=satoshi_coins getbalance)}]" \
+        options="{\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$D_TXID\",\"vout\":$D_VOUT,\"sequence\":4294967293},{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}],\"subtract_fee_from_outputs\":[0]}")
+
+        # Check for valid TXID; if valid, output to log.
+        TXID=$(echo $OUTPUT | jq -r .txid)
+        if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
+            echo "DELETE_CHAIN: TXID:$TXID TIME:$(date +%s)" | sudo tee -a /var/log/satoshi_coins/log
+        else
+            echo $OUTPUT; exit 1
+        fi
+    fi
 
 elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log)
-    #WALLET="satoshi_coins"
-    WALLET="testing"
-    cat /var/log/$WALLET/log
+    cat /var/log/satoshi_coins/log
+    ############ get the latest chain tip ############## Show the latest chaintip
+        ###### and show some stats on it ###################
 
 else
     $0 --help
@@ -413,6 +475,6 @@ fi
 ##CHAIN: c3709e664bc6bf2d93d2eddaa715a7add8403365894826ede584191c3db1bad6 - BBOQC
 
 
-##            echo "   DATE: $(date)" | sudo tee -a /var/log/$WALLET/log
-##            echo "   ASCII DATA: \"$(echo $HEXSTRING | awk '{for(i=1;i<=length;i+=2) printf "%c", strtonum("0x"substr($0,i,2));}')\"" | sudo tee -a /var/log/$WALLET/log
+##            echo "   DATE: $(date)" | sudo tee -a /var/log/satoshi_coins/log
+##            echo "   ASCII DATA: \"$(echo $HEXSTRING | awk '{for(i=1;i<=length;i+=2) printf "%c", strtonum("0x"substr($0,i,2));}')\"" | sudo tee -a /var/log/satoshi_coins/log
             # Log "create "name" txid, blockheight, Regular time!!!! It's logging, but should it be different ????????????????????????????????????????????????????????????????????????
