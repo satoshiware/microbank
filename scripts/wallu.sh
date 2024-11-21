@@ -240,7 +240,7 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain (consolidates 
         # Check for valid TXID; if valid, output to log.
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
-            echo "NEW_CHAIN: \"$NAME_OF_BANK_OPERATION\" TXID:$TXID DATA:$HEXSTRING TIME:$(date +%s)" | sudo tee -a /var/log/satoshi_coins/log
+            echo "NEW_CHAIN: TXID:$TXID TIME:$(date +%s) DATA:$HEXSTRING NAME:\"$NAME_OF_BANK_OPERATION\"" | sudo tee -a /var/log/satoshi_coins/log
         else
             echo $OUTPUT; exit 1
         fi
@@ -377,7 +377,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         # Check for valid TXID; if valid, output to log.
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
-            echo "LOAD: TXID:$TXID \$ATS:$TOTAL TIME:$(date +%s)" | sudo tee -a /var/log/satoshi_coins/log
+            echo "LOAD: TXID:$TXID TIME:$(date +%s) \$ATS:$TOTAL" | sudo tee -a /var/log/satoshi_coins/log
             for address in "${!coins[@]}"; do # log each coin
                 echo "    $address: $AMOUNT_PER_COIN" | sudo tee -a /var/log/satoshi_coins/log
             done
@@ -470,7 +470,7 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log)
 
 else
     $0 --help
-    echo "Script Version 0.22"
+    echo "Script Version 0.23"
 fi
 
 
