@@ -258,16 +258,16 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         echo "Error! Insufficient Parameters!"; exit 1
     fi
 
+    # Check the logs to verify the chain is active
+    if [[ $(($(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log"))) -eq 0 ]]; then
+        echo "Error! There is no active chain!"; exit 1
+    fi
+
     # Get the tip of the Satoshi Coins' Chain
     TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/satoshi_coins/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
     TXID_SATOSHI_COIN_CHAIN_TIP=${TXID_SATOSHI_COIN_CHAIN_TIP:5}
     if ! [[ ${#TXID_SATOSHI_COIN_CHAIN_TIP} -eq 64 && "$TXID_SATOSHI_COIN_CHAIN_TIP" =~ ^[0-9a-fA-F]+$ ]]; then
         echo "Error! Invalid Chain tip TXID (${TXID_SATOSHI_COIN_CHAIN_TIP})!"; exit 1
-    fi
-
-    # Check the logs to verify the chain is active
-    if [[ $(($(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log"))) -eq 0 ]]; then
-        echo "Error! There is no active chain!"; exit 1
     fi
 
     # Verify TXID has an unspent utxo on the first output
@@ -309,8 +309,8 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         # Allow the user to type 'done' to stop input
         if [[ "$user_input" == "done" ]]; then
             break
-		elif [[ -z "$user_input" ]]; then
-			continue
+        elif [[ -z "$user_input" ]]; then
+            continue
         fi
 
         # Convert the input to lowercase
@@ -358,7 +358,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     echo "    Confirmations of Previous Chain Tip: $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq .confirmations)"; echo ""
 
     # Verify there is enough satoshis in the wallet
-    if [[ $TOTAL -gt $BALANCE ]]; then
+    if [[ $(($TOTAL + 10000)) -gt $BALANCE ]]; then
         echo "Error: Not enough satoshis in your wallet!"; exit 1
     fi
 
@@ -404,16 +404,16 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
         echo "Error! Address provided is not valid!"; exit 1
     fi
 
+    # Check the logs to verify there is active chain to destroy
+    if [[ $(( $(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log") )) -eq 0 ]]; then
+        echo "Error! There is no active chain to destroy!"; exit 1
+    fi
+
     # Get the tip of the Satoshi Coins' Chain
     TXID_SATOSHI_COIN_CHAIN_TIP=$(tac /var/log/satoshi_coins/log | grep -m 1 -E "NEW_CHAIN|LOAD" | cut -d " " -f 2)
     TXID_SATOSHI_COIN_CHAIN_TIP=${TXID_SATOSHI_COIN_CHAIN_TIP:5}
     if ! [[ ${#TXID_SATOSHI_COIN_CHAIN_TIP} -eq 64 && "$TXID_SATOSHI_COIN_CHAIN_TIP" =~ ^[0-9a-fA-F]+$ ]]; then
         echo "Error! Invalid Chain tip TXID (${TXID_SATOSHI_COIN_CHAIN_TIP})!"; exit 1
-    fi
-
-    # Check the logs to verify there is active chain to destroy
-    if [[ $(( $(grep -c "NEW_CHAIN" "/var/log/satoshi_coins/log") - $(grep -c "DELETE_CHAIN" "/var/log/satoshi_coins/log") )) -eq 0 ]]; then
-        echo "Error! There is no active chain to destroy!"; exit 1
     fi
 
     # Verify TXID has an unspent utxo on the first output
