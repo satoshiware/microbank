@@ -68,6 +68,10 @@ elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (wallu) in
     sudo cat $0 | sudo tee /usr/local/sbin/wallu > /dev/null
     sudo chmod +x /usr/local/sbin/wallu
 
+    # Make sure satoshi coins' log file and corresponding directory exist
+    sudo mkdir -p /var/log/satoshi_coins
+    sudo touch /var/log/satoshi_coins/log
+
 elif [[ $1 = "--cron" ]]; then # (Re)Create a weekly cronjob to send a wallet email update at 6:45 AM on Monday: RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
     if [[ -z $NAME || -z $EMAIL ]]; then
@@ -203,10 +207,6 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain (consolidates 
     NAME_OF_BANK_OPERATION="${2^^}"; PRIORITY=${3,,} # Parameters: NAME_OF_BANK_OPERATION  (PRIORITY)
 
     HEXSTRING="5341544f53484920434f494e533a20" # ASCII HEX: "SATOSHI COINS: "
-
-    # Make sure satoshi coins' log file and corresponding directory exist
-    sudo mkdir -p /var/log/satoshi_coins
-    sudo touch /var/log/satoshi_coins/log
 
     # Input Checking
     if [[ -z $NAME_OF_BANK_OPERATION ]]; then
@@ -506,5 +506,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.26"
+    echo "Script Version 0.262"
 fi
