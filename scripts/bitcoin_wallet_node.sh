@@ -189,6 +189,7 @@ sudo ln -s /var/lib/bitcoin/mining ~/backup
 sudo ln -s /var/lib/bitcoin/bank ~/backup
 sudo ln -s /root/passphrase ~/backup
 sudo ln -s /etc/default/send_messages.env ~/backup
+sudo ln -s /var/log/satoshi_coins/log ~/backup
 
 # If "~/restore" folder is present then restore all pertinent files; assumes all files are present
 if [[ -d ~/restore ]]; then
@@ -198,6 +199,7 @@ if [[ -d ~/restore ]]; then
     sudo chown -R bitcoin:bitcoin ~/restore/bank
     sudo chown root:root ~/restore/passphrase
     sudo chown root:root ~/restore/send_messages.env
+    sudo chown root:root ~/restore/log
 
     # Move files to their correct locations
     sudo systemctl stop bitcoind; echo "Waiting 30 seconds for bitcoind to shutdown..."; sleep 30
@@ -209,6 +211,7 @@ if [[ -d ~/restore ]]; then
     sudo mv -f ~/restore/bank /var/lib/bitcoin
     sudo mv ~/restore/passphrase /root/passphrase
     sudo mv ~/restore/send_messages.env /etc/default/send_messages.env
+    sudo mv ~/restore/log /var/log/satoshi_coins/log
 
     # Remove the "~/restore" folder
     cd ~; sudo rm -rf restore
