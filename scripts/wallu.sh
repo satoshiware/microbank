@@ -69,8 +69,11 @@ elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (wallu) in
     sudo chmod +x /usr/local/sbin/wallu
 
     # Make sure satoshi coins' log file and corresponding directory exist
-    sudo mkdir -p /var/log/satoshi_coins
-    sudo touch /var/log/satoshi_coins/log
+    if [[ ! -f /var/log/satoshi_coins/log ]]; then
+        sudo mkdir -p /var/log/satoshi_coins
+        sudo touch /var/log/satoshi_coins/log
+        echo "Satoshi Coins Log Created: $(date)" | sudo tee -a /var/log/satoshi_coins/log
+    fi
 
 elif [[ $1 = "--cron" ]]; then # (Re)Create a weekly cronjob to send a wallet email update at 6:45 AM on Monday: RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
@@ -332,10 +335,13 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     # Get wallet balance (in $ATS)
     BALANCE=$(awk -v balance="$($BTC -rpcwallet=satoshi_coins getbalance)" 'BEGIN {printf("%.0f", balance * 100000000)}' </dev/null)
 
-    # Get Fee Rate (BTC / kB) from full node !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   satoshi:satoshi@192.168.2.12:8332 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    FEE_RATE=$(curl -s --data-binary "{\"jsonrpc\":\"2.0\",\"id\":\"SCEstimateSmartFee\",\"method\":\"estimatesmartfee\",\"params\":[$TARGET]}" -H 'content-type:text/plain;' satoshi:satoshi@192.168.2.12:8332 | jq '.result.feerate')
+    # Get Fee Rate (BTC / kB) from full node
+    BTC_FULL_NODE_IP=$(sudo cat /etc/bitcoin.conf | grep connect= | cut -d "=" -f 2) # Discover full node ipv4 from bitcoin config file
+    if [[ ! "$BTC_FULL_NODE_IP" == *:* ]]; then  # Add default port if node was added
+        BTC_FULL_NODE_IP="$BTC_FULL_NODE_IP:8332"
+    fi
+    FEE_RATE=$(curl -s --data-binary "{\"jsonrpc\":\"2.0\",\"id\":\"SCEstimateSmartFee\",\"method\":\"estimatesmartfee\",\"params\":[$TARGET]}" -H 'content-type:text/plain;' satoshi:satoshi@$BTC_FULL_NODE_IP | jq '.result.feerate')
     FEE_RATE=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal)}' </dev/null) # Make sure the fee rate is not in scientific notation
-          ############ how can we verifiy that we got something back... error if naddad ################# can we still send without specifying the feerate????????????????????????
 
     # Calculate Weight
     UTXO_COUNT=$($BTC -rpcwallet=satoshi_coins listunspent 0 | grep txid | wc -l)
@@ -491,6 +497,9 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
         fi
     fi
 
+    # Exit if there is no TXID (i.e. virgin log file)
+    if [[ -z $LAST_TXID ]]; then exit; fi
+
     # Show Chain Tip's TX Details
     echo "Chain Tip's TX Details:"
     $BTC -rpcwallet=satoshi_coins gettransaction $LAST_TXID | grep -m 1 amount
@@ -506,5 +515,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.262"
+    echo "Script Version 0.263"
 fi
