@@ -173,6 +173,7 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | sa
     TXID=$(echo $OUTPUT | jq -r .txid)
     if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
         #$BTC sendrawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
+		echo $TXID
     else
         echo $OUTPUT
     fi
@@ -562,5 +563,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.36"
+    echo "Script Version 0.37"
 fi
