@@ -154,7 +154,15 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | sa
         echo "Error! Priority could not be determined!"; exit 1
     fi
 
-    $UNLOCK; $MINING_UNLOCK; $BTC -rpcwallet=$WALLET send "{\"$ADDRESS\": $AMOUNT}" $TARGET $ESTIMATION null "{\"replaceable\": true${SEND_ALL}}"
+    # Get Fee Rates (BTC / kB; SATS / vB) from full node
+    BTC_FULL_NODE_IP=$(sudo cat /etc/bitcoin.conf | grep connect= | cut -d "=" -f 2) # Discover full node ipv4 from bitcoin config file
+    if [[ ! "$BTC_FULL_NODE_IP" == *:* ]]; then  # Add default port if node was added
+        BTC_FULL_NODE_IP="$BTC_FULL_NODE_IP:8332"
+    fi
+    FEE_RATE=$(curl -s --data-binary "{\"jsonrpc\":\"2.0\",\"id\":\"SCEstimateSmartFee\",\"method\":\"estimatesmartfee\",\"params\":[$TARGET]}" -H 'content-type:text/plain;' satoshi:satoshi@$BTC_FULL_NODE_IP | jq '.result.feerate')
+    FEE_RATE_SATS_VB=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal * 100000)}' </dev/null)
+
+    $UNLOCK; $MINING_UNLOCK; $BTC -rpcwallet=$WALLET send "{\"$ADDRESS\": $AMOUNT}" null "unset" $FEE_RATE_SATS_VB "{\"replaceable\": true${SEND_ALL}}"
 
 elif [[ $1 = "--bump" ]]; then # Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank and mining wallets only)
     WALLETS=("bank" "mining"); bump_flag=""
@@ -239,8 +247,17 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain (consolidates 
     # Prepare and send the transaction; it will also combine all CONFIRMED utxos into one.
     read -p "Creating new Chain: \"$NAME_OF_BANK_OPERATION\". Would you like to continue? (y|n): "
     if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
+        # Get Fee Rates (BTC / kB; SATS / vB) from full node
+        BTC_FULL_NODE_IP=$(sudo cat /etc/bitcoin.conf | grep connect= | cut -d "=" -f 2) # Discover full node ipv4 from bitcoin config file
+        if [[ ! "$BTC_FULL_NODE_IP" == *:* ]]; then  # Add default port if node was added
+            BTC_FULL_NODE_IP="$BTC_FULL_NODE_IP:8332"
+        fi
+        FEE_RATE=$(curl -s --data-binary "{\"jsonrpc\":\"2.0\",\"id\":\"SCEstimateSmartFee\",\"method\":\"estimatesmartfee\",\"params\":[$TARGET]}" -H 'content-type:text/plain;' satoshi:satoshi@$BTC_FULL_NODE_IP | jq '.result.feerate')
+        FEE_RATE_SATS_VB=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal * 100000)}' </dev/null)
+
         HEXSTRING="${HEXSTRING}$(echo -n $NAME_OF_BANK_OPERATION | od -An -tx1 | sed 's/ //g' | sed ':a;N;$!ba;s/\n//g')"
-        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send estimate_mode=economical conf_target=$TARGET \
+        ##$SATOSHI_COINS_UNLOCK
+        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send fee_rate=$FEE_RATE_SATS_VB \
         outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":$($BTC -rpcwallet=satoshi_coins getbalance)},{\"data\":\"$HEXSTRING\"}]" \
         options="{\"change_position\":0,\"replaceable\":true,\"subtract_fee_from_outputs\":[0]}")
 
@@ -335,13 +352,14 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     # Get wallet balance (in $ATS)
     BALANCE=$(awk -v balance="$($BTC -rpcwallet=satoshi_coins getbalance)" 'BEGIN {printf("%.0f", balance * 100000000)}' </dev/null)
 
-    # Get Fee Rate (BTC / kB) from full node
+    # Get Fee Rates (BTC / kB; SATS / vB) from full node
     BTC_FULL_NODE_IP=$(sudo cat /etc/bitcoin.conf | grep connect= | cut -d "=" -f 2) # Discover full node ipv4 from bitcoin config file
     if [[ ! "$BTC_FULL_NODE_IP" == *:* ]]; then  # Add default port if node was added
         BTC_FULL_NODE_IP="$BTC_FULL_NODE_IP:8332"
     fi
     FEE_RATE=$(curl -s --data-binary "{\"jsonrpc\":\"2.0\",\"id\":\"SCEstimateSmartFee\",\"method\":\"estimatesmartfee\",\"params\":[$TARGET]}" -H 'content-type:text/plain;' satoshi:satoshi@$BTC_FULL_NODE_IP | jq '.result.feerate')
     FEE_RATE=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal)}' </dev/null) # Make sure the fee rate is not in scientific notation
+    FEE_RATE_SATS_VB=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal * 100000)}' </dev/null)
 
     # Calculate Weight
     UTXO_COUNT=$($BTC -rpcwallet=satoshi_coins listunspent 0 | grep txid | wc -l)
@@ -381,7 +399,8 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         done
 
         # Send & capture the output to $OUTPUT
-        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send estimate_mode=economical conf_target=$TARGET \
+        ##$SATOSHI_COINS_UNLOCK
+        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send fee_rate=$FEE_RATE_SATS_VB \
         outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":0.0001}$COIN_OUTPUTS]" \
         options="{\"change_position\":0,\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}]}")
 
@@ -459,8 +478,17 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
             fi
         done
 
+        # Get Fee Rates (BTC / kB; SATS / vB) from full node
+        BTC_FULL_NODE_IP=$(sudo cat /etc/bitcoin.conf | grep connect= | cut -d "=" -f 2) # Discover full node ipv4 from bitcoin config file
+        if [[ ! "$BTC_FULL_NODE_IP" == *:* ]]; then  # Add default port if node was added
+            BTC_FULL_NODE_IP="$BTC_FULL_NODE_IP:8332"
+        fi
+        FEE_RATE=$(curl -s --data-binary "{\"jsonrpc\":\"2.0\",\"id\":\"SCEstimateSmartFee\",\"method\":\"estimatesmartfee\",\"params\":[$TARGET]}" -H 'content-type:text/plain;' satoshi:satoshi@$BTC_FULL_NODE_IP | jq '.result.feerate')
+        FEE_RATE_SATS_VB=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal * 100000)}' </dev/null)
+
         # Create a transaction with two inputs where the utxo for the Satoshi Coins' chain tip is used as the second one.
-        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send estimate_mode=economical conf_target=$TARGET \
+        ###$SATOSHI_COINS_UNLOCK
+        OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send fee_rate=$FEE_RATE_SATS_VB \
         outputs="[{\"$ADDRESS_FOR_REMAINING_WALLET_BALANCE\":$($BTC -rpcwallet=satoshi_coins getbalance)}]" \
         options="{\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$D_TXID\",\"vout\":$D_VOUT,\"sequence\":4294967293},{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}],\"subtract_fee_from_outputs\":[0]}")
 
@@ -515,5 +543,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.263"
+    echo "Script Version 0.30"
 fi
