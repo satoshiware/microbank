@@ -256,7 +256,7 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain (consolidates 
         FEE_RATE_SATS_VB=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal * 100000)}' </dev/null)
 
         HEXSTRING="${HEXSTRING}$(echo -n $NAME_OF_BANK_OPERATION | od -An -tx1 | sed 's/ //g' | sed ':a;N;$!ba;s/\n//g')"
-        ##$SATOSHI_COINS_UNLOCK
+        $SATOSHI_COINS_UNLOCK
         OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send fee_rate=$FEE_RATE_SATS_VB \
         outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":$($BTC -rpcwallet=satoshi_coins getbalance)},{\"data\":\"$HEXSTRING\"}]" \
         options="{\"change_position\":0,\"replaceable\":true,\"subtract_fee_from_outputs\":[0]}")
@@ -399,7 +399,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         done
 
         # Send & capture the output to $OUTPUT
-        ##$SATOSHI_COINS_UNLOCK
+        $SATOSHI_COINS_UNLOCK
         OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send fee_rate=$FEE_RATE_SATS_VB \
         outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":0.0001}$COIN_OUTPUTS]" \
         options="{\"change_position\":0,\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}]}")
@@ -487,7 +487,7 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
         FEE_RATE_SATS_VB=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal * 100000)}' </dev/null)
 
         # Create a transaction with two inputs where the utxo for the Satoshi Coins' chain tip is used as the second one.
-        ###$SATOSHI_COINS_UNLOCK
+        $SATOSHI_COINS_UNLOCK
         OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send fee_rate=$FEE_RATE_SATS_VB \
         outputs="[{\"$ADDRESS_FOR_REMAINING_WALLET_BALANCE\":$($BTC -rpcwallet=satoshi_coins getbalance)}]" \
         options="{\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$D_TXID\",\"vout\":$D_VOUT,\"sequence\":4294967293},{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}],\"subtract_fee_from_outputs\":[0]}")
