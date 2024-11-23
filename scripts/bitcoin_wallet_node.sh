@@ -109,8 +109,6 @@ echo "alias btc=\"sudo -u bitcoin /usr/bin/bitcoin-cli -datadir=/var/lib/bitcoin
 # Generate Bitcoin Configuration File with the Appropriate Permissions
 cat << EOF | sudo tee /etc/bitcoin.conf
 # [core]
-# Only downloads and relays blocks; ignores unconfirmed transaction and disables most of the mempool functionality (i.e. maxmempool=0).
-blocksonly=1
 # Set database cache size in MB (The minimum value is 4; default is 450).
 dbcache=256
 # Reduce storage requirements by only storing this many MBs of the most recent blocks (The minimum value is 550).
