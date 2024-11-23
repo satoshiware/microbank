@@ -173,7 +173,7 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | sa
     TXID=$(echo $OUTPUT | jq -r .txid)
     if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
         #$BTC sendrawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
-		echo $TXID
+        echo $TXID
     else
         echo $OUTPUT
     fi
