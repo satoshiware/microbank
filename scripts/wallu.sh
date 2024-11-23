@@ -162,7 +162,16 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | sa
     FEE_RATE=$(curl -s --data-binary "{\"jsonrpc\":\"2.0\",\"id\":\"SCEstimateSmartFee\",\"method\":\"estimatesmartfee\",\"params\":[$TARGET]}" -H 'content-type:text/plain;' satoshi:satoshi@$BTC_FULL_NODE_IP | jq '.result.feerate')
     FEE_RATE_SATS_VB=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal * 100000)}' </dev/null)
 
-    $UNLOCK; $MINING_UNLOCK; $BTC -rpcwallet=$WALLET send "{\"$ADDRESS\": $AMOUNT}" null "unset" $FEE_RATE_SATS_VB "{\"replaceable\": true${SEND_ALL}}"
+    # Generate transacation
+    $UNLOCK; $MINING_UNLOCK; OUTPUT=$($BTC -rpcwallet=$WALLET send "{\"$ADDRESS\": $AMOUNT}" null "unset" $FEE_RATE_SATS_VB "{\"replaceable\": true${SEND_ALL}}")
+
+    # Check for valid TXID; if valid, ensure the tx was broadcasted
+    TXID=$(echo $OUTPUT | jq -r .txid)
+    if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
+        $BTC sendrawtransaction $(btc -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
+    else
+        echo $OUTPUT
+    fi
 
 elif [[ $1 = "--bump" ]]; then # Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank and mining wallets only)
     WALLETS=("bank" "mining"); bump_flag=""
@@ -261,9 +270,10 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain (consolidates 
         outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":$($BTC -rpcwallet=satoshi_coins getbalance)},{\"data\":\"$HEXSTRING\"}]" \
         options="{\"change_position\":0,\"replaceable\":true,\"subtract_fee_from_outputs\":[0]}")
 
-        # Check for valid TXID; if valid, output to log.
+        # Check for valid TXID; if valid, output to log and ensure the tx was broadcasted
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
+            $BTC sendrawtransaction $(btc -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
             echo "NEW_CHAIN: TXID:$TXID TIME:$(date +%s) DATA:$HEXSTRING NAME:\"$NAME_OF_BANK_OPERATION\"" | sudo tee -a /var/log/satoshi_coins/log
         else
             echo $OUTPUT; exit 1
@@ -333,6 +343,9 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
             continue
         fi
 
+        # Remove any text after the address
+        user_input=$(echo "$user_input" | cut -d " " -f 1)
+
         # Convert the input to lowercase
         user_input=$(echo "$user_input" | tr 'A-Z' 'a-z')
 
@@ -386,7 +399,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         echo "Error: Not enough satoshis in your wallet!"; exit 1
     fi
 
-    # Verify it's a go with the user; prepare and send the transaction.
+    # Verify it's a go with the user; prepare and send the transaction
     read -p "Would you like to continue? (y|n): "
     if [[ "${REPLY}" = "y" || "${REPLY}" = "Y" ]]; then
         # Convert $AMOUNT_PER_COIN from SATS to BTC
@@ -404,9 +417,10 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":0.0001}$COIN_OUTPUTS]" \
         options="{\"change_position\":0,\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}]}")
 
-        # Check for valid TXID; if valid, output to log.
+        # Check for valid TXID; if valid, output to log and ensure the tx was broadcasted
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
+            $BTC sendrawtransaction $(btc -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
             echo "LOAD: TXID:$TXID TIME:$(date +%s) \$ATS:$TOTAL" | sudo tee -a /var/log/satoshi_coins/log
             for address in "${!coins[@]}"; do # log each coin
                 echo "    $address: $AMOUNT_PER_COIN BTC" | sudo tee -a /var/log/satoshi_coins/log
@@ -492,9 +506,10 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
         outputs="[{\"$ADDRESS_FOR_REMAINING_WALLET_BALANCE\":$($BTC -rpcwallet=satoshi_coins getbalance)}]" \
         options="{\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$D_TXID\",\"vout\":$D_VOUT,\"sequence\":4294967293},{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}],\"subtract_fee_from_outputs\":[0]}")
 
-        # Check for valid TXID; if valid, output to log.
+        # Check for valid TXID; if valid, output to log and ensure the tx was broadcasted
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
+            $BTC sendrawtransaction $(btc -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
             echo "DELETE_CHAIN: TXID:$TXID TIME:$(date +%s)" | sudo tee -a /var/log/satoshi_coins/log
         else
             echo $OUTPUT; exit 1
@@ -543,5 +558,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.30"
+    echo "Script Version 0.35"
 fi
