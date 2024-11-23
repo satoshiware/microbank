@@ -42,11 +42,15 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --create      Start new Satoshi Coins' chain (consolidates into single utxo): "NAME_OF_BANK_OPERATION"  (PRIORITY)
       --load        Load Satoshi Coins: AMOUNT_PER_COIN  (PRIORITY)
       --destroy     Bring the current Satoshi Coins' chain to an end: ADDRESS_FOR_REMAINING_WALLET_BALANCE  (PRIORITY)
+                        Note: PRIORITY is optional (default = NORMAL). It helps determine the fee rate.
+                              It can be set to NOW, NORMAL (6 hours), ECONOMICAL (1 day), or CHEAPSKATE (1 week).
+
       --log         Show log (/var/log/satoshicoins/log) and Satoshi Coins' chain tip transaction stat's
 
         Sample Chains:
-            Satoshiware: 95a5b1a0787614d293907c871ac2b1f418d8ab415e7776793362e0e7579b000b
-            BBOQC: c3709e664bc6bf2d93d2eddaa715a7add8403365894826ede584191c3db1bad6
+            "BBOQC": c3709e664bc6bf2d93d2eddaa715a7add8403365894826ede584191c3db1bad6
+            "Satoshiware": 95a5b1a0787614d293907c871ac2b1f418d8ab415e7776793362e0e7579b000b
+            "BTC OF AZ": a8201d19dea0a03d453beb385482a8599eed91cfeb36e323ccb10a2e1e4aa617
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (wallu) in /usr/local/sbin (Repository: /satoshiware/microbank/scripts/wallu.sh)
@@ -168,7 +172,7 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | sa
     # Check for valid TXID; if valid, ensure the tx was broadcasted
     TXID=$(echo $OUTPUT | jq -r .txid)
     if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
-        $BTC sendrawtransaction $(btc -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
+        #$BTC sendrawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
     else
         echo $OUTPUT
     fi
@@ -273,7 +277,7 @@ elif [[ $1 = "--create" ]]; then # Start new Satoshi Coins' chain (consolidates 
         # Check for valid TXID; if valid, output to log and ensure the tx was broadcasted
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
-            $BTC sendrawtransaction $(btc -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
+            #$BTC sendrawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
             echo "NEW_CHAIN: TXID:$TXID TIME:$(date +%s) DATA:$HEXSTRING NAME:\"$NAME_OF_BANK_OPERATION\"" | sudo tee -a /var/log/satoshi_coins/log
         else
             echo $OUTPUT; exit 1
@@ -420,7 +424,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         # Check for valid TXID; if valid, output to log and ensure the tx was broadcasted
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
-            $BTC sendrawtransaction $(btc -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
+            #$BTC sendrawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
             echo "LOAD: TXID:$TXID TIME:$(date +%s) \$ATS:$TOTAL" | sudo tee -a /var/log/satoshi_coins/log
             for address in "${!coins[@]}"; do # log each coin
                 echo "    $address: $AMOUNT_PER_COIN BTC" | sudo tee -a /var/log/satoshi_coins/log
@@ -509,7 +513,7 @@ elif [[ $1 = "--destroy" ]]; then # Bring the current Satoshi Coins' chain to an
         # Check for valid TXID; if valid, output to log and ensure the tx was broadcasted
         TXID=$(echo $OUTPUT | jq -r .txid)
         if [[ ${#TXID} -eq 64 && "$TXID" =~ ^[0-9a-fA-F]+$ ]]; then
-            $BTC sendrawtransaction $(btc -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
+            #$BTC sendrawtransaction $($BTC -rpcwallet=satoshi_coins gettransaction $TXID | jq -r .hex) # Ensures tx is broadcasted if mempool is disabled
             echo "DELETE_CHAIN: TXID:$TXID TIME:$(date +%s)" | sudo tee -a /var/log/satoshi_coins/log
         else
             echo $OUTPUT; exit 1
@@ -558,5 +562,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.35"
+    echo "Script Version 0.36"
 fi
