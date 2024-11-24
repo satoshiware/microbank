@@ -423,7 +423,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
         $SATOSHI_COINS_UNLOCK
         OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send fee_rate=$FEE_RATE_SATS_VB \
         outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":$REMAINDER}$COIN_OUTPUTS]" \
-        options="{\"change_position\":0,\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}]}")
+        options="{\"change_position\":0,\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}],\"subtract_fee_from_outputs\":[0]}")
 
         # Check for valid TXID; if valid, output to log and ensure the tx was broadcasted
         TXID=$(echo $OUTPUT | jq -r .txid)
@@ -566,5 +566,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.38"
+    echo "Script Version 0.39"
 fi
