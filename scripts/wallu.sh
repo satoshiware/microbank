@@ -388,7 +388,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     FEE_TOTAL=$(awk -v weight="$WEIGHT" -v feerate="$FEE_RATE" 'BEGIN {printf("%.0f", weight * feerate * 100000000 / 4000)}' </dev/null)
 
     # Calculate total (in $ATS)
-    TOTAL=$(( (COIN_COUNT * AMOUNT_PER_COIN) + FEE_TOTAL ))
+    TOTAL=$(( (COIN_COUNT * AMOUNT_PER_COIN) ))
 
     echo ""; echo "Summary:"
     echo "    Wallet Balance: $BALANCE \$ATS"
@@ -400,7 +400,7 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
     echo "    Confirmations of Previous Chain Tip: $($BTC -rpcwallet=satoshi_coins gettransaction $TXID_SATOSHI_COIN_CHAIN_TIP | jq .confirmations)"; echo ""
 
     # Verify there is enough satoshis in the wallet
-    if [[ $(($TOTAL + 10000)) -gt $BALANCE ]]; then
+    if [[ $(($TOTAL + $FEE_TOTAL + 1000)) -gt $BALANCE ]]; then
         echo "Error: Not enough satoshis in your wallet!"; exit 1
     fi
 
@@ -416,10 +416,13 @@ elif [[ $1 = "--load" ]]; then # Load Satoshi Coins
             COIN_OUTPUTS+=",{\"$address\":$AMOUNT_PER_COIN}"
         done
 
+        # Calculate remaining balance (in BTC) after this transaction
+        REMAINDER=$(awk -v remain_sats="$(( $BALANCE - $TOTAL ))" 'BEGIN {printf("%.8f", remain_sats / 100000000)}' </dev/null)
+
         # Send & capture the output to $OUTPUT
         $SATOSHI_COINS_UNLOCK
         OUTPUT=$($BTC -rpcwallet=satoshi_coins -named send fee_rate=$FEE_RATE_SATS_VB \
-        outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":0.0001}$COIN_OUTPUTS]" \
+        outputs="[{\"$($BTC -rpcwallet=satoshi_coins getnewaddress)\":$REMAINDER}$COIN_OUTPUTS]" \
         options="{\"change_position\":0,\"replaceable\":true,\"add_inputs\":true,\"inputs\":[{\"txid\":\"$TXID_SATOSHI_COIN_CHAIN_TIP\",\"vout\":0,\"sequence\":4294967293}]}")
 
         # Check for valid TXID; if valid, output to log and ensure the tx was broadcasted
@@ -563,5 +566,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.37"
+    echo "Script Version 0.38"
 fi
