@@ -121,7 +121,7 @@ EOF
     echo ""
 
 elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | satoshi_coins) wallet
-    ADDRESS="${2,,}"; AMOUNT=$3; WALLET=${4,,}; PRIORITY=${5,,} # Parameters: ADDRESS  AMOUNT  WALLET  (PRIORITY)
+    ADDRESS=$2; AMOUNT=$3; WALLET=${4,,}; PRIORITY=${5,,} # Parameters: ADDRESS  AMOUNT  WALLET  (PRIORITY)
 
     # Input Checking
     if [[ -z $ADDRESS || -z $AMOUNT || -z $WALLET ]]; then
@@ -566,5 +566,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.39"
+    echo "Script Version 0.391"
 fi
