@@ -9,6 +9,20 @@ To execute any of these scripts, login as a sudo user (that is not root) and exe
 pre_fork_micro(folder)
     Scipts to setup and operate a new microcurrency during the distribution period.
 
+# satoshi-coins.sh
+	Installs a Satoshi Coins explorer. This script will install an unencrypted website (meant to sit behind a reverse proxy).
+
+	Global Variables:
+		$YUBIKEY
+		$MICRO_BANK_NAME
+		$BTC_EXPLORER
+		$BTC_ELECTRUM
+
+	Hardware VM Recommendation:
+        CPU:        4
+        RAM:        2GB
+        Storage:    8GB
+
 # bitcoin_node.sh
     Installs a Full Indexed Bitcoin Node.
     Be sure to forward the P2P port 8333 on the router to this Virtual Machine.
