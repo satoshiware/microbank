@@ -959,10 +959,15 @@ elif [[ $1 = "--disable-contr" ]]; then # Disable a contract
 elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme care!
     TABLE=$2; COLUMN=$3; REFERENCE_COLUMN=$4; UNIQUE_REFERENCE_ROW=$5; VALUE=$6
 
-    echo "Rows to be modified:"; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
+    echo "Rows to be modified:"; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = '$UNIQUE_REFERENCE_ROW'"
     read -p "Press enter to continue ..."
-    sudo sqlite3 $SQ3DBNAME "UPDATE $TABLE SET $COLUMN = '$VALUE' WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
-    echo ""; echo "After modification:"; sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = $UNIQUE_REFERENCE_ROW"
+    sudo sqlite3 $SQ3DBNAME "UPDATE $TABLE SET $COLUMN = '$VALUE' WHERE $REFERENCE_COLUMN = '$UNIQUE_REFERENCE_ROW'"
+    echo ""; echo "After modification:"
+    if [[ $COLUMN == $REFERENCE_COLUMN ]]; then
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = '$VALUE'"
+    else
+        sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = '$UNIQUE_REFERENCE_ROW'"
+    fi
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administrator and manager
@@ -1151,5 +1156,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.16"
+    echo "Script Version 1.161"
 fi
