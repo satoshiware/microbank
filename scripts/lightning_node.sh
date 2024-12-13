@@ -42,13 +42,9 @@ FYI:
 
     Bitcoin configuratijon: /etc/bitcoin.conf
 
-    The "sudo systemctl status bitcoind" command show the status of the bitcoin daemon.
+    The "sudo systemctl status Lightningd" command show the status of the bitcoin daemon.
+	The "sudo journalctl ????????status Lightningd" command show the status of the bitcoin daemon.
 
-Hardware:
-    Rasperry Pi Compute Module 4: CM4008000 (w/ Compute Blade)
-    8GB RAM
-    M.2 PCI SSD 2TB
-    Netgear 5 Port Switch (PoE+ @ 120W)
 
 
 
@@ -147,7 +143,7 @@ if [[ ! "$(sha256sum ~/${SOURCE##*/})" == *"$CHECKSUM"* ]]; then
     exit 1
 fi
 sudo tar -xvf ${SOURCE##*/} -C /usr/local --strip-components=2
-rm ${SOURCE##*/}
+sudo rm ${SOURCE##*/}
 
 # Create lightning System User
 sudo useradd --system --shell=/sbin/nologin lightning
@@ -190,15 +186,15 @@ MemoryDenyWriteExecute=true
 WantedBy=multi-user.target
 EOF
 
-# Generate Core Lightning Configuration File with the Appropriate Permissions
+# Generate Core Lightning Configuration File with the Appropriate Permissions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Directory location!!! Find something else!!! Using btc-node.local, btcofaz, and color 45ABEF again !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 cat << EOF | sudo tee /etc/lightningd.conf
-#--bitcoin-datadir <arg>                           -datadir arg for bitcoin-cli
-#--bitcoin-cli <arg>                               bitcoin-cli pathname
-#--bitcoin-rpcuser <arg>                           bitcoind RPC username
-#--bitcoin-rpcpassword <arg>                       bitcoind RPC password
-#--bitcoin-rpcconnect <arg>                        bitcoind RPC host to connect to
-#--bitcoin-rpcport <arg>                           bitcoind RPC host's port
-#echo "alias btc=\"sudo -u bitcoin /usr/bin/bitcoin-cli -micro -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf\"" | sudo tee -a /etc/bash.bashrc # Reestablish alias @ boot
+--enable-experimental-features ############ add this ???
+
+# Data directory argument for bitcoin-cli
+bitcoin-datadir=/home/satoshi
+
+# bitcoin-cli pathname
+bitcoin-cli=/usr/bin/bitcoin-cli             
 
 # bitcoind RPC username
 bitcoin-rpcuser=satoshi
@@ -213,28 +209,28 @@ bitcoin-rpcconnect=btc-node.local
 bitcoin-rpcport=8332
 
 # Give your node a name
-#alias=<NAME>
+alias=btcofaz
 
 # Pick your favorite color as a hex code
-#rgb=FFA500
+rgb=45ABEF
 
 # Set the network for Core Lightning
 network=bitcoin
 
-# Run `lightningd` as a background daemon
+# Run lightningd as a background daemon
 daemon
 
-## Log output to specified file
+# Log output to specified file
 log-file=/var/log/lightningd/log
 
 # Set to debug for more verbose log output
-#log-level=debug
+log-level=debug
 
 ## Password encrypt your `hsm_secret` ???????????????????????????????????????????????????????????????????????????????????
 ## You must supply the password on startup if you choose to do this
 #encrypted-hsm
 
-### Networking Settings ###
+### Networking Settings ### ?????????????????????????????? is this the default???????????????????????????
 # Inbound Connections (default PORT 9735)
 #addr=0.0.0.0
 
@@ -353,52 +349,6 @@ sudo systemctl enable btc-node-autossh.service --now
 
 
 
-# Generate Strong Bitcoin RPC Passwords. Replace '/' characters with '0', Replace '+' characters with '1', and Replace '=' characters with ''
-EXTRPCPASSWD=$(openssl rand -base64 16); EXTRPCPASSWD=${EXTRPCPASSWD//\//0}; EXTRPCPASSWD=${EXTRPCPASSWD//+/1}; EXTRPCPASSWD=${EXTRPCPASSWD//=/} # External RPC
-LCLRPCPASSWD=$(openssl rand -base64 16); LCLRPCPASSWD=${LCLRPCPASSWD//\//0}; LCLRPCPASSWD=${LCLRPCPASSWD//+/1}; LCLRPCPASSWD=${LCLRPCPASSWD//=/} # Localhost RPC
-echo $EXTRPCPASSWD | sudo tee /root/extrpcpasswd
-echo $LCLRPCPASSWD | sudo tee /root/lclrpcpasswd
-sudo chmod 400 /root/extrpcpasswd
-sudo chmod 400 /root/lclrpcpasswd
-
-
-
-
-
-
-
-# Install/Setup/Enable the Uncomplicated Firewall (UFW)
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow ssh # Open Default SSH Port
-sudo ufw allow 8333 # Open port for p2p Bitcoin mainnet
-sudo ufw --force enable # Enable Firewall @ Boot and Start it now!
-
-# Install/Setup/Enable SSH(D)
-sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config # Disable password login
-sudo sed -i 's/X11Forwarding yes/#X11Forwarding no/g' /etc/ssh/sshd_config # Disable X11Forwarding (default value)
-sudo sed -i 's/#AllowTcpForwarding yes/AllowTcpForwarding Local/g' /etc/ssh/sshd_config # Only allow local port forwarding
-sudo sed -i 's/#.*StrictHostKeyChecking ask/\ \ \ \ StrictHostKeyChecking yes/g' /etc/ssh/ssh_config # Enable strict host verification
-
-echo -e "\nMatch User *,"'!'"ext_rpc,"'!'"root,"'!'"$USER" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tAllowTCPForwarding no" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tForceCommand /usr/sbin/nologin" | sudo tee -a /etc/ssh/sshd_config
-
-echo -e "\nMatch User ext_rpc" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tPermitOpen localhost:8332 localhost:8433" | sudo tee -a /etc/ssh/sshd_config # Denies any request of local forwarding besides localhost:8332 (Bitcoin RPC), and localhost:8433 (Bitcoin ZMQ)
-
-# Setup a "no login" users called "ext_rpc"
-sudo useradd -s /bin/false -m -d /home/ext_rpc ext_rpc
-
-# Create .ssh folder (ext_rpc); Set ownership and permissions
-sudo mkdir -p /home/ext_rpc/.ssh
-sudo touch /home/ext_rpc/.ssh/authorized_keys
-sudo chown -R ext_rpc:ext_rpc /home/ext_rpc/.ssh
-sudo chmod 700 /home/ext_rpc/.ssh
-sudo chmod 600 /home/ext_rpc/.ssh/authorized_keys
-
 # Generating Strong Wallet Passphrase
 STRONGPASSPF=$(openssl rand -base64 24)
 STRONGPASSPF=${STRONGPASSPF//\//0} # Replace '/' characters with '0'
@@ -409,23 +359,7 @@ STRONGPASSPF=${STRONGPASSPF//l/1} # Replace 'l' (L) characters with '1'
 echo $STRONGPASSPF | sudo tee /root/passphrase
 sudo chmod 400 /root/passphrase
 
-# Generate "bank" Wallet
-sudo -u bitcoin /usr/bin/bitcoin-cli -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf --named createwallet wallet_name="bank" passphrase=$(sudo cat /root/passphrase) load_on_startup=true
 
-# Backup Wallets
-sudo mkdir -p /media/usb
-sudo mount /dev/sda1 /media/usb
-sudo install -C -m 400 /var/lib/bitcoin/wallets/bank/wallet.dat /media/usb/bank.dat
-sudo install -C -m 400 /root/passphrase /media/usb/passphrase
-sudo umount /dev/sda1
-sudo rm -rf /media/usb
-
-# Create Aliases to lock and unlocks (24 Hours) wallets
-echo "alias unlockwallets=\"btc -rpcwallet=bank walletpassphrase \\\$(sudo cat /root/passphrase) 86400\"" | sudo tee -a /etc/bash.bashrc
-echo "alias lockwallets=\"btc -rpcwallet=bank walletlock\"" | sudo tee -a /etc/bash.bashrc
-
-# Install the "bitnode" utility (bitnode.sh)
-bash ~/microbank/scripts/bitnode.sh -i
 
 # Restart the machine
 sudo reboot now
@@ -434,24 +368,10 @@ sudo reboot now
 
 
 
-2024-12-12T23:25:50.487Z INFO    lightningd: v24.11
-2024-12-12T23:25:50.514Z INFO    lightningd: Creating configuration directory /root/.lightning/bitcoin
-2024-12-12T23:25:50.551Z INFO    plugin-clnrest: Killing plugin: disabled itself: No module named 'gevent'
-2024-12-12T23:25:50.552Z INFO    plugin-wss-proxy: Killing plugin: disabled itself: No module named 'websockets'
-2024-12-12T23:25:50.552Z UNUSUAL plugin-bookkeeper: topic 'utxo_deposit' is not a known notification topic
-2024-12-12T23:25:50.552Z UNUSUAL plugin-bookkeeper: topic 'utxo_spend' is not a known notification topic
-Usage: lightningd
-
---list-features-only                              List the features configured, and exit immediately
---developer                                       Enable developer commands/options, disable legacy APIs
---conf=<file>                                     Specify configuration file
---lightning-dir=<dir>                             Set base directory: network-specific subdirectory is under here (default: "/root/.lightning")
+lightning-dir=<dir>                             Set base directory: network-specific subdirectory is under here (default: "/root/.lightning")
 
 --network <arg>                                   Select the network parameters (bitcoin, testnet, signet, regtest, litecoin or litecoin-testnet) (default: bitcoin)
---testnet                                         Alias for --network=testnet
---signet                                          Alias for --network=signet
---mainnet                                         Alias for --network=bitcoin
---regtest                                         Alias for --network=regtest
+
 
 --version|-V                                      Print version and exit
 --rpc-file <arg>                                  Set JSON-RPC socket (or /dev/tty) (default: "lightning-rpc")
@@ -525,105 +445,92 @@ Usage: lightningd
 --log-prefix <arg>                                log prefix
 --log-file=<file>                                 Also log to file (- for stdout)
 
+dev-debugger=<subprocess>                       Invoke gdb at start of <subprocess>
+dev-no-plugin-checksum                          Don't checksum plugins to detect changes
+dev-builtin-plugins-unimportant                 Make builtin plugins unimportant so you can plugin stop them.
+dev-no-reconnect                                Disable automatic reconnect-attempts by this node, but accept incoming
+dev-no-reconnect-private                        Disable automatic reconnect-attempts to peers with private channel(s) only, but accept incoming
+dev-fast-reconnect                              Make max default reconnect delay 3 (not 300) seconds
+dev-disconnect=<filename>                       File containing disconnection points
+dev-allow-localhost                             Announce and allow announcments for localhost address
+dev-bitcoind-poll <arg>                         Time between polling for new transactions (default: 30)
+dev-fast-gossip                                 Make gossip broadcast 1 second, etc
+dev-fast-gossip-prune                           Make gossip pruning 120 seconds
+dev-gossip-time <arg>                           UNIX time to override gossipd to use. (default: 0)
+dev-force-privkey <arg>                         Force HSM to use this as node private key
+dev-force-bip32-seed <arg>                      Force HSM to use this as bip32 seed
+dev-force-channel-secrets <arg>                 Force HSM to use these for all per-channel secrets
+dev-max-funding-unconfirmed-blocks <arg>        Maximum number of blocks we wait for a channel funding transaction to confirm, if we are the fundee. (default: 2016)
+dev-force-tmp-channel-id <arg>                  Force the temporary channel id, instead of random
+dev-no-htlc-timeout                             Don't kill channeld if HTLCs not confirmed within 30 seconds
+dev-fail-process-onionpacket                    Force all processing of onion packets to fail
+dev-no-version-checks                           Skip calling subdaemons with --version on startup
+dev-force-features <arg>                        Force the init/globalinit/node_announce/channel/bolt11/ features, each comma-separated bitnumbers OR a single +/-<bitnumber>
+dev-timeout-secs <arg>                          Seconds to timeout if we don't receive INIT from peer (default: 60)
+dev-no-modern-onion                             Ignore modern onion messages
+dev-disable-commit-after <arg>                  Disable commit timer after this many commits (default: -1)
+dev-no-ping-timer                               Don't hang up if we don't get a ping response
+dev-onion-reply-length <arg>                    Send onion errors of custom length (default: 256)
+dev-max-fee-multiplier <arg>                    Allow the fee proposed by the remote end to be up to multiplier times higher than our own. Small values will cause channels to be closed more often due to fee fluctuations, large values may result in large fees. (default: 10)
+dev-allowdustreserve <arg>                      If true, we allow the `fundchannel` RPC command and the `openchannel` plugin hook to set a reserve that is below the dust limit. (default: false)
+dev-any-channel-type                            Allow sending any channel type, and accept any
+dev-allow-shutdown-destination-change           Allow destination override on close, even if risky
+dev-hsmd-no-preapprove-check                    Tell hsmd not to support preapprove_check msgs
+dev-hsmd-fail-preapprove                        Tell hsmd to always deny preapprove_invoice / preapprove_keysend
+dev-fd-limit-multiplier <arg>                   Try to set fd limit to this many times by number of channels (default: 2) (default: 2)
+dev-handshake-no-reply                          Don't send or read init message after connection
+dev-strict-forwarding                           Forward HTLCs along the channel specified
+dev-throttle-gossip                             Throttle gossip right down, for testing
+dev-limit-connections-inflight                  Throttle connection limiting down for testing.
+dev-low-prio-anchor-blocks <arg>                How many blocks to aim for low-priority anchor closes (default: 2016) (default: 2016)
+dev-debug-self                                  Fire up a terminal window with a debugger in it on initialization
 
+autoconnect-seeker-peers <arg>                  Seeker autoconnects to maintain this minimum number of gossip peers (default: 10)
 
+bitcoin-datadir <arg>                           -datadir arg for bitcoin-cli
+bitcoin-cli <arg>                               bitcoin-cli pathname
+bitcoin-rpcuser <arg>                           bitcoind RPC username
+bitcoin-rpcpassword <arg>                       bitcoind RPC password
+bitcoin-rpcconnect <arg>                        bitcoind RPC host to connect to
+bitcoin-rpcport <arg>                           bitcoind RPC host's port
+bitcoin-rpcclienttimeout <arg>                  bitcoind RPC timeout in seconds during HTTP requests (default: 60)
+bitcoin-retry-timeout <arg>                     how long to keep retrying to contact bitcoind before fatally exiting (default: 60)
 
+autoclean-cycle <arg>                           Perform cleanup every given seconds (default: 3600)
+autoclean-succeededforwards-age <arg>           How old do successful forwards have to be before deletion (0 = never)
+autoclean-failedforwards-age <arg>              How old do failed forwards have to be before deletion (0 = never)
+autoclean-succeededpays-age <arg>               How old do successful pays have to be before deletion (0 = never)
+autoclean-failedpays-age <arg>                  How old do failed pays have to be before deletion (0 = never)
+autoclean-paidinvoices-age <arg>                How old do paid invoices have to be before deletion (0 = never)
+autoclean-expiredinvoices-age <arg>             How old do expired invoices have to be before deletion (0 = never)
 
---dev-debugger=<subprocess>                       Invoke gdb at start of <subprocess>
---dev-no-plugin-checksum                          Don't checksum plugins to detect changes
---dev-builtin-plugins-unimportant                 Make builtin plugins unimportant so you can plugin stop them.
---dev-no-reconnect                                Disable automatic reconnect-attempts by this node, but accept incoming
---dev-no-reconnect-private                        Disable automatic reconnect-attempts to peers with private channel(s) only, but accept incoming
---dev-fast-reconnect                              Make max default reconnect delay 3 (not 300) seconds
---dev-disconnect=<filename>                       File containing disconnection points
---dev-allow-localhost                             Announce and allow announcments for localhost address
---dev-bitcoind-poll <arg>                         Time between polling for new transactions (default: 30)
---dev-fast-gossip                                 Make gossip broadcast 1 second, etc
---dev-fast-gossip-prune                           Make gossip pruning 120 seconds
---dev-gossip-time <arg>                           UNIX time to override gossipd to use. (default: 0)
---dev-force-privkey <arg>                         Force HSM to use this as node private key
---dev-force-bip32-seed <arg>                      Force HSM to use this as bip32 seed
---dev-force-channel-secrets <arg>                 Force HSM to use these for all per-channel secrets
---dev-max-funding-unconfirmed-blocks <arg>        Maximum number of blocks we wait for a channel funding transaction to confirm, if we are the fundee. (default: 2016)
---dev-force-tmp-channel-id <arg>                  Force the temporary channel id, instead of random
---dev-no-htlc-timeout                             Don't kill channeld if HTLCs not confirmed within 30 seconds
---dev-fail-process-onionpacket                    Force all processing of onion packets to fail
---dev-no-version-checks                           Skip calling subdaemons with --version on startup
---dev-force-features <arg>                        Force the init/globalinit/node_announce/channel/bolt11/ features, each comma-separated bitnumbers OR a single +/-<bitnumber>
---dev-timeout-secs <arg>                          Seconds to timeout if we don't receive INIT from peer (default: 60)
---dev-no-modern-onion                             Ignore modern onion messages
---dev-disable-commit-after <arg>                  Disable commit timer after this many commits (default: -1)
---dev-no-ping-timer                               Don't hang up if we don't get a ping response
---dev-onion-reply-length <arg>                    Send onion errors of custom length (default: 256)
---dev-max-fee-multiplier <arg>                    Allow the fee proposed by the remote end to be up to multiplier times higher than our own. Small values will cause channels to be closed more often due to fee fluctuations, large values may result in large fees. (default: 10)
---dev-allowdustreserve <arg>                      If true, we allow the `fundchannel` RPC command and the `openchannel` plugin hook to set a reserve that is below the dust limit. (default: false)
---dev-any-channel-type                            Allow sending any channel type, and accept any
---dev-allow-shutdown-destination-change           Allow destination override on close, even if risky
---dev-hsmd-no-preapprove-check                    Tell hsmd not to support preapprove_check msgs
---dev-hsmd-fail-preapprove                        Tell hsmd to always deny preapprove_invoice / preapprove_keysend
---dev-fd-limit-multiplier <arg>                   Try to set fd limit to this many times by number of channels (default: 2) (default: 2)
---dev-handshake-no-reply                          Don't send or read init message after connection
---dev-strict-forwarding                           Forward HTLCs along the channel specified
---dev-throttle-gossip                             Throttle gossip right down, for testing
---dev-limit-connections-inflight                  Throttle connection limiting down for testing.
---dev-low-prio-anchor-blocks <arg>                How many blocks to aim for low-priority anchor closes (default: 2016) (default: 2016)
---dev-debug-self                                  Fire up a terminal window with a debugger in it on initialization
+funder-policy <arg>                             Policy to use for dual-funding requests. [match, available, fixed] (default: fixed)
+funder-policy-mod <arg>                         Percent to apply policy at (match/available); or amount to fund (fixed) (default: 0)
+funder-min-their-funding <arg>                  Minimum funding peer must open with to activate our policy (default: 10000sat)
+funder-max-their-funding <arg>                  Maximum funding peer may open with to activate our policy (default: 4294967295sat)
+funder-per-channel-min <arg>                    Minimum funding we'll add to a channel. If we can't meet this, we don't fund (default: 10000sat)
+funder-per-channel-max <arg>                    Maximum funding we'll add to a channel. We cap all contributions to this (default: 4294967295sat)
+funder-reserve-tank <arg>                       Amount of funds we'll always leave available. (default: 0sat)
+funder-fuzz-percent <arg>                       Percent to fuzz the policy contribution by. Defaults to 0%. Max is 100% (default: 0)
+funder-fund-probability <arg>                   Percent of requests to consider. Defaults to 100%. Setting to 0% will disable dual-funding (default: 100)
+funder-lease-requests-only <arg>                Only fund lease requests. Defaults to true if channel lease rates are being advertised (default: true)
 
---autoconnect-seeker-peers <arg>                  Seeker autoconnects to maintain this minimum number of gossip peers (default: 10)
+lease-fee-base-sat <arg>                        Channel lease rates, base fee for leased funds, in satoshi.
+lease-fee-basis <arg>                           Channel lease rates, basis charged for leased funds (per 10,000 satoshi.)
+lease-funding-weight <arg>                      Channel lease rates, weight we'll ask opening peer to pay for in funding transaction
+channel-fee-max-base-msat <arg>                 Channel lease rates, maximum channel fee base we'll charge for funds routed through a leased channel.
+channel-fee-max-proportional-thousandths <arg>  Channel lease rates, maximum proportional fee (in thousandths, or ppt) we'll charge for funds routed through a leased channel. Note: 1ppt = 1,000ppm
+fetchinvoice-noconnect                          Don't try to connect directly to fetch/pay an invoice.
+renepay-debug-mcf                               Enable renepay MCF debug info.
+renepay-debug-payflow                           Enable renepay payment flows debug info.
+xpay-handle-pay <arg>                           Make xpay take over pay commands it can handle. (default: false)
+exposesecret-passphrase <arg>                   Enable exposesecret command to allow HSM Secret backup, with this passphrase
 
-#--bitcoin-datadir <arg>                           -datadir arg for bitcoin-cli
-#--bitcoin-cli <arg>                               bitcoin-cli pathname
---bitcoin-rpcuser <arg>                           bitcoind RPC username
---bitcoin-rpcpassword <arg>                       bitcoind RPC password
---bitcoin-rpcconnect <arg>                        bitcoind RPC host to connect to
-#--bitcoin-rpcport <arg>                           bitcoind RPC host's port
-#--bitcoin-rpcclienttimeout <arg>                  bitcoind RPC timeout in seconds during HTTP requests (default: 60)
-#--bitcoin-retry-timeout <arg>                     how long to keep retrying to contact bitcoind before fatally exiting (default: 60)
+disable-mpp                                     Disable multi-part payments.
 
+bookkeeper-dir <arg>                            Location for bookkeeper records.
+bookkeeper-db <arg>                             Location of the bookkeeper database
 
-
---autoclean-cycle <arg>                           Perform cleanup every given seconds (default: 3600)
---autoclean-succeededforwards-age <arg>           How old do successful forwards have to be before deletion (0 = never)
---autoclean-failedforwards-age <arg>              How old do failed forwards have to be before deletion (0 = never)
---autoclean-succeededpays-age <arg>               How old do successful pays have to be before deletion (0 = never)
---autoclean-failedpays-age <arg>                  How old do failed pays have to be before deletion (0 = never)
---autoclean-paidinvoices-age <arg>                How old do paid invoices have to be before deletion (0 = never)
---autoclean-expiredinvoices-age <arg>             How old do expired invoices have to be before deletion (0 = never)
-
-
-
---funder-policy <arg>                             Policy to use for dual-funding requests. [match, available, fixed] (default: fixed)
---funder-policy-mod <arg>                         Percent to apply policy at (match/available); or amount to fund (fixed) (default: 0)
---funder-min-their-funding <arg>                  Minimum funding peer must open with to activate our policy (default: 10000sat)
---funder-max-their-funding <arg>                  Maximum funding peer may open with to activate our policy (default: 4294967295sat)
---funder-per-channel-min <arg>                    Minimum funding we'll add to a channel. If we can't meet this, we don't fund (default: 10000sat)
---funder-per-channel-max <arg>                    Maximum funding we'll add to a channel. We cap all contributions to this (default: 4294967295sat)
---funder-reserve-tank <arg>                       Amount of funds we'll always leave available. (default: 0sat)
---funder-fuzz-percent <arg>                       Percent to fuzz the policy contribution by. Defaults to 0%. Max is 100% (default: 0)
---funder-fund-probability <arg>                   Percent of requests to consider. Defaults to 100%. Setting to 0% will disable dual-funding (default: 100)
---funder-lease-requests-only <arg>                Only fund lease requests. Defaults to true if channel lease rates are being advertised (default: true)
-
-
-
---lease-fee-base-sat <arg>                        Channel lease rates, base fee for leased funds, in satoshi.
---lease-fee-basis <arg>                           Channel lease rates, basis charged for leased funds (per 10,000 satoshi.)
---lease-funding-weight <arg>                      Channel lease rates, weight we'll ask opening peer to pay for in funding transaction
---channel-fee-max-base-msat <arg>                 Channel lease rates, maximum channel fee base we'll charge for funds routed through a leased channel.
---channel-fee-max-proportional-thousandths <arg>  Channel lease rates, maximum proportional fee (in thousandths, or ppt) we'll charge for funds routed through a leased channel. Note: 1ppt = 1,000ppm
---fetchinvoice-noconnect                          Don't try to connect directly to fetch/pay an invoice.
---renepay-debug-mcf                               Enable renepay MCF debug info.
---renepay-debug-payflow                           Enable renepay payment flows debug info.
---xpay-handle-pay <arg>                           Make xpay take over pay commands it can handle. (default: false)
---exposesecret-passphrase <arg>                   Enable exposesecret command to allow HSM Secret backup, with this passphrase
-
---disable-mpp                                     Disable multi-part payments.
-
-
---bookkeeper-dir <arg>                            Location for bookkeeper records.
---bookkeeper-db <arg>                             Location of the bookkeeper database
-
-
---grpc-host <arg>                                 Which host should the grpc listen for incomming connections? (default: 127.0.0.1)
---grpc-msg-buffer-size <arg>                      Number of notifications which can be stored in the grpc message buffer. Notifications can be skipped if this buffer is full (default: 1024)
---grpc-port <arg>                                 Which port should the grpc plugin listen for incoming connections? (default: 9736)
-
+grpc-host <arg>                                 Which host should the grpc listen for incomming connections? (default: 127.0.0.1)
+grpc-msg-buffer-size <arg>                      Number of notifications which can be stored in the grpc message buffer. Notifications can be skipped if this buffer is full (default: 1024)
+grpc-port <arg>                                 Which port should the grpc plugin listen for incoming connections? (default: 9736)
