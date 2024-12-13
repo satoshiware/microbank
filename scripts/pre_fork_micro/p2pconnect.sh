@@ -227,13 +227,13 @@ elif [[ $1 = "-d" || $1 = "--delete" ]]; then # Delete a connection: CONNECTION_
     while IFS= read -r line ; do sudo kill -9 $(echo $line | cut -d ' ' -f 1) 2> /dev/null; done <<< "$P2P_PIDS"
 
 elif [[ $1 = "-f" || $1 = "--info" ]]; then # Get the connection parameters for this node
-    echo "Hostname: $(hostname)" | sudo tee -a /etc/micronode.info
-    echo "Local IP: $(hostname -I)" | sudo tee -a /etc/micronode.info
+    echo "Hostname: $(hostname)"
+    echo "Local IP: $(hostname -I)"
 
     echo "This Host Key (Public): $(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')"
     echo "This P2P Key (Public): $(sudo cat /root/.ssh/p2pkey.pub)"
 
 else
     $0 --help
-    echo "Script Version 0.211"
+    echo "Script Version 0.212"
 fi
