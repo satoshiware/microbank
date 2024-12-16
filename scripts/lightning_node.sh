@@ -72,33 +72,22 @@ sudo apt-get -y upgrade
 # Install Packages
 sudo apt-get -y install wget xz-utils libpq5 autossh
 
+# Install Pythong Modules
+sudo apt-get -y install python3-pip python3-websockets python3-cryptography python3-gevent python3-gunicorn python3-flask python3-json5
+##sudo pip install pyln-client flask_restx flask_cors flask_socketio --break-system-packages
 
-sudo apt-get -y install python3-pip
-sudo apt-get -y install python3-websockets
-sudo apt-get -y install python3-cryptography
-sudo apt-get -y install python3-gevent
-sudo apt-get -y install python3-gunicorn
-sudo apt-get -y install python3-flask
-sudo apt-get -y install python3-json5
+sudo apt-get -y install python3-venv
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install pyln-client flask_restx flask_cors flask_socketio
 
-sudo pip download pyln-client
-sudo pip install pyln-client --break-system-packages
 
-sudo pip download flask_restx
-sudo pip install flask_restx --break-system-packages
-
-sudo pip download flask_cors
-sudo pip install flask_cors --break-system-packages
-
-sudo pip download flask_socketio
-sudo pip install flask_socketio --break-system-packages
 
 
 2024-12-16T18:15:53.221Z UNUSUAL plugin-bookkeeper: topic 'utxo_deposit' is not a known notification topic
 2024-12-16T18:15:53.221Z UNUSUAL plugin-bookkeeper: topic 'utxo_spend' is not a known notification topic
 2024-12-16T18:15:53.221Z DEBUG   lightningd: io_break: check_plugins_manifests
 2024-12-16T18:15:53.222Z DEBUG   lightningd: io_loop_with_timers: plugins_init
-
 
 # Load global environment variables
 source ~/globals.env
@@ -205,7 +194,7 @@ MemoryDenyWriteExecute=true
 WantedBy=multi-user.target
 EOF
 
-# Generate Core Lightning Configuration File with the Appropriate Permissions !!!!!!!!!!!!!!!!!!! Unique color 45ABEF add to globals !!!!!!!!!!!!!!!!!!!!!!
+# Generate Core Lightning Configuration File with the Appropriate Permissions
 cat << EOF | sudo tee /etc/lightningd.conf
 # Set base directory
 lightning-dir=/var/lib/lightningd
@@ -215,7 +204,7 @@ network=bitcoin
 daemon
 # experimental-peer-storage                       EXPERIMENTAL: enable peer backup storage and restore
 # RRGGBB hex color for node
-rgb=45ABEF
+rgb=$LIGHTNING_RGBHEX_COLOR
 # Up to 32-byte alias for node
 alias=${MICRO_BANK_NAME// /}
 # Minimum fee to charge for every payment which passes through (in HTLC) (millisatoshis; 1/1000 of a satoshi) (default: 1000)
