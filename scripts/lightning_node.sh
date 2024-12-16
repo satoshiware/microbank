@@ -43,7 +43,7 @@ FYI:
     Bitcoin configuratijon: /etc/bitcoin.conf
 
     The "sudo systemctl status Lightningd" command show the status of the bitcoin daemon.
-	The "sudo journalctl ????????status Lightningd" command show the status of the bitcoin daemon.
+    The "sudo journalctl ????????status Lightningd" command show the status of the bitcoin daemon.
 
 
 
@@ -56,11 +56,11 @@ FYI:
     # Need to configure the ssh key in the Bitcoin node before we can connect !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     Get SSH Public Key to pass to the Bitcoin Node: sudo cat /root/.ssh/btc-node-autossh-key.pub
 
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIUE8MRpzyIjGSg8kZg4ujLHnwHc+av0ejEwf6n8oRBN
-
     /root/.ssh/known_hosts
 
 
+    # announce-addr-discovered-port <arg>             NETWORK: Sets the public TCP port to use for announcing discovered IPs. (default: 9735)
+    # bind-addr <arg>                                 NETWORK: Set an IP address (v4 or v6) to listen on, but not announce, to bind Core Lightning RPC server (default: 127.0.0.1:9734)
 EOF
 read -p "Press the enter key to continue..."
 
@@ -71,6 +71,34 @@ sudo apt-get -y upgrade
 
 # Install Packages
 sudo apt-get -y install wget xz-utils libpq5 autossh
+
+
+sudo apt-get -y install python3-pip
+sudo apt-get -y install python3-websockets
+sudo apt-get -y install python3-cryptography
+sudo apt-get -y install python3-gevent
+sudo apt-get -y install python3-gunicorn
+sudo apt-get -y install python3-flask
+sudo apt-get -y install python3-json5
+
+sudo pip download pyln-client
+sudo pip install pyln-client --break-system-packages
+
+sudo pip download flask_restx
+sudo pip install flask_restx --break-system-packages
+
+sudo pip download flask_cors
+sudo pip install flask_cors --break-system-packages
+
+sudo pip download flask_socketio
+sudo pip install flask_socketio --break-system-packages
+
+
+2024-12-16T18:15:53.221Z UNUSUAL plugin-bookkeeper: topic 'utxo_deposit' is not a known notification topic
+2024-12-16T18:15:53.221Z UNUSUAL plugin-bookkeeper: topic 'utxo_spend' is not a known notification topic
+2024-12-16T18:15:53.221Z DEBUG   lightningd: io_break: check_plugins_manifests
+2024-12-16T18:15:53.222Z DEBUG   lightningd: io_loop_with_timers: plugins_init
+
 
 # Load global environment variables
 source ~/globals.env
@@ -94,10 +122,10 @@ sudo ssh-keygen -t ed25519 -f /root/.ssh/btc-node-autossh-key -N "" -C "" ######
 
 # Create/Update known_hosts file with host key from the Bitcoin Node
 sudo touch /root/.ssh/known_hosts
-HOSTSIG=$(ssh-keyscan -p 22 -H btc-node.local) # !!!!!!!!!!!!!!!!!!!!!!!!!!! btc-node.local !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! do we want to stick with that name???????????
+HOSTSIG=$(ssh-keyscan -p 22 -H $BTC_NODE_LOCAL)
 echo "${HOSTSIG} # BTC NODE HOST KEY" | sudo tee -a /root/.ssh/known_hosts
 
-# Create systemd service file for "Bitcoin Node Auto SSH Connection"  !!!!!!!!!!!!!!!!!!!!!!!!!!! btc-node.local !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! do we want to stick with that name???????????
+# Create systemd service file for "Bitcoin Node Auto SSH Connection"
 cat << EOF | sudo tee /etc/systemd/system/btc-node-autossh.service
 [Unit]
 Description=Bitcoin Node Auto SSH Connection
@@ -106,7 +134,7 @@ After=network-online.target
 
 [Service]
 Environment="AUTOSSH_GATETIME=0"
-ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/btc-node-autossh-key -L 8332:localhost:8332 -p 22 btc-remote-cli@btc-node.local
+ExecStart=/usr/bin/autossh -M 0 -NT -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -o "ServerAliveCountMax 3" -i /root/.ssh/btc-node-autossh-key -L 8332:localhost:8332 -p 22 btc-remote-cli@$BTC_NODE_LOCAL
 
 RestartSec=5
 Restart=always
@@ -119,10 +147,6 @@ EOF
 cat << EOF
 See list of Core Lightning Releases @ https://github.com/ElementsProject/lightning/releases
 The latest releases as of 12/12/2024 listed below:
-
-# clightning-v24.11, amd64 (Ubuntu-20.04)
-    https://github.com/ElementsProject/lightning/releases/download/v24.11/clightning-v24.11-Ubuntu-20.04-amd64.tar.xz
-    13815e0b5db15631a3002176dcf3cf873fa065cb261408e1f0aff015928a18bf
 
 # clightning-v24.11, amd64 (Ubuntu-22.04)
     https://github.com/ElementsProject/lightning/releases/download/v24.11/clightning-v24.11-Ubuntu-22.04-amd64.tar.xz
@@ -148,11 +172,6 @@ sudo rm ${SOURCE##*/}
 # Create lightning System User
 sudo useradd --system --shell=/sbin/nologin lightning
 
-# Create lightning directory
-sudo mkdir -p /var/lib/lightningd
-sudo chown root:lightning -R /var/lib/lightningd
-sudo chmod 670 -R /var/lib/lightningd
-
 # Prepare Service Configuration
 cat << EOF | sudo tee /etc/systemd/system/lightningd.service
 [Unit]
@@ -162,7 +181,7 @@ After=network-online.target
 After=btc-node-autossh.service
 
 [Service]
-ExecStart=/usr/local/bin/lightningd --conf /etc/lightningd.conf --lightning-dir /var/lib/lightningd --pid-file /run/lightningd/lightningd.pid
+ExecStart=/usr/local/bin/lightningd --conf /etc/lightningd.conf --pid-file /run/lightningd/lightningd.pid
 
 Type=simple
 PIDFile=/run/lightningd/lightningd.pid
@@ -186,109 +205,139 @@ MemoryDenyWriteExecute=true
 WantedBy=multi-user.target
 EOF
 
-# Generate Core Lightning Configuration File with the Appropriate Permissions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Directory location!!! Find something else!!! Using btc-node.local, btcofaz, and color 45ABEF again !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Generate Core Lightning Configuration File with the Appropriate Permissions !!!!!!!!!!!!!!!!!!! Unique color 45ABEF add to globals !!!!!!!!!!!!!!!!!!!!!!
 cat << EOF | sudo tee /etc/lightningd.conf
---enable-experimental-features ############ add this ???
-
-# Data directory argument for bitcoin-cli
-bitcoin-datadir=/home/satoshi
-
-# bitcoin-cli pathname
-bitcoin-cli=/usr/bin/bitcoin-cli             
-
+# Set base directory
+lightning-dir=/var/lib/lightningd
+# Select the network
+network=bitcoin
+# Run in the background
+daemon
+# experimental-peer-storage                       EXPERIMENTAL: enable peer backup storage and restore
+# RRGGBB hex color for node
+rgb=45ABEF
+# Up to 32-byte alias for node
+alias=${MICRO_BANK_NAME// /}
+# Minimum fee to charge for every payment which passes through (in HTLC) (millisatoshis; 1/1000 of a satoshi) (default: 1000)
+fee-base=1000
+# Microsatoshi fee for every satoshi in HTLC (10 is 0.001%, 100 is 0.01%, 1000 is 0.1% etc.) (default: 10)
+fee-per-satoshi=10
+# max-concurrent-htlcs <arg>                      STD_SETTINGS: Maximum number of HTLCs one channel can handle, in each direction, concurrently. Should be between 1 and 483 (default: 30)
+# max-dust-htlc-exposure-msat <arg>               STD_SETTINGS: Max HTLC amount that can be trimmed (default: 50000000)
+# announce-addr <arg>                             NETWORK: Set an IP address (v4 or v6) or .onion v3 to announce, but not listen on, so peers can find your node (example: <IP/TOR ADDRESS>:9735)
+# accept-htlc-tlv-type <arg>                      HTLC TLV type to accept (can be used multiple times)
+# encrypted-hsm                                   Set the password to encrypt hsm_secret with. If no password is passed through command line, you will be prompted to enter it on startup
+# force-feerates <arg>                            Set testnet/regtest feerates in sats perkw, opening/mutual_close/unlateral_close/delayed_to_us/htlc_resolution/penalty: if fewer specified, last number applies to remainder
+# commit-fee <arg>                                Percentage of fee to request for their commitment (default: 100)
+# commit-feerate-offset <arg>                     Additional feerate per kw to apply to feerate updates as the channel opener (default: 5)
+# min-emergency-msat <arg>                        Amount to leave in wallet for spending anchor closes (default: 25000000)
+# subdaemon <arg>                                 Arg specified as SUBDAEMON:PATH. Specifies an alternate subdaemon binary. If the supplied path is relative the subdaemon binary is found in the working directory. This option may be specified multiple times. For example, --subdaemon=hsmd:remote_signer would use a hypothetical remote signing subdaemon.
+# invoices-onchain-fallback                       Include an onchain address in invoices and mark them as paid if payment is received on-chain
+# log level (io, debug, info, unusual, broken) [:prefix] (default: info)
+log-level=debug
+# Log to file (- for stdout)
+log-file=/var/log/lightningd/log
+# datadir arg for bitcoin-cli
+bitcoin-datadir=/var/lib/bitcoin
 # bitcoind RPC username
 bitcoin-rpcuser=satoshi
-
 # bitcoind RPC password
 bitcoin-rpcpassword=satoshi
-
 # bitcoind RPC host to connect to
-bitcoin-rpcconnect=btc-node.local
+bitcoin-rpcconnect=$BTC_NODE_LOCAL
+# funder-policy <arg>                             Policy to use for dual-funding requests. [match, available, fixed] (default: fixed)
+# funder-policy-mod <arg>                         Percent to apply policy at (match/available); or amount to fund (fixed) (default: 0)
+# funder-min-their-funding <arg>                  Minimum funding peer must open with to activate our policy (default: 10000sat)
+# funder-max-their-funding <arg>                  Maximum funding peer may open with to activate our policy (default: 4294967295sat)
+# funder-per-channel-min <arg>                    Minimum funding we'll add to a channel. If we can't meet this, we don't fund (default: 10000sat)
+# funder-per-channel-max <arg>                    Maximum funding we'll add to a channel. We cap all contributions to this (default: 4294967295sat)
+# funder-lease-requests-only <arg>                Only fund lease requests. Defaults to true if channel lease rates are being advertised (default: true)
+# lease-fee-base-sat <arg>                        Channel lease rates, base fee for leased funds, in satoshi.
+# lease-fee-basis <arg>                           Channel lease rates, basis charged for leased funds (per 10,000 satoshi.)
+# lease-funding-weight <arg>                      Channel lease rates, weight we'll ask opening peer to pay for in funding transaction
+# channel-fee-max-base-msat <arg>                 Channel lease rates, maximum channel fee base we'll charge for funds routed through a leased channel.
+# channel-fee-max-proportional-thousandths <arg>  Channel lease rates, maximum proportional fee (in thousandths, or ppt) we'll charge for funds routed through a leased channel. Note: 1ppt = 1,000ppm
+# exposesecret-passphrase <arg>                   Enable exposesecret command to allow HSM Secret backup, with this passphrase
+# disable-mpp                                     Disable multi-part payments.
+# fetchinvoice-noconnect                          Don't try to connect directly to fetch/pay an invoice.
 
-# bitcoind RPC host's port
-bitcoin-rpcport=8332
+# renepay-debug-mcf                               Enable renepay MCF debug info.
+# renepay-debug-payflow                           Enable renepay payment flows debug info.
 
-# Give your node a name
-alias=btcofaz
+# xpay-handle-pay <arg>                           Make xpay take over pay commands it can handle. (default: false)
 
-# Pick your favorite color as a hex code
-rgb=45ABEF
+# bookkeeper-dir <arg>                            Location for bookkeeper records.
+# bookkeeper-db <arg>                             Location of the bookkeeper database
 
-# Set the network for Core Lightning
-network=bitcoin
+# grpc-host <arg>                                 Which host should the grpc listen for incomming connections? (default: 127.0.0.1)
+# grpc-msg-buffer-size <arg>                      Number of notifications which can be stored in the grpc message buffer. Notifications can be skipped if this buffer is full (default: 1024)
+# grpc-port <arg>                                 Which port should the grpc plugin listen for incoming connections? (default: 9736)
 
-# Run lightningd as a background daemon
-daemon
 
-# Log output to specified file
-log-file=/var/log/lightningd/log
 
-# Set to debug for more verbose log output
-log-level=debug
+# plugin-dir <arg>                                Add a directory to AUTOMATICALLY load plugins from (can be used multiple times) (default: /path/to/your/.lightning/plugins)
+# clear-plugins                                   Remove all plugins added before this option
+# plugin <arg>                                    Add a plugin to be run (can be used multiple times)
+# disable-plugin <arg>                            Disable a particular plugin by filename/name
+# important-plugin <arg>                          Add an important plugin to be run (can be used multiple times). Die if the plugin dies
 
-## Password encrypt your `hsm_secret` ???????????????????????????????????????????????????????????????????????????????????
-## You must supply the password on startup if you choose to do this
-#encrypted-hsm
 
-### Networking Settings ### ?????????????????????????????? is this the default???????????????????????????
-# Inbound Connections (default PORT 9735)
-#addr=0.0.0.0
-
-# Peers can find your node here ????????????????????????????????????????
-#announce-addr=<IP/TOR ADDRESS>:9735
-
-## Bind Core Lightning RPC server to localhost PORT 9734 ?????????????????????????
-#bind-addr=127.0.0.1:9734
-
-## Configure proxy/tor for OUTBOUND connections.
-#proxy=127.0.0.1:9050
-
-## Force all outbound connections through the proxy/tor
-#always-use-proxy=false
-
-### Channel Settings ###
-##
-#                     Channel Settings
-# !! Please read the manual before editing these !!
-# !!  and for a full list of available options   !!
-##
-
-## Removes capacity limit for channel creation
-#large-channels
-
-## Base fee to charge for every payment which passes through in MILLISATOSHI (1/1000 of a satoshi)
-#fee-base=1000
-
-## In millionths (10 is 0.001%, 100 is 0.01%, 1000 is 0.1% etc.)
-#fee-per-satoshi=10
-
-## Minimum value, in SATOSHI, to accept for channel open requests
-#min-capacity-sat=10000
-
-## Sets the minimum HTLC value for new channels
-#htlc-minimum-msat=0
-
-## Blockchain confirmations required for channel to be considered valid
-#funding-confirms=3
-
-## Max number of HTLC channels can handle in each direction
-#max-concurrent-htlcs=30
-
-##
-#                   Plugins
-#  Plugins allow you to extend Core Lightnings functionality
-#   For a community curated list of available plugins visit:
-#         "https://github.com/lightningd/plugins"
-##
-
-## Load your plugins from a directory
-#plugin-dir=/path/to/your/.lightning/plugins
-
-## Load plugins individually
-#plugin=path/to/plugin
 EOF
 sudo chown root:lightning /etc/lightningd.conf
 sudo chmod 640 /etc/lightningd.conf
+
+
+########## If someone opens a channel with me, I want them to carry at least a little of the burden
+      ####### Avoid openining a ton of small channels, sending the sats and then leaving them for me to close with large fees.
+      ####### Well, we don't have access to that money. How to get the whole amount if they have gone dorminant without the
+
+# According to the BOLT 3 specification, the peer that funded the channel will incur the costs of closing fees.
+# It also seems that these fees would be calculated before closing a payment channel.
+# Both parties already have a transaction with a built in fee that can be used to close the channel that they can broadcast at anytime.
+###### Then, the only policiy is that of being able to demand the reserved fee amount for someone to be able to open a channel with me.
+
+
+
+2024-12-14T17:17:19.006Z DEBUG   plugin-manager: started(12292) /usr/local/libexec/c-lightning/plugins/autoclean
+2024-12-14T17:17:19.007Z DEBUG   plugin-manager: started(12293) /usr/local/libexec/c-lightning/plugins/chanbackup
+2024-12-14T17:17:19.008Z DEBUG   plugin-manager: started(12294) /usr/local/libexec/c-lightning/plugins/bcli
+2024-12-14T17:17:19.009Z DEBUG   plugin-manager: started(12295) /usr/local/libexec/c-lightning/plugins/commando
+2024-12-14T17:17:19.011Z DEBUG   plugin-manager: started(12296) /usr/local/libexec/c-lightning/plugins/funder
+2024-12-14T17:17:19.012Z DEBUG   plugin-manager: started(12297) /usr/local/libexec/c-lightning/plugins/topology
+2024-12-14T17:17:19.013Z DEBUG   plugin-manager: started(12298) /usr/local/libexec/c-lightning/plugins/exposesecret
+2024-12-14T17:17:19.014Z DEBUG   plugin-manager: started(12299) /usr/local/libexec/c-lightning/plugins/keysend
+2024-12-14T17:17:19.016Z DEBUG   plugin-manager: started(12300) /usr/local/libexec/c-lightning/plugins/offers
+2024-12-14T17:17:19.017Z DEBUG   plugin-manager: started(12301) /usr/local/libexec/c-lightning/plugins/pay
+2024-12-14T17:17:19.018Z DEBUG   plugin-manager: started(12302) /usr/local/libexec/c-lightning/plugins/recklessrpc
+2024-12-14T17:17:19.019Z DEBUG   plugin-manager: started(12303) /usr/local/libexec/c-lightning/plugins/recover
+2024-12-14T17:17:19.020Z DEBUG   plugin-manager: started(12304) /usr/local/libexec/c-lightning/plugins/txprepare
+2024-12-14T17:17:19.022Z DEBUG   plugin-manager: started(12305) /usr/local/libexec/c-lightning/plugins/cln-renepay
+2024-12-14T17:17:19.023Z DEBUG   plugin-manager: started(12306) /usr/local/libexec/c-lightning/plugins/cln-xpay
+2024-12-14T17:17:19.024Z DEBUG   plugin-manager: started(12307) /usr/local/libexec/c-lightning/plugins/spenderp
+2024-12-14T17:17:19.025Z DEBUG   plugin-manager: started(12308) /usr/local/libexec/c-lightning/plugins/cln-askrene
+2024-12-14T17:17:19.026Z DEBUG   plugin-manager: started(12309) /usr/local/libexec/c-lightning/plugins/sql
+2024-12-14T17:17:19.028Z DEBUG   plugin-manager: started(12310) /usr/local/libexec/c-lightning/plugins/cln-grpc
+2024-12-14T17:17:19.029Z DEBUG   plugin-manager: started(12311) /usr/local/libexec/c-lightning/plugins/bookkeeper
+2024-12-14T17:17:19.030Z DEBUG   plugin-manager: started(12313) /usr/local/libexec/c-lightning/plugins/clnrest/clnrest
+2024-12-14T17:17:19.031Z DEBUG   plugin-manager: started(12314) /usr/local/libexec/c-lightning/plugins/wss-proxy/wss-proxy
+2024-12-14T17:17:19.039Z INFO    plugin-clnrest: Killing plugin: disabled itself: No module named 'gevent'
+2024-12-14T17:17:19.040Z INFO    plugin-wss-proxy: Killing plugin: disabled itself: No module named 'websockets'
+2024-12-14T17:17:19.041Z UNUSUAL plugin-bookkeeper: topic 'utxo_deposit' is not a known notification topic
+2024-12-14T17:17:19.041Z UNUSUAL plugin-bookkeeper: topic 'utxo_spend' is not a known notification topic
+2024-12-14T17:17:19.041Z DEBUG   lightningd: io_break: check_plugins_manifests
+2024-12-14T17:17:19.041Z DEBUG   lightningd: io_loop_with_timers: plugins_init
+
+plugin-bookkeeper: Setting up database at sqlite3://accounts.sqlite3
+
+
+
+
+# Create lightning & bitcoin directory
+sudo mkdir -p /var/lib/lightningd
+sudo chown root:lightning -R /var/lib/lightningd
+sudo chmod 670 -R /var/lib/lightningd
+sudo mkdir /var/lib/bitcoin
+sudo touch /var/lib/bitcoin/bitcoin.conf # Required for bitcoin-cli utility to function
 
 # Create lightningd log file location /w appropriate permissions
 sudo mkdir -p /var/log/lightningd
@@ -364,173 +413,3 @@ sudo chmod 400 /root/passphrase
 # Restart the machine
 sudo reboot now
 
-
-
-
-
-lightning-dir=<dir>                             Set base directory: network-specific subdirectory is under here (default: "/root/.lightning")
-
---network <arg>                                   Select the network parameters (bitcoin, testnet, signet, regtest, litecoin or litecoin-testnet) (default: bitcoin)
-
-
---version|-V                                      Print version and exit
---rpc-file <arg>                                  Set JSON-RPC socket (or /dev/tty) (default: "lightning-rpc")
---test-daemons-only                               Test that subdaemons can be run, then exit immediately
---allow-deprecated-apis <arg>                     Enable deprecated options, JSONRPC commands, fields, etc. (default: true)
---plugin <arg>                                    Add a plugin to be run (can be used multiple times)
---plugin-dir <arg>                                Add a directory to load plugins from (can be used multiple times)
---clear-plugins                                   Remove all plugins added before this option
---disable-plugin <arg>                            Disable a particular plugin by filename/name
---important-plugin <arg>                          Add an important plugin to be run (can be used multiple times). Die if the plugin dies.
---always-use-proxy <arg>                          Use the proxy always (default: false)
-
---daemon                                          Run in the background, suppress stdout/stderr
---wallet <arg>                                    Location of the wallet database.
---recover <arg>                                   Populate hsm_secret with the given codex32 secret and starts the node in `offline` mode.
---experimental-dual-fund                          experimental: Advertise dual-funding and allow peers to establish channels via v2 channel open protocol.
---experimental-splicing                           experimental: Enables the ability to resize channels using splicing
---experimental-shutdown-wrong-funding             EXPERIMENTAL: allow shutdown with alternate txids
---experimental-peer-storage                       EXPERIMENTAL: enable peer backup storage and restore
---experimental-quiesce                            experimental: Advertise ability to quiesce channels.
---help|-h                                         Print this message.
-
---rgb <arg>                                       RRGGBB hex color for node
---alias <arg>                                     Up to 32-byte alias for node
---pid-file=<file>                                 Specify pid file (default: "/root/.lightning/lightningd-bitcoin.pid")
---ignore-fee-limits <arg>                         (DANGEROUS) allow peer to set any feerate (default: false)
---watchtime-blocks <arg>                          Blocks before peer can unilaterally spend funds (default: 144)
---funding-confirms <arg>                          Confirmations required for funding transaction (default: 3)
---require-confirmed-inputs <arg>                  Confirmations required for inputs to funding transaction (v2 opens only) (default: false)
---cltv-delta <arg>                                Number of blocks for cltv_expiry_delta (default: 34)
---cltv-final <arg>                                Number of blocks for final cltv_expiry (default: 18)
---commit-time=<millseconds>                       Time after changes before sending out COMMIT (default: 10)
---fee-base <arg>                                  Millisatoshi minimum to charge for HTLC (default: 1000)
---rescan <arg>                                    Number of blocks to rescan from the current head, or absolute blockheight if negative (default: 15)
---fee-per-satoshi <arg>                           Microsatoshi fee for every satoshi in HTLC (default: 10)
---htlc-minimum-msat <arg>                         The default minimal value an HTLC must carry in order to be forwardable for new channels (default: 0)
---htlc-maximum-msat <arg>                         The default maximal value an HTLC must carry in order to be forwardable for new channel (default: 18446744073709551615)
---max-concurrent-htlcs <arg>                      Number of HTLCs one channel can handle concurrently. Should be between 1 and 483 (default: 30)
---max-dust-htlc-exposure-msat <arg>               Max HTLC amount that can be trimmed (default: 50000000)
---min-capacity-sat <arg>                          Minimum capacity in satoshis for accepting channels (default: 10000)
-
---addr <arg>                                      Set an IP address (v4 or v6) to listen on and announce to the network for incoming connections
---bind-addr <arg>                                 Set an IP address (v4 or v6) to listen on, but not announce
---announce-addr <arg>                             Set an IP address (v4 or v6) or .onion v3 to announce, but not listen on
---announce-addr-discovered <arg>                  Explicitly turns IP discovery 'on' or 'off'. (default: auto)
---announce-addr-discovered-port <arg>             Sets the public TCP port to use for announcing discovered IPs. (default: 9735)
---offline                                         Start in offline-mode (do not automatically reconnect and do not accept incoming connections)
---autolisten <arg>                                If true, listen on default port and announce if it seems to be a public interface (default: true)
---proxy <arg>                                     Set a socks v5 proxy IP address and port
---tor-service-password <arg>                      Set a Tor hidden service password
---accept-htlc-tlv-type <arg>                      HTLC TLV type to accept (can be used multiple times)
---disable-dns                                     Disable DNS lookups of peers
---encrypted-hsm                                   Set the password to encrypt hsm_secret with. If no password is passed through command line, you will be prompted to enter it.
---rpc-file-mode <arg>                             Set the file mode (permissions) for the JSON-RPC socket (default: 0600)
---force-feerates <arg>                            Set testnet/regtest feerates in sats perkw, opening/mutual_close/unlateral_close/delayed_to_us/htlc_resolution/penalty: if fewer specified, last number applies
-                                                  to remainder
---commit-fee <arg>                                Percentage of fee to request for their commitment (default: 100)
---commit-feerate-offset <arg>                     Additional feerate per kw to apply to feerate updates as the channel opener (default: 5)
---min-emergency-msat <arg>                        Amount to leave in wallet for spending anchor closes (default: 25000000)
---subdaemon <arg>                                 Arg specified as SUBDAEMON:PATH. Specifies an alternate subdaemon binary. If the supplied path is relative the subdaemon binary is found in the working
-                                                  directory. This option may be specified multiple times. For example, --subdaemon=hsmd:remote_signer would use a hypothetical remote signing subdaemon.
---experimental-upgrade-protocol                   experimental: allow channel types to be upgraded on reconnect
---invoices-onchain-fallback                       Include an onchain address in invoices and mark them as paid if payment is received on-chain
---database-upgrade <arg>                          Set to true to allow database upgrades even on non-final releases (WARNING: you won't be able to downgrade!)
---i-promise-to-fix-broken-api-user <arg>          Re-enable a long-deprecated API (which will be removed entirely next version!)
-
-
-
---log-level <arg>                                 log level (io, debug, info, unusual, broken) [:prefix] (default: info)
---log-timestamps <arg>                            prefix log messages with timestamp (default: true)
---log-prefix <arg>                                log prefix
---log-file=<file>                                 Also log to file (- for stdout)
-
-dev-debugger=<subprocess>                       Invoke gdb at start of <subprocess>
-dev-no-plugin-checksum                          Don't checksum plugins to detect changes
-dev-builtin-plugins-unimportant                 Make builtin plugins unimportant so you can plugin stop them.
-dev-no-reconnect                                Disable automatic reconnect-attempts by this node, but accept incoming
-dev-no-reconnect-private                        Disable automatic reconnect-attempts to peers with private channel(s) only, but accept incoming
-dev-fast-reconnect                              Make max default reconnect delay 3 (not 300) seconds
-dev-disconnect=<filename>                       File containing disconnection points
-dev-allow-localhost                             Announce and allow announcments for localhost address
-dev-bitcoind-poll <arg>                         Time between polling for new transactions (default: 30)
-dev-fast-gossip                                 Make gossip broadcast 1 second, etc
-dev-fast-gossip-prune                           Make gossip pruning 120 seconds
-dev-gossip-time <arg>                           UNIX time to override gossipd to use. (default: 0)
-dev-force-privkey <arg>                         Force HSM to use this as node private key
-dev-force-bip32-seed <arg>                      Force HSM to use this as bip32 seed
-dev-force-channel-secrets <arg>                 Force HSM to use these for all per-channel secrets
-dev-max-funding-unconfirmed-blocks <arg>        Maximum number of blocks we wait for a channel funding transaction to confirm, if we are the fundee. (default: 2016)
-dev-force-tmp-channel-id <arg>                  Force the temporary channel id, instead of random
-dev-no-htlc-timeout                             Don't kill channeld if HTLCs not confirmed within 30 seconds
-dev-fail-process-onionpacket                    Force all processing of onion packets to fail
-dev-no-version-checks                           Skip calling subdaemons with --version on startup
-dev-force-features <arg>                        Force the init/globalinit/node_announce/channel/bolt11/ features, each comma-separated bitnumbers OR a single +/-<bitnumber>
-dev-timeout-secs <arg>                          Seconds to timeout if we don't receive INIT from peer (default: 60)
-dev-no-modern-onion                             Ignore modern onion messages
-dev-disable-commit-after <arg>                  Disable commit timer after this many commits (default: -1)
-dev-no-ping-timer                               Don't hang up if we don't get a ping response
-dev-onion-reply-length <arg>                    Send onion errors of custom length (default: 256)
-dev-max-fee-multiplier <arg>                    Allow the fee proposed by the remote end to be up to multiplier times higher than our own. Small values will cause channels to be closed more often due to fee fluctuations, large values may result in large fees. (default: 10)
-dev-allowdustreserve <arg>                      If true, we allow the `fundchannel` RPC command and the `openchannel` plugin hook to set a reserve that is below the dust limit. (default: false)
-dev-any-channel-type                            Allow sending any channel type, and accept any
-dev-allow-shutdown-destination-change           Allow destination override on close, even if risky
-dev-hsmd-no-preapprove-check                    Tell hsmd not to support preapprove_check msgs
-dev-hsmd-fail-preapprove                        Tell hsmd to always deny preapprove_invoice / preapprove_keysend
-dev-fd-limit-multiplier <arg>                   Try to set fd limit to this many times by number of channels (default: 2) (default: 2)
-dev-handshake-no-reply                          Don't send or read init message after connection
-dev-strict-forwarding                           Forward HTLCs along the channel specified
-dev-throttle-gossip                             Throttle gossip right down, for testing
-dev-limit-connections-inflight                  Throttle connection limiting down for testing.
-dev-low-prio-anchor-blocks <arg>                How many blocks to aim for low-priority anchor closes (default: 2016) (default: 2016)
-dev-debug-self                                  Fire up a terminal window with a debugger in it on initialization
-
-autoconnect-seeker-peers <arg>                  Seeker autoconnects to maintain this minimum number of gossip peers (default: 10)
-
-bitcoin-datadir <arg>                           -datadir arg for bitcoin-cli
-bitcoin-cli <arg>                               bitcoin-cli pathname
-bitcoin-rpcuser <arg>                           bitcoind RPC username
-bitcoin-rpcpassword <arg>                       bitcoind RPC password
-bitcoin-rpcconnect <arg>                        bitcoind RPC host to connect to
-bitcoin-rpcport <arg>                           bitcoind RPC host's port
-bitcoin-rpcclienttimeout <arg>                  bitcoind RPC timeout in seconds during HTTP requests (default: 60)
-bitcoin-retry-timeout <arg>                     how long to keep retrying to contact bitcoind before fatally exiting (default: 60)
-
-autoclean-cycle <arg>                           Perform cleanup every given seconds (default: 3600)
-autoclean-succeededforwards-age <arg>           How old do successful forwards have to be before deletion (0 = never)
-autoclean-failedforwards-age <arg>              How old do failed forwards have to be before deletion (0 = never)
-autoclean-succeededpays-age <arg>               How old do successful pays have to be before deletion (0 = never)
-autoclean-failedpays-age <arg>                  How old do failed pays have to be before deletion (0 = never)
-autoclean-paidinvoices-age <arg>                How old do paid invoices have to be before deletion (0 = never)
-autoclean-expiredinvoices-age <arg>             How old do expired invoices have to be before deletion (0 = never)
-
-funder-policy <arg>                             Policy to use for dual-funding requests. [match, available, fixed] (default: fixed)
-funder-policy-mod <arg>                         Percent to apply policy at (match/available); or amount to fund (fixed) (default: 0)
-funder-min-their-funding <arg>                  Minimum funding peer must open with to activate our policy (default: 10000sat)
-funder-max-their-funding <arg>                  Maximum funding peer may open with to activate our policy (default: 4294967295sat)
-funder-per-channel-min <arg>                    Minimum funding we'll add to a channel. If we can't meet this, we don't fund (default: 10000sat)
-funder-per-channel-max <arg>                    Maximum funding we'll add to a channel. We cap all contributions to this (default: 4294967295sat)
-funder-reserve-tank <arg>                       Amount of funds we'll always leave available. (default: 0sat)
-funder-fuzz-percent <arg>                       Percent to fuzz the policy contribution by. Defaults to 0%. Max is 100% (default: 0)
-funder-fund-probability <arg>                   Percent of requests to consider. Defaults to 100%. Setting to 0% will disable dual-funding (default: 100)
-funder-lease-requests-only <arg>                Only fund lease requests. Defaults to true if channel lease rates are being advertised (default: true)
-
-lease-fee-base-sat <arg>                        Channel lease rates, base fee for leased funds, in satoshi.
-lease-fee-basis <arg>                           Channel lease rates, basis charged for leased funds (per 10,000 satoshi.)
-lease-funding-weight <arg>                      Channel lease rates, weight we'll ask opening peer to pay for in funding transaction
-channel-fee-max-base-msat <arg>                 Channel lease rates, maximum channel fee base we'll charge for funds routed through a leased channel.
-channel-fee-max-proportional-thousandths <arg>  Channel lease rates, maximum proportional fee (in thousandths, or ppt) we'll charge for funds routed through a leased channel. Note: 1ppt = 1,000ppm
-fetchinvoice-noconnect                          Don't try to connect directly to fetch/pay an invoice.
-renepay-debug-mcf                               Enable renepay MCF debug info.
-renepay-debug-payflow                           Enable renepay payment flows debug info.
-xpay-handle-pay <arg>                           Make xpay take over pay commands it can handle. (default: false)
-exposesecret-passphrase <arg>                   Enable exposesecret command to allow HSM Secret backup, with this passphrase
-
-disable-mpp                                     Disable multi-part payments.
-
-bookkeeper-dir <arg>                            Location for bookkeeper records.
-bookkeeper-db <arg>                             Location of the bookkeeper database
-
-grpc-host <arg>                                 Which host should the grpc listen for incomming connections? (default: 127.0.0.1)
-grpc-msg-buffer-size <arg>                      Number of notifications which can be stored in the grpc message buffer. Notifications can be skipped if this buffer is full (default: 1024)
-grpc-port <arg>                                 Which port should the grpc plugin listen for incoming connections? (default: 9736)
