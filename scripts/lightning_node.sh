@@ -37,37 +37,6 @@ Info' Commands:
 	sudo journalctl -a -u lightningd # Show system log for lightningd
 	sudo journalctl -f -a -u lightningd # Show ROLLING system log for lightningd
 
-Initial Goals (Level 1):
-	Policy and methods for lightning nodes to connect with this one.
-		Minimum Amount: 10,000 SATS (default)
-		Maximum Amount: No Maximum
-		They Pay the fee
-		Can I set the fee
-	Channel Observation and management (How to close and open)
-	Lightning Address server
-	Generate invoice for an arbitrary amount
-	
-	Generate invoice for a specific amount
-	Generate bolt12 invoice for arbitrary amount that can be paid infinite times.
-	
-	open/close channels
-	
-
-
-
-
-Hosted Channels:
-	As some point it would be cool to integrate hosted channels where anyone could open a hosted channel. 
-	We'd have a policy where dormant channels for more than 30 days will cost 1% or 10,000 SATS, whatever is greater. 
-	This requires both a hosted client and hosted server plugin in order to work. It would have it's own network port
-
-
-
-
-
-
-
-
     # announce-addr-discovered-port <arg>             NETWORK: Sets the public TCP port to use for announcing discovered IPs. (default: 9735)
     # bind-addr <arg>                                 NETWORK: Set an IP address (v4 or v6) to listen on, but not announce, to bind Core Lightning RPC server (default: 127.0.0.1:9734)
 EOF
@@ -203,10 +172,32 @@ daemon
 rgb=$LIGHTNING_RGBHEX_COLOR
 # Up to 32-byte alias for node
 alias=${MICRO_BANK_NAME// /}
+
+############## Outbound?? Channel Policies ##############
 # Minimum fee to charge for every payment which passes through (in HTLC) (millisatoshis; 1/1000 of a satoshi) (default: 1000)
-fee-base=1000
+fee-base=1
 # Microsatoshi fee for every satoshi in HTLC (10 is 0.001%, 100 is 0.01%, 1000 is 0.1% etc.) (default: 10)
-fee-per-satoshi=10
+fee-per-satoshi=1
+# The default minimal value an HTLC will carry in order to be forwardable (default: 0)
+htlc-minimum-msat=1
+
+       #Note that the peer also enforces a minimum for the channel: setting it below that will simply set it to that value with a warning. Also note that htlcmin only applies to forwarded HTLCs: we can still send smaller payments ourselves. The default is no lower limit.
+
+
+# The default maximal value an HTLC will still carry in order to be forwardable (default: 18446744073709551615)
+htlc-maximum-msat 100000   10 million is 1 Grand Let it be determined by the channel size. 
+
+#--max-dust-htlc-exposure-msat <arg>               Max HTLC amount that can be trimmed (default: 50000000)
+
+#--max-concurrent-htlcs <arg>                      Number of HTLCs one channel can handle concurrently. Should be between 1 and 483 (default: 30)
+
+
+#max-dust-htlc-exposure-msat=10000000???????????
+
+#Note that the peer also enforces a minimum for the channel: 
+#setting it below that will simply set it to that value with a warning. 
+#Also note that htlcmin only applies to forwarded HTLCs: 
+#we can still send smaller payments ourselves. The default is no lower limit.
 
 ############## Incomming Connection Policy ##############
 # funder-policy <arg>                             Policy to use for dual-funding requests. [match, available, fixed] (default: fixed)
@@ -321,71 +312,6 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable btc-node-autossh
 sudo systemctl enable lightningd
-
-
-
-
-
-
-##2024-12-16T18:15:53.221Z UNUSUAL plugin-bookkeeper: topic 'utxo_deposit' is not a known notification topic
-##2024-12-16T18:15:53.221Z UNUSUAL plugin-bookkeeper: topic 'utxo_spend' is not a known notification topic
-###plugin-bookkeeper: Setting up database at sqlite3://accounts.sqlite3
-############# it was located in /var/lib/lightningd/bitcoin/accounts.sqlite3 ?????????
-
-
-##2024-12-16T18:15:53.221Z DEBUG   lightningd: io_break: check_plugins_manifests
-##2024-12-16T18:15:53.222Z DEBUG   lightningd: io_loop_with_timers: plugins_init
-
-2024-12-17T11:04:02.767Z DEBUG   lightningd: io_break: connect_init_done
-2024-12-17T11:04:02.767Z DEBUG   lightningd: io_loop: connectd_init
-
-
-2024-12-17T11:11:26.705Z DEBUG   plugin-manager: started(779) /usr/local/libexec/c-lightning/plugins/autoclean
-2024-12-17T11:11:26.706Z DEBUG   plugin-manager: started(780) /usr/local/libexec/c-lightning/plugins/chanbackup
-2024-12-17T11:11:26.707Z DEBUG   plugin-manager: started(781) /usr/local/libexec/c-lightning/plugins/bcli
-2024-12-17T11:11:26.709Z DEBUG   plugin-manager: started(782) /usr/local/libexec/c-lightning/plugins/commando
-2024-12-17T11:11:26.710Z DEBUG   plugin-manager: started(783) /usr/local/libexec/c-lightning/plugins/funder
-2024-12-17T11:11:26.711Z DEBUG   plugin-manager: started(784) /usr/local/libexec/c-lightning/plugins/topology
-2024-12-17T11:11:26.712Z DEBUG   plugin-manager: started(785) /usr/local/libexec/c-lightning/plugins/exposesecret
-2024-12-17T11:11:26.714Z DEBUG   plugin-manager: started(786) /usr/local/libexec/c-lightning/plugins/keysend
-2024-12-17T11:11:26.715Z DEBUG   plugin-manager: started(787) /usr/local/libexec/c-lightning/plugins/offers
-2024-12-17T11:11:26.716Z DEBUG   plugin-manager: started(788) /usr/local/libexec/c-lightning/plugins/pay
-2024-12-17T11:11:26.717Z DEBUG   plugin-manager: started(789) /usr/local/libexec/c-lightning/plugins/recklessrpc
-2024-12-17T11:11:26.718Z DEBUG   plugin-manager: started(790) /usr/local/libexec/c-lightning/plugins/recover
-2024-12-17T11:11:26.720Z DEBUG   plugin-manager: started(791) /usr/local/libexec/c-lightning/plugins/txprepare
-2024-12-17T11:11:26.721Z DEBUG   plugin-manager: started(792) /usr/local/libexec/c-lightning/plugins/cln-renepay
-2024-12-17T11:11:26.722Z DEBUG   plugin-manager: started(793) /usr/local/libexec/c-lightning/plugins/cln-xpay
-2024-12-17T11:11:26.723Z DEBUG   plugin-manager: started(794) /usr/local/libexec/c-lightning/plugins/spenderp
-2024-12-17T11:11:26.724Z DEBUG   plugin-manager: started(795) /usr/local/libexec/c-lightning/plugins/cln-askrene
-2024-12-17T11:11:26.725Z DEBUG   plugin-manager: started(796) /usr/local/libexec/c-lightning/plugins/sql
-2024-12-17T11:11:26.727Z DEBUG   plugin-manager: started(797) /usr/local/libexec/c-lightning/plugins/cln-grpc
-2024-12-17T11:11:26.728Z DEBUG   plugin-manager: started(798) /usr/local/libexec/c-lightning/plugins/bookkeeper
-2024-12-17T11:11:26.729Z DEBUG   plugin-manager: started(800) /usr/local/libexec/c-lightning/plugins/clnrest/clnrest
-2024-12-17T11:11:26.730Z DEBUG   plugin-manager: started(801) /usr/local/libexec/c-lightning/plugins/wss-proxy/wss-proxy
-
-
-
-
-########## If someone opens a channel with me, I want them to carry at least a little of the burden
-      ####### Avoid openining a ton of small channels, sending the sats and then leaving them for me to close with large fees.
-      ####### Well, we don't have access to that money. How to get the whole amount if they have gone dorminant without the
-
-# According to the BOLT 3 specification, the peer that funded the channel will incur the costs of closing fees.
-# It also seems that these fees would be calculated before closing a payment channel.
-# Both parties already have a transaction with a built in fee that can be used to close the channel that they can broadcast at anytime.
-###### Then, the only policiy is that of being able to demand the reserved fee amount for someone to be able to open a channel with me.
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
