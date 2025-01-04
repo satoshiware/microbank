@@ -50,7 +50,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get -y install --only-upgrade openssh-se
 sudo apt-get -y upgrade
 
 # Install Packages
-sudo apt-get -y install wget ufw
+sudo apt-get -y install wget psmisc ufw
 
 # Load global environment variables
 source ~/globals.env
