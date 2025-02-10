@@ -18,10 +18,12 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
       --global_channel  Establish a "global" channel to improve liquidity world-wide (0 reserve): $PEER_ID  $AMOUNT
                             Note: The ID of each global peer is stored in the file /var/log/lightningd/global_peers
-      --local_channel  Establish a "local" channel to a "trusted" peer bank (0 reserve): $PEER_ID  $AMOUNT
+      --local_channel   Establish a "local" channel to a "trusted" peer bank (0 reserve): $PEER_ID  $AMOUNT
                             Note: The ID of each local trusted peer is stored in the file /var/log/lightningd/local_peers
-      --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
-
+      --btcpay          Establish a private channel with the BTCPAY server: $PEER_ID  $LOCAL_IP_ADDRESS  $AMOUNT
+                            Note: The ID & IP of each BTCPAY server is stored in the file /var/log/lightningd/btcpay
+	  --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
+	  
 
 Useful Commands:
 	lncli getinfo 					# See the info' on this node
@@ -104,7 +106,28 @@ elif [[ $1 == "--local_channel" ]]; then # Establish a "local" channel to a "tru
             echo $PEER_ID | sudo -u lightning tee -a /var/log/lightningd/local_peers
         fi
     fi
+	
+elif [[ $1 == "--btcpay" ]]; then # Establish a private channel with the BTCPAY server: $PEER_ID  $LOCAL_IP_ADDRESS  $AMOUNT
+    PEER_ID=$2; LOCAL_IP_ADDRESS=$3; AMOUNT=$4
 
+    # Input checking
+    if [[ -z $PEER_ID || -z $LOCAL_IP_ADDRESS || -z $AMOUNT ]]; then
+        echo ""; echo "Error! Not all variables (PEER_ID, LOCAL_IP_ADDRESS, & AMOUNT) have proper assignments"
+        exit 1
+    fi
+
+    lncli connect $PEER_ID $LOCAL_IP_ADDRESS; sleep 2
+    RESULT=$(lncli fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0 announce=false)
+
+    echo $RESULT
+
+    # On success, add the PEER_ID to the btcpay file without duplicates
+    if [[ $RESULT != *"code"* ]]; then # If no error "code" was thrown then assume success
+        if ! sudo grep -Fxq "$PEER_ID $LOCAL_IP_ADDRESS" /var/log/lightningd/btcpay; then
+            echo "$PEER_ID $LOCAL_IP_ADDRESS" | sudo -u lightning tee -a /var/log/lightningd/btcpay
+        fi
+    fi
+	
 elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
     PEER_SHORT_CHANNEL_ID=$2 # This parameter contains the "Short Channel ID", Channel ID, or Peer ID (all channels with this given peer).
     FEE_RATE=$3 # Fee added proportionally (per-millionths) to any routed payment volume (e.g. 1000 = 0.1% fee).
