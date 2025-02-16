@@ -13,6 +13,7 @@ fi
 BTC=$(cat /etc/bash.bashrc | grep "alias btc=" | cut -d "\"" -f 2)
 SATOSHI_COINS_UNLOCK="$BTC -rpcwallet=satoshi_coins walletpassphrase $(sudo cat /root/passphrase) 600"
 MINING_UNLOCK="$BTC -rpcwallet=mining walletpassphrase $(sudo cat /root/passphrase) 600"
+BTCPAY_UNLOCK="$BTC -rpcwallet=btcpay walletpassphrase $(sudo cat /root/passphrase) 600"
 UNLOCK="$BTC -rpcwallet=bank walletpassphrase $(sudo cat /root/passphrase) 600"
 
 # See which wallu parameter was passed and execute accordingly
@@ -24,17 +25,24 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --cron        (Re)Create a weekly cronjob to send a wallet email update at 6:45 AM on Monday: RECIPIENTS_FIRST_NAME  EMAIL
       --email       Email (send out) the wallet update (requires send_messages to be configured): RECIPIENTS_FIRST_NAME  EMAIL
 
-      --balances    Show balances for the Satoshi Coins, Mining, and Bank wallets
+      --balances    Show balances for the Satoshi Coins, Mining, btcpay, and Bank wallets
 
-      --send        Send funds (coins) from the (bank | mining) wallet
+      --send        Send funds (coins) from the (bank | mining | btcpay) wallet
                     Parameters: ADDRESS  AMOUNT  WALLET  (PRIORITY)
                         Note: PRIORITY is optional (default = NORMAL). It helps determine the fee rate.
                               It can be set to NOW, NORMAL (6 hours), ECONOMICAL (1 day), or CHEAPSKATE (1 week).
                         Note: Enter '.' for the amount to empty the wallet completly (NORMAL priority is enforced)
 
-      --bump        Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank and mining wallets only)
+      --bump        Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank, btcpay, and mining wallets only)
       --mining      Create new address to receive funds into the Mining wallet
       --bank        Create new address to receive funds into the Bank wallet
+      --btcpay      Show the Descriptor, the Extended Public Key, and the first 10 HD addresses for the btcpay wallet
+                        Note: By default the gap limit is 1000 (keypool=1000). Rather than changing this limit globally (affecting all wallets), a cron job was
+                              installed (with this script's installation that runs every 6 hours) to execute the keypoolrefill command topping off the btcpay
+                              descriptor wallet with 25K more keys since last transaction. In the case where the balances between the btcpay server and this
+                              btcpay wallet differ, it may be due to insufficient gap limit. There's no built in contingency for this and will require further
+                              investigation and hacking. Edge case: one or more tx(s) occur(s) followed by 25K keys of spacing and then another transaction
+                              that all happen before the keypoolrefill is executed again.
       --recent      Show recent (last 50) bank wallet transactions
 
     Satoshi Coins:
@@ -79,6 +87,16 @@ elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (wallu) in
         echo "Satoshi Coins Log Created: $(date)" | sudo tee -a /var/log/satoshi_coins/log
     fi
 
+    # Create script (refillkeys) that will top off the btcpay wallet key pool with 25000 keys since last transaction.
+    if [[ ! -f /usr/local/sbin/refillkeys ]]; then
+        echo "sudo -u bitcoin /usr/bin/bitcoin-cli -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf -rpcwallet=btcpay walletpassphrase \$(sudo cat /root/passphrase) 10" | sudo tee /usr/local/sbin/refillkeys > /dev/null
+        echo "sudo -u bitcoin /usr/bin/bitcoin-cli -rpcwallet=btcpay -datadir=/var/lib/bitcoin -conf=/etc/bitcoin.conf keypoolrefill 25000" | sudo tee -a /usr/local/sbin/refillkeys > /dev/null
+        sudo chmod +x /usr/local/sbin/refillkeys
+    fi
+
+    # Add Cron Job that executes a script (refillkeys) every 6 hours that tops off the btcpay wallet key pool (i.e. manually enforce a gap limit).
+    (crontab -l | grep -v -F "/usr/local/sbin/refillkeys" ; echo "0 */6 * * * /bin/bash -lc \"/usr/local/sbin/refillkeys\"" ) | crontab -
+
 elif [[ $1 = "--cron" ]]; then # (Re)Create a weekly cronjob to send a wallet email update at 6:45 AM on Monday: RECIPIENTS_NAME  EMAIL
     NAME=$2; EMAIL=$3
     if [[ -z $NAME || -z $EMAIL ]]; then
@@ -117,6 +135,10 @@ elif [[ $1 = "--balances" ]]; then # Show balances for the Satoshi Coins, Mining
     Satoshi Coins Wallet:
         Unconfirmed Balance:    $($BTC -rpcwallet=satoshi_coins getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
         Trusted Balance:        $($BTC -rpcwallet=satoshi_coins getbalance)
+
+    BTCPAY Wallet:
+        Unconfirmed Balance:    $($BTC -rpcwallet=btcpay getbalances | jq '.mine.untrusted_pending' | awk '{printf("%.8f", $1)}')
+        Trusted Balance:        $($BTC -rpcwallet=btcpay getbalance)
 EOF
     echo ""
 
@@ -167,7 +189,7 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | sa
     FEE_RATE_SATS_VB=$(awk -v decimal="$FEE_RATE" 'BEGIN {printf("%.8f", decimal * 100000)}' </dev/null)
 
     # Generate transacation
-    $UNLOCK; $MINING_UNLOCK; OUTPUT=$($BTC -rpcwallet=$WALLET send "{\"$ADDRESS\": $AMOUNT}" null "unset" $FEE_RATE_SATS_VB "{\"replaceable\": true${SEND_ALL}}")
+    $UNLOCK; $MINING_UNLOCK; $BTCPAY_UNLOCK; OUTPUT=$($BTC -rpcwallet=$WALLET send "{\"$ADDRESS\": $AMOUNT}" null "unset" $FEE_RATE_SATS_VB "{\"replaceable\": true${SEND_ALL}}")
 
     # Check for valid TXID; if valid, ensure the tx was broadcasted
     TXID=$(echo $OUTPUT | jq -r .txid)
@@ -178,13 +200,13 @@ elif [[ $1 = "--send" ]]; then # Send funds (coins) from the (bank | mining | sa
         echo $OUTPUT
     fi
 
-elif [[ $1 = "--bump" ]]; then # Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank and mining wallets only)
-    WALLETS=("bank" "mining"); bump_flag=""
+elif [[ $1 = "--bump" ]]; then # Bumps the fee of all (recent) outgoing transactions that are BIP 125 replaceable and not confirmed (bank, btcpay, and mining wallets only)
+    WALLETS=("bank" "btcpay" "mining"); bump_flag=""
     for wallet in "${WALLETS[@]}"; do
         readarray -t TXS < <($BTC -rpcwallet=$wallet listtransactions "*" 40 0 false | jq -r '.[] | .confirmations, .txid, .category')
         for ((i = 0 ; i < ${#TXS[@]} ; i = i + 3)); do
             if [[ ${TXS[i]} -eq 0 && ${TXS[i + 2]} == "send" ]]; then
-                $UNLOCK; $MINING_UNLOCK; $BTC -rpcwallet=$wallet bumpfee ${TXS[i + 1]}
+                $UNLOCK; $MINING_UNLOCK; $BTCPAY_UNLOCK; $BTC -rpcwallet=$wallet bumpfee ${TXS[i + 1]}
                 bump_flag="true"
             fi
         done
@@ -197,6 +219,14 @@ elif [[ $1 = "--mining" ]]; then # Create new address to receive funds into the 
 
 elif [[ $1 = "--bank" ]]; then # Create new address to receive funds into the Bank wallet
     echo ""; $BTC -rpcwallet=bank getnewaddress; echo ""
+
+elif [[ $1 = "--btcpay" ]]; then # Show the Descriptor, the Extended Public Key, and the first 10 HD addresses for the btcpay wallet
+    echo "BTCPAY Wallet Information"
+    echo "    Descriptor:"
+    echo "$(btc -rpcwallet=btcpay listdescriptors | grep -m 1 "\"wpkh" -A 9)"
+    echo ""; echo "    Extended Public Key:    $(btc -rpcwallet=btcpay listdescriptors | grep -m 1 "\"wpkh" | cut -d "]" -f 2 | cut -d "/" -f 1)"
+    echo "    First 10 HD Addresses:"
+    $BTC -rpcwallet=btcpay deriveaddresses "$($BTC -rpcwallet=btcpay listdescriptors | grep -m 1 "\"wpkh" | cut -d "\"" -f 4)" "[0,9]"
 
 elif [[ $1 = "--recent" ]]; then # Show recent (last 50) Bank wallet transactions
     readarray -t TXS < <($BTC -rpcwallet=bank listtransactions "*" 50 0 false | jq -r '.[] | .category, .amount, .confirmations, .time, .address, .txid')
@@ -566,5 +596,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.391"
+    echo "Script Version 0.4"
 fi
