@@ -37,12 +37,6 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --mining      Create new address to receive funds into the Mining wallet
       --bank        Create new address to receive funds into the Bank wallet
       --btcpay      Show the Descriptor, the Extended Public Key, and the first 10 HD addresses for the btcpay wallet
-                        Note: By default the gap limit is 1000 (keypool=1000). Rather than changing this limit globally (affecting all wallets), a cron job was
-                              installed (with this script's installation that runs every 6 hours) to execute the keypoolrefill command topping off the btcpay
-                              descriptor wallet with 25K more keys since last transaction. In the case where the balances between the btcpay server and this
-                              btcpay wallet differ, it may be due to insufficient gap limit. There's no built in contingency for this and will require further
-                              investigation and hacking. Edge case: one or more tx(s) occur(s) followed by 25K keys of spacing and then another transaction
-                              that all happen before the keypoolrefill is executed again.
       --recent      Show recent (last 50) bank wallet transactions
 
     Satoshi Coins:
@@ -223,10 +217,19 @@ elif [[ $1 = "--bank" ]]; then # Create new address to receive funds into the Ba
 elif [[ $1 = "--btcpay" ]]; then # Show the Descriptor, the Extended Public Key, and the first 10 HD addresses for the btcpay wallet
     echo "BTCPAY Wallet Information"
     echo "    Descriptor:"
-    echo "$(btc -rpcwallet=btcpay listdescriptors | grep -m 1 "\"wpkh" -A 9)"
-    echo ""; echo "    Extended Public Key:    $(btc -rpcwallet=btcpay listdescriptors | grep -m 1 "\"wpkh" | cut -d "]" -f 2 | cut -d "/" -f 1)"
+    echo "$($BTC -rpcwallet=btcpay listdescriptors | grep -m 1 "\"wpkh" -A 9)"
+    echo ""; echo "    Extended Public Key:    $($BTC -rpcwallet=btcpay listdescriptors | grep -m 1 "\"wpkh" | cut -d "]" -f 2 | cut -d "/" -f 1)"
     echo "    First 10 HD Addresses:"
     $BTC -rpcwallet=btcpay deriveaddresses "$($BTC -rpcwallet=btcpay listdescriptors | grep -m 1 "\"wpkh" | cut -d "\"" -f 4)" "[0,9]"
+
+    echo ""; cat << EOF
+    Note: By default the gap limit is 1000 (keypool=1000). Rather than changing this limit globally (affecting all wallets), a cron job was
+          installed (with this script's installation that runs every 6 hours) to execute the keypoolrefill command topping off the btcpay
+          descriptor wallet with 25K more keys since last transaction. In the case where the balances between the btcpay server and this
+          btcpay wallet differ, it may be due to insufficient gap limit. There's no built in contingency for this and will require further
+          investigation and hacking. Edge case: one or more tx(s) occur(s) followed by 25K keys of spacing and then another transaction
+          that all happen before the keypoolrefill is executed again.
+EOF
 
 elif [[ $1 = "--recent" ]]; then # Show recent (last 50) Bank wallet transactions
     readarray -t TXS < <($BTC -rpcwallet=bank listtransactions "*" 50 0 false | jq -r '.[] | .category, .amount, .confirmations, .time, .address, .txid')
@@ -596,5 +599,5 @@ elif [[ $1 = "--log" ]]; then # Show log (/var/log/satoshicoins/log) and Satoshi
 
 else
     $0 --help
-    echo "Script Version 0.4"
+    echo "Script Version 0.41"
 fi
