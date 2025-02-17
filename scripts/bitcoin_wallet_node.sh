@@ -22,6 +22,15 @@ Use this node to manage the following wallets:
 The /usr/local/sbin/wallu script facilitates many of the desired wallet activities.
 Also installed is a script, /usr/local/sbin/send_email, to send email reports to the admins.
 
+BTCPAY Wallet Gap Limit:
+    By default the gap limit is 1000 (keypool=1000). Rather than changing this limit globally (affecting all wallets),
+    a cron job is installed (with the wallu script's installation) that runs every 6 hours and executes the keypoolrefill
+    command topping off the btcpay descriptor wallet with 25K more keys since last transaction. In the case where the
+    balances between the btcpay server and this btcpay wallet differ, it may be due to insufficient gap limit. There's no
+    built in contingency for this and will require further investigation and hacking. Edge case: one or more tx(s)
+    occur(s) followed by 25K keys of spacing and then another transaction that all happen before the keypoolrefill is
+    executed again.
+
 Note: This is a pruned bitcoin node. The rescan feature is not possible on a pruned blockchain; therefore,
     importing private keys or addresses to watch is not possible. Also, wallet files cannot be imported either
     without downloading the entire blockchain once again. If restoring from backup, do not shortcut the bitcoin
