@@ -33,14 +33,6 @@ Management:
         echo -e "# \$NAME, \${DESCRIPTION}\naddnode=\$ADDRESS:\$PORT" | sudo tee -a /etc/bitcoin.conf
             ":\$PORT" is not necessary for the default port 8333
             "\$NAME" and "\${DESCRIPTION}" add desired info' as part of the connections' comment heading
-
-Core Lightning Remote Node:
-    Core Lightning requires local access to the Bitcoin JSON RPC Port 8332.
-    In order to run a remote lightning node, the port 8332 needs to be available via SSH Tunneling
-
-    User Login: btc-remote-cli
-    Add Remote's SSH Key: sudo nano /home/btc-remote-cli/.ssh/authorized_keys
-    This Node's Host Key: echo \$(sudo cat /etc/ssh/ssh_host_ed25519_key.pub | sed 's/ root@.*//')
 EOF
 read -p "Press the enter key to continue..."
 
@@ -209,54 +201,17 @@ sudo ufw --force enable # Enable Firewall @ Boot and Start it now!
 sudo systemctl daemon-reload
 sudo systemctl enable bitcoind
 
-# Setup a "no login" user called "btc-remote-cli"; Makes the bitcoin-cli utility possible to run on remote machines
-sudo useradd -s /bin/false -m -d /home/btc-remote-cli btc-remote-cli
-
-# Create (btc-remote-cli) .ssh folder; Set ownership and permissions
-sudo mkdir -p /home/btc-remote-cli/.ssh
-sudo touch /home/btc-remote-cli/.ssh/authorized_keys
-sudo chown -R btc-remote-cli:btc-remote-cli /home/btc-remote-cli/.ssh
-sudo chmod 700 /home/btc-remote-cli/.ssh
-sudo chmod 600 /home/btc-remote-cli/.ssh/authorized_keys
-
-# Configure SSHD to securely accommodate user "btc-remote-cli"
-sudo sed -i 's/X11Forwarding yes/#X11Forwarding no/g' /etc/ssh/sshd_config # Disable X11Forwarding (default value)
-sudo sed -i 's/#AllowTcpForwarding yes/AllowTcpForwarding Local/g' /etc/ssh/sshd_config # Only allow local port forwarding
-
-echo -e "\nMatch User *,"'!'"btc-remote-cli,"'!'"root,"'!'"$USER" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tAllowTCPForwarding no" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tForceCommand /usr/sbin/nologin" | sudo tee -a /etc/ssh/sshd_config
-
-echo -e "\nMatch User btc-remote-cli" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tPermitTTY no" | sudo tee -a /etc/ssh/sshd_config
-echo -e "\tPermitOpen localhost:8332" | sudo tee -a /etc/ssh/sshd_config # Denies any request of local forwarding besides localhost:8332
-
-# Remove unwanted/unused host keys
-sudo rm /etc/ssh/ssh_host_dsa_key* 2> /dev/null
-sudo rm /etc/ssh/ssh_host_ecdsa_key* 2> /dev/null
-sudo rm /etc/ssh/ssh_host_rsa_key* 2> /dev/null
-
 # Create links (for backup purposes) to all critical files needed to restore this node
 cd ~; mkdir backup
 sudo ln -s /etc/bitcoin.conf ~/backup
-sudo ln -s /home/btc-remote-cli/.ssh/authorized_keys ~/backup
-sudo ln -s /etc/ssh/ssh_host_ed25519_key ~/backup
-sudo ln -s /etc/ssh/ssh_host_ed25519_key.pub ~/backup
 
 # If "~/restore" folder is present then restore all pertinent files; assumes all files are present
 if [[ -d ~/restore ]]; then
     # Restore ownership to files
     sudo chown root:bitcoin ~/restore/bitcoin.conf
-    sudo chown btc-remote-cli:btc-remote-cli ~/restore/authorized_keys
-    sudo chown root:root ~/restore/ssh_host_ed25519_key
-    sudo chown root:root ~/restore/ssh_host_ed25519_key.pub
 
     # Move files to their correct locations
     sudo mv ~/restore/bitcoin.conf /etc/bitcoin.conf
-    sudo mv ~/restore/authorized_keys /home/btc-remote-cli/.ssh/authorized_keys
-    sudo mv ~/restore/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
-    sudo mv ~/restore/ssh_host_ed25519_key.pub /etc/ssh/ssh_host_ed25519_key.pub
 
     # Remove the "~/restore" folder
     cd ~; sudo rm -rf restore
