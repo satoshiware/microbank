@@ -137,10 +137,10 @@ How-To Copy this BTC Pruned Node (Establish New Pruned Nodes Quickly)
 
     #### From the Host, Download bitcoin.tar.gz ####
     sudo rm ~/bitcoin.tar.gz
-    cd ~; scp -i ~/.ssh/vmkey satoshi@btcpay.local:/home/satoshi/bitcoin.tar.gz .
+    cd ~; scp -i ~/.ssh/vmkey satoshi@clightn.local:/home/satoshi/bitcoin.tar.gz .
 
     #### From the Host, Upload bitcoin.tar.gz to the NEW IMAGE ####
-    NEW_IMGAGE=btcpay
+    NEW_IMGAGE=clightn
     scp -i ~/.ssh/vmkey ~/bitcoin.tar.gz satoshi@\${NEW_IMGAGE}.local:/home/satoshi/bitcoin.tar.gz
 
     #### From the NEW IMAGE, Extract Files to Appropriate Location ####
