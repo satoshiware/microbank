@@ -12,6 +12,17 @@ fi
 # See which litu parameter was passed and execute accordingly
 if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
+
+Future Improvements (i.e. todos):
+    Watchtowers are automatically integrated with all trusted (peer bank) channel partners.
+		The Eye of Satoshi (rust-teos) Watchtower: https://github.com/talaia-labs/rust-teos
+		Watchtower Client: https://github.com/talaia-labs/rust-teos
+    Convert all private channels to hosted private channels when the Core Lightning software has advanced sufficiently.
+    Remove the bitcoind install from this VM Instance (there may be a plugin for this)
+        Note: The current Core Lightning software (2/18/25) requires a local bitcoind instance running for bitcoin-cli access
+        (even though it's still connected to this bank's full bitcoin node). On future updates, it may no longer be necessary.
+		
+
     Options:
       --help            Display this help message and exit
       --install         Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
@@ -40,6 +51,57 @@ List Global (and information) peers [all all channel information]
 List Unsolicited (and information) peers [all all channel information]  (aka incomming connections)
 
 
+
+during the install, create cronjob that sends summery
+during the install, create cronjob that checks balances and sends alerts
+during the install, create cronjob that tries to balance channels. 
+
+What kind of notification do we want?
+    A cron job that gives us a summary (balances and analytics)
+        there is a bookeeper plugin and a "accounting" plugin or something like that.
+    When channel balances become low.
+	cron job that tries to balance
+
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    lncli updatechanpolicy --base_fee_msat 100 --fee_rate 0.00001 --time_lock_delta 50 --min_htlc_msat 1000 --chan_point 17ec2d0ac18d953b1dfe2cafa116b0c118020cab4d80c4063fe98debda6df469:1
+
+    lncli openchannel --node_key 021c97a90a411ff2b10dc2a8e32de2f29d2fa49d41bfbb52bd416e460db0747d0d --connect 50.112.125.89:9735 --local_amt 210000000 --remote_max_value_in_flight_msat 105000000000 --max_local_csv 50
+
+
+    Each channel has its own fee policy. Those fee policies include: Base Fee + % Fee
+    min_htlc_msat
+
+    The waiting period can be defined individually for each channel at its creation using the --max_local_csv
+    --remote_csv_delay flags of lncli openchannel.
+    A large waiting period makes it safer to recover from a failure, but will also lock up funds for longer if a channel closes unilaterally.
+
+
+    How can I put a policy to protect myself?
+
+
+Initial Goals (Level 1):
+    No dual funded or splicing supported yet; Single wallet for balance both on-chain and lighting togethor
+    Policy and methods for lightning nodes to connect with this one.
+        Minimum Amount: 10,000 SATS (default)
+        Maximum Amount: No Maximum
+        They Pay the fee
+        Can I set the fee
+    Channel Observation and management (How to close and open)
+    Lightning Address server
+    Generate invoice for an arbitrary amount
+
+    Generate invoice for a specific amount
+    Generate bolt12 invoice for arbitrary amount that can be paid infinite times.
+	
+	
+	
+	
 
 EOF
 
