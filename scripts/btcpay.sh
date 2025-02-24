@@ -104,15 +104,14 @@ Post Install BTCPAY Configuration
                 "Select a preset": Online
                 "Enable payment methods only when amount is …"
                     BTC-LN      "Less than"         0.040 BTC
-                    BTC-CHAIN   "Greater than"      0.039 BTC
+                    BTC-CHAIN   "Greater than"      0.03999999 BTC
             Add Another Store Owner (Settings > Users)
                 Note: Follow up and make sure new owner implements proper security measures for authentication.
-        Create Lightning Address (PLUGINS > Lightning Address) (e.g. satoshi@btcpay.\$YOUR_BANK_DOMAIN.com w/ default settings)
+        Create Lightning Address (PLUGINS > Lightning Address) (e.g. satoshi@btcpay.\$YOUR_BANK_DOMAIN.com w/ "invoice currency" = sats the rest blank)
         Setup FIDO2 Two-Factor Authentication (Account > Two-Factor Authentication) (e.g. Yubikey)
         Confire Server Email (Server Settings > Email)
             Create unique password with SMTP Relay (e.g. brevo.com)
-            Be sure to select "Use custom SMTP settings for this store" in the first store created (Store > Settings > Emails)
-        Configure Block Explorer (Server Settings > Block Explorers) (e.g. https://btc-explorer.\$YOUR_BANK_DOMAIN.com)
+        Configure Block Explorer (Server Settings > Block Explorers) (e.g. https://btc-explorer.\$YOUR_BANK_DOMAIN.com/tx/{0})
         Configure BTCPAY Server Name and Contact URL (Server Settings > Branding)
 
 BTCPAY Access
