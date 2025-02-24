@@ -3,10 +3,6 @@
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
-   echo "if you need to create a sudo user (e.g. satoshi), run the following commands:"
-   echo "   sudo adduser satoshi"
-   echo "   sudo usermod -aG sudo satoshi"
-   echo "   sudo su satoshi # Switch to the new user"
    exit 1
 elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    echo "You do not have enough sudo privileges!"
@@ -105,7 +101,7 @@ Upgrading Core Lightning:
         sudo systemctl enable lightningd --now
 
 Backup/Restore:
-    WARNING! If you intend to backup/resotre the lightningd database, know that snapshot-style backups of the lightningd database is discouraged,
+    WARNING! If you intend to backup/restore the lightningd database, know that snapshot-style backups of the lightningd database is discouraged,
     as any loss of state may result in permanent loss of funds! If you are to continue, first disable and stop (i.e. shutdown) lightningd:
         sudo systemctl disable lightningd
         sudo systemctl stop lightningd
@@ -432,6 +428,11 @@ sudo ln -s /var/lib/lightningd/bitcoin/hsm_secret ~/backup # HD wallet seed for 
 sudo ln -s /var/lib/lightningd/bitcoin/emergency.recover ~/backup # Each time a new channel is created, this file will need to be backed up anew.
     # Note: Static channel recovery file that requires cooperation with peers and should only be used as a last resort!
 sudo ln -s /var/lib/lightningd/bitcoin/lightningd.sqlite3.backup ~/backup # Lightning daemon database backup
+sudo ln -s /etc/default/litu.env ~/backup # Environment file for the litu utility
+sudo ln -s /var/log/lightningd/global_peers ~/backup # litu utility list of global_peers
+sudo ln -s /var/log/lightningd/local_peers ~/backup # litu utility list of local_peers
+sudo ln -s /var/log/lightningd/local_channels ~/backup # litu utility list of local_channels
+sudo ln -s /etc/default/send_messages.env ~/backup # Environment file for the send_messages utility
 
 # If "~/restore" folder is present then restore all pertinent files; assumes all files are present
 if [[ -d ~/restore ]]; then
@@ -439,11 +440,21 @@ if [[ -d ~/restore ]]; then
     sudo chown lightning:lightning ~/restore/hsm_secret
     sudo chown lightning:lightning ~/restore/emergency.recover
     sudo chown lightning:lightning ~/restore/lightningd.sqlite3.backup
+    sudo chown root:root ~/restore/litu.env
+    sudo chown root:root ~/restore/global_peers
+    sudo chown root:root ~/restore/local_peers
+    sudo chown root:root ~/restore/local_channels
+    sudo chown root:root ~/restore/send_messages.env
 
     # Move files to their correct locations
     sudo mv ~/restore/hsm_secret /var/lib/lightningd/bitcoin/hsm_secret
     sudo mv ~/restore/emergency.recover /var/lib/lightningd/bitcoin/emergency.recover
     sudo mv ~/restore/lightningd.sqlite3.backup /var/lib/lightningd/bitcoin/lightningd.sqlite3.backup
+    sudo mv ~/restore/litu.env /etc/default/litu.env
+    sudo mv ~/restore/global_peers /var/log/lightningd/global_peers
+    sudo mv ~/restore/local_peers /var/log/lightningd/local_peers
+    sudo mv ~/restore/local_channels /var/log/lightningd/local_channels
+    sudo mv ~/restore/send_messages.env /etc/default/send_messages.env
 
     echo ""
     echo "EXTREMELY IMPORTANT:"
