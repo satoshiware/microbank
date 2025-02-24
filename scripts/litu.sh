@@ -13,6 +13,8 @@ fi
 if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
 
+Remember, we need to install GENERIC cron jobs here
+
 Future Improvements (i.e. todos):
     Watchtowers are automatically integrated with all trusted (peer bank) channel partners.
 		The Eye of Satoshi (rust-teos) Watchtower: https://github.com/talaia-labs/rust-teos
@@ -26,13 +28,14 @@ Future Improvements (i.e. todos):
     Options:
       --help            Display this help message and exit
       --install         Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
+	  --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/litu.env
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
       --global_channel  Establish a "global" channel to improve liquidity world-wide (0 reserve): $PEER_ID  $AMOUNT
                             Note: The ID of each global peer is stored in the file /var/log/lightningd/global_peers
       --local_channel   Establish a "local" channel to a "trusted" peer bank (0 reserve): $PEER_ID  $AMOUNT
                             Note: The ID of each local trusted peer is stored in the file /var/log/lightningd/local_peers
-      --btcpay          Establish a private channel with the BTCPAY server: $PEER_ID  $LOCAL_IP_ADDRESS  $AMOUNT
-                            Note: The ID & IP of each BTCPAY server is stored in the file /var/log/lightningd/btcpay
+      --private_channel Establish a private channel with the BTCPAY server: $PEER_ID  $LOCAL_IP_ADDRESS  $AMOUNT
+                            Note: The ID & IP of each BTCPAY server is stored in the file /var/log/lightningd/local_channels
 	  --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
 	  
 
@@ -41,7 +44,9 @@ Useful Commands:
 	lncli listnodes 					# Show all nodes (and info') on the lightning network
 	lncli listnodes $CONNECTION_ID  	# Get info' on another node
 	lncli listpeers 					# Show all nodes that share a connection with this node
+	lncli newaddr					# Get a deposit address
 	
+	bc1qsfw44ge7w7grqn0pzvm8cm39eegfr898kthrdd
 	
 ################################# Some maybe useful stuff todo ############################################
 list peers (and information) without channels
