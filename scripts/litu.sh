@@ -18,6 +18,9 @@ elif [ "$(sudo -l | grep '(ALL : ALL) ALL' | wc -l)" = 0 ]; then
    exit 1
 fi
 
+# Universal envrionment variables
+LNCLI=$(cat /etc/bash.bashrc | grep "alias lncli=" | cut -d "\"" -f 2)
+
 # See which litu parameter was passed and execute accordingly
 if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
@@ -129,8 +132,8 @@ elif [[ $1 == "--global_channel" ]]; then # Establish a "global" channel to impr
         exit 1
     fi
 
-    lncli connect $PEER_ID; sleep 2
-    RESULT=$(lncli fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0)
+    $LNCLI connect $PEER_ID; sleep 2
+    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0)
 
     echo $RESULT
 
@@ -150,8 +153,8 @@ elif [[ $1 == "--local_channel" ]]; then # Establish a "peer" channel to a trust
         exit 1
     fi
 
-    lncli connect $PEER_ID; sleep 2
-    RESULT=$(lncli fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0)
+    $LNCLI connect $PEER_ID; sleep 2
+    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0)
 
     echo $RESULT
 
@@ -171,8 +174,8 @@ elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with 
         exit 1
     fi
 
-    lncli connect $PEER_ID $LOCAL_IP_ADDRESS; sleep 2
-    RESULT=$(lncli fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0 announce=false)
+    $LNCLI connect $PEER_ID $LOCAL_IP_ADDRESS; sleep 2
+    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0 announce=false)
 
     echo $RESULT
 
@@ -193,9 +196,9 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
         exit 1
     fi
 
-    lncli setchannel -k id=$PEER_SHORT_CHANNEL_ID feeppm=$FEE_RATE
+    $LNCLI setchannel -k id=$PEER_SHORT_CHANNEL_ID feeppm=$FEE_RATE
 
 else
     $0 --help
-    echo "Script Version 0.10"
+    echo "Script Version 0.11"
 fi
