@@ -1,5 +1,14 @@
 #!/bin/bash
 
+##### Future Todos ##### <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+#    Watchtowers are automatically integrated with all trusted (peer bank) channel partners.
+#        The Eye of Satoshi (rust-teos) Watchtower: https://github.com/talaia-labs/rust-teos
+#        Watchtower Client: https://github.com/talaia-labs/rust-teos
+#    Convert all private channels to hosted private channels when the Core Lightning software has advanced sufficiently.
+#    Remove the bitcoind install from this VM Instance (there may be a plugin for this)
+#        Note: The current Core Lightning software (2/18/25) requires a local bitcoind instance running for bitcoin-cli access
+#        (even though it's still connected to this bank's full bitcoin node). On future updates, it may no longer be necessary.
+
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
    echo "This script must NOT be run as root (or with sudo)!"
@@ -12,42 +21,33 @@ fi
 # See which litu parameter was passed and execute accordingly
 if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
-
-Remember, we need to install GENERIC cron jobs here
-
-Future Improvements (i.e. todos):
-    Watchtowers are automatically integrated with all trusted (peer bank) channel partners.
-		The Eye of Satoshi (rust-teos) Watchtower: https://github.com/talaia-labs/rust-teos
-		Watchtower Client: https://github.com/talaia-labs/rust-teos
-    Convert all private channels to hosted private channels when the Core Lightning software has advanced sufficiently.
-    Remove the bitcoind install from this VM Instance (there may be a plugin for this)
-        Note: The current Core Lightning software (2/18/25) requires a local bitcoind instance running for bitcoin-cli access
-        (even though it's still connected to this bank's full bitcoin node). On future updates, it may no longer be necessary.
-		
-
     Options:
       --help            Display this help message and exit
       --install         Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
-	  --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/litu.env
+      --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/litu.env
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
-      --global_channel  Establish a "global" channel to improve liquidity world-wide (0 reserve): $PEER_ID  $AMOUNT
-                            Note: The ID of each global peer is stored in the file /var/log/lightningd/global_peers
-      --local_channel   Establish a "local" channel to a "trusted" peer bank (0 reserve): $PEER_ID  $AMOUNT
-                            Note: The ID of each local trusted peer is stored in the file /var/log/lightningd/local_peers
-      --private_channel Establish a private channel with the BTCPAY server: $PEER_ID  $LOCAL_IP_ADDRESS  $AMOUNT
-                            Note: The ID & IP of each BTCPAY server is stored in the file /var/log/lightningd/local_channels
-	  --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
-	  
+      --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): $PEER_ID  $AMOUNT
+                            Note: The ID is stored in the file /var/log/lightningd/global_channels
+      --local_channel   Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): $PEER_ID  $AMOUNT
+                            Note: The ID is stored in the file /var/log/lightningd/peer_channels
+      --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT
+                            Note: The ID and IP is stored in the file /var/log/lightningd/private_channels
+      --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
 
 Useful Commands:
-	lncli getinfo 					# See the info' on this node
-	lncli listnodes 					# Show all nodes (and info') on the lightning network
-	lncli listnodes $CONNECTION_ID  	# Get info' on another node
-	lncli listpeers 					# Show all nodes that share a connection with this node
-	lncli newaddr					# Get a deposit address
-	
-	bc1qsfw44ge7w7grqn0pzvm8cm39eegfr898kthrdd
-	
+    lncli getinfo                   # See the info' on this node
+    lncli listnodes                 # Show all nodes (and info') on the lightning network
+    lncli listnodes $CONNECTION_ID  # Get info' on another node
+    lncli listpeers                 # Show all nodes that share a connection with this node
+
+    [on-chain wallet]
+    lncli newaddr                   # Generates a new address which can subsequently be used to fund channels managed by the Core Lightning node
+    lncli listaddresses             # List of all Bitcoin addresses that have been generated and issued by the Core Lightning node up to the current date
+    lncli bkpr-listbalances         # List of all current and historical account balances both on-chain and channel balances
+    lncli withdraw \$ADDRESS \$AMOUNT # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
+                                    # The \$AMOUNT (msat, sats [default], btc, or "all") to be withdrawn from the internal on-chain wallet.
+                                    # When using "all" for the \$AMOUNT, it will leave the at least min-emergency-msat as change if there are any open (or unsettled) channels.
+
 ################################# Some maybe useful stuff todo ############################################
 list peers (and information) without channels
 List ALL peers (and information) with channels (I'm still assuming they are always connected) [all all channel information]
@@ -55,24 +55,6 @@ List Local (and information) peers [all all channel information]
 List Global (and information) peers [all all channel information]
 List Unsolicited (and information) peers [all all channel information]  (aka incomming connections)
 
-
-
-during the install, create cronjob that sends summery
-during the install, create cronjob that checks balances and sends alerts
-during the install, create cronjob that tries to balance channels. 
-
-What kind of notification do we want?
-    A cron job that gives us a summary (balances and analytics)
-        there is a bookeeper plugin and a "accounting" plugin or something like that.
-    When channel balances become low.
-	cron job that tries to balance
-
-
-
-
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     lncli updatechanpolicy --base_fee_msat 100 --fee_rate 0.00001 --time_lock_delta 50 --min_htlc_msat 1000 --chan_point 17ec2d0ac18d953b1dfe2cafa116b0c118020cab4d80c4063fe98debda6df469:1
 
@@ -103,10 +85,10 @@ Initial Goals (Level 1):
 
     Generate invoice for a specific amount
     Generate bolt12 invoice for arbitrary amount that can be paid infinite times.
-	
-	
-	
-	
+
+
+
+
 
 EOF
 
@@ -129,6 +111,12 @@ elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (litu) in 
     sudo cat $0 | sudo tee /usr/local/sbin/litu > /dev/null
     sudo chmod +x /usr/local/sbin/litu
 
+    ## Install cron jobs here: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        # during the install, create cronjob that sends summery (e.g. analytics, channel balances, etc.)
+            # Would the bookkeeper or accounting plugin help??
+        # during the install, create cronjob that checks balances and sends alerts when balances become low
+        # during the install, create cronjob that tries to balance channels.
+
 elif [[ $1 == "--ip_update" ]]; then # For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node.
     echo ""
 
@@ -146,14 +134,14 @@ elif [[ $1 == "--global_channel" ]]; then # Establish a "global" channel to impr
 
     echo $RESULT
 
-    # On success, add the PEER_ID to the global_peers file without duplicates
+    # On success, add the PEER_ID to the global_channels file without duplicates
     if [[ $RESULT != *"code"* ]]; then # If no error "code" was thrown then assume success
-        if ! sudo grep -Fxq $PEER_ID /var/log/lightningd/global_peers; then
-            echo $PEER_ID | sudo -u lightning tee -a /var/log/lightningd/global_peers
+        if ! sudo grep -Fxq $PEER_ID /var/log/lightningd/global_channels; then
+            echo $PEER_ID | sudo -u lightning tee -a /var/log/lightningd/global_channels
         fi
     fi
 
-elif [[ $1 == "--local_channel" ]]; then # Establish a "local" channel to a "trusted" peer bank (0 reserve): $PEER_ID  $AMOUNT
+elif [[ $1 == "--local_channel" ]]; then # Establish a "peer" channel to a trusted local bank (w/ 0 reserves): $PEER_ID  $AMOUNT
     PEER_ID=$2; AMOUNT=$3
 
     # Input checking
@@ -167,14 +155,14 @@ elif [[ $1 == "--local_channel" ]]; then # Establish a "local" channel to a "tru
 
     echo $RESULT
 
-    # On success, add the PEER_ID to the local_peers file without duplicates
+    # On success, add the PEER_ID to the peer_channels file without duplicates
     if [[ $RESULT != *"code"* ]]; then # If no error "code" was thrown then assume success
-        if ! sudo grep -Fxq $PEER_ID /var/log/lightningd/local_peers; then
-            echo $PEER_ID | sudo -u lightning tee -a /var/log/lightningd/local_peers
+        if ! sudo grep -Fxq $PEER_ID /var/log/lightningd/peer_channels; then
+            echo $PEER_ID | sudo -u lightning tee -a /var/log/lightningd/peer_channels
         fi
     fi
-	
-elif [[ $1 == "--btcpay" ]]; then # Establish a private channel with the BTCPAY server: $PEER_ID  $LOCAL_IP_ADDRESS  $AMOUNT
+
+elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT
     PEER_ID=$2; LOCAL_IP_ADDRESS=$3; AMOUNT=$4
 
     # Input checking
@@ -188,13 +176,13 @@ elif [[ $1 == "--btcpay" ]]; then # Establish a private channel with the BTCPAY 
 
     echo $RESULT
 
-    # On success, add the PEER_ID to the btcpay file without duplicates
+    # On success, add the PEER_ID to the private_channels file without duplicates
     if [[ $RESULT != *"code"* ]]; then # If no error "code" was thrown then assume success
-        if ! sudo grep -Fxq "$PEER_ID $LOCAL_IP_ADDRESS" /var/log/lightningd/btcpay; then
-            echo "$PEER_ID $LOCAL_IP_ADDRESS" | sudo -u lightning tee -a /var/log/lightningd/btcpay
+        if ! sudo grep -Fxq "$PEER_ID $LOCAL_IP_ADDRESS" /var/log/lightningd/private_channels; then
+            echo "$PEER_ID $LOCAL_IP_ADDRESS" | sudo -u lightning tee -a /var/log/lightningd/private_channels
         fi
     fi
-	
+
 elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
     PEER_SHORT_CHANNEL_ID=$2 # This parameter contains the "Short Channel ID", Channel ID, or Peer ID (all channels with this given peer).
     FEE_RATE=$3 # Fee added proportionally (per-millionths) to any routed payment volume (e.g. 1000 = 0.1% fee).
@@ -209,5 +197,5 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 
 else
     $0 --help
-    echo "Script Version 0.01"
+    echo "Script Version 0.10"
 fi
