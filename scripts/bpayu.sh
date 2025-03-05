@@ -15,18 +15,18 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
 
 Future Improvements (i.e. todos):
     Watchtowers are automatically integrated with all trusted (peer bank) channel partners.
-		The Eye of Satoshi (rust-teos) Watchtower: https://github.com/talaia-labs/rust-teos
-		Watchtower Client: https://github.com/talaia-labs/rust-teos
+        The Eye of Satoshi (rust-teos) Watchtower: https://github.com/talaia-labs/rust-teos
+        Watchtower Client: https://github.com/talaia-labs/rust-teos
     Convert all private channels to hosted private channels when the Core Lightning software has advanced sufficiently.
     Remove the bitcoind install from this VM Instance (there may be a plugin for this)
         Note: The current Core Lightning software (2/18/25) requires a local bitcoind instance running for bitcoin-cli access
         (even though it's still connected to this bank's full bitcoin node). On future updates, it may no longer be necessary.
-		
+
 
     Options:
       --help            Display this help message and exit
       --install         Install (or upgrade) this script (bpayu) in /usr/local/sbin (/satoshiware/microbank/scripts/bpayu.sh)
-	  --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/bpayu.env
+      --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/bpayu.env
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
       --global_channel  Establish a "global" channel to improve liquidity world-wide (0 reserve): $PEER_ID  $AMOUNT
                             Note: The ID of each global peer is stored in the file /var/log/lightningd/global_peers
@@ -34,18 +34,18 @@ Future Improvements (i.e. todos):
                             Note: The ID of each local trusted peer is stored in the file /var/log/lightningd/local_peers
       --private_channel Establish a private channel with the BTCPAY server: $PEER_ID  $LOCAL_IP_ADDRESS  $AMOUNT
                             Note: The ID & IP of each BTCPAY server is stored in the file /var/log/lightningd/local_channels
-	  --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
-	  
+      --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
+
 
 Useful Commands:
-	lncli getinfo 					# See the info' on this node
-	lncli listnodes 					# Show all nodes (and info') on the lightning network
-	lncli listnodes $CONNECTION_ID  	# Get info' on another node
-	lncli listpeers 					# Show all nodes that share a connection with this node
-	lncli newaddr					# Get a deposit address
-	
-	bc1qsfw44ge7w7grqn0pzvm8cm39eegfr898kthrdd
-	
+    lncli getinfo                   # See the info' on this node
+    lncli listnodes                     # Show all nodes (and info') on the lightning network
+    lncli listnodes $CONNECTION_ID      # Get info' on another node
+    lncli listpeers                     # Show all nodes that share a connection with this node
+    lncli newaddr                   # Get a deposit address
+
+    bc1qsfw44ge7w7grqn0pzvm8cm39eegfr898kthrdd
+
 ################################# Some maybe useful stuff todo ############################################
 list peers (and information) without channels
 List ALL peers (and information) with channels (I'm still assuming they are always connected) [all all channel information]
@@ -57,13 +57,13 @@ List Unsolicited (and information) peers [all all channel information]  (aka inc
 
 during the install, create cronjob that sends summery
 during the install, create cronjob that checks balances and sends alerts
-during the install, create cronjob that tries to balance channels. 
+during the install, create cronjob that tries to balance channels.
 
 What kind of notification do we want?
     A cron job that gives us a summary (balances and analytics)
         there is a bookeeper plugin and a "accounting" plugin or something like that.
     When channel balances become low.
-	cron job that tries to balance
+    cron job that tries to balance
 
 
 
@@ -101,10 +101,10 @@ Initial Goals (Level 1):
 
     Generate invoice for a specific amount
     Generate bolt12 invoice for arbitrary amount that can be paid infinite times.
-	
-	
-	
-	
+
+
+
+
 
 EOF
 
@@ -171,7 +171,7 @@ elif [[ $1 == "--local_channel" ]]; then # Establish a "local" channel to a "tru
             echo $PEER_ID | sudo -u lightning tee -a /var/log/lightningd/local_peers
         fi
     fi
-	
+
 elif [[ $1 == "--btcpay" ]]; then # Establish a private channel with the BTCPAY server: $PEER_ID  $LOCAL_IP_ADDRESS  $AMOUNT
     PEER_ID=$2; LOCAL_IP_ADDRESS=$3; AMOUNT=$4
 
@@ -192,7 +192,7 @@ elif [[ $1 == "--btcpay" ]]; then # Establish a private channel with the BTCPAY 
             echo "$PEER_ID $LOCAL_IP_ADDRESS" | sudo -u lightning tee -a /var/log/lightningd/btcpay
         fi
     fi
-	
+
 elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
     PEER_SHORT_CHANNEL_ID=$2 # This parameter contains the "Short Channel ID", Channel ID, or Peer ID (all channels with this given peer).
     FEE_RATE=$3 # Fee added proportionally (per-millionths) to any routed payment volume (e.g. 1000 = 0.1% fee).
