@@ -8,7 +8,7 @@
 #    Remove the bitcoind install from this VM Instance (there may be a plugin for this)
 #        Note: The current Core Lightning software (2/18/25) requires a local bitcoind instance running for bitcoin-cli access
 #        (even though it's still connected to this bank's full bitcoin node). On future updates, it may no longer be necessary.
-#    Allow for reserve requirements (on this end) to be 0 for incomming connnections. Implement this on other lightning nodes as well. 
+#    Allow for reserve requirements (on this end) to be 0 for incomming connnections. Implement this on other lightning nodes as well.
 
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
@@ -33,13 +33,13 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): \$PEER_ID  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
       --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): \$PEER_ID  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
       --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
-	  --channel_summary Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<<	Add filter option??? Probably<<<<
+      --channel_summary Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<< Add filter option??? Probably<<<<
       --update_fees     Change the channel % fee: [\$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]  \$FEE_RATE (e.g. 1000 = 0.1% fee)
 
-Files: 
+Files:
     The IDs for "global" channels are stored in the file /var/log/lightningd/global_channels
-	The IDs for "peer" channels are stored in the file /var/log/lightningd/peer_channels
-	The IDs AND IPs for "private" channels are stored in the file /var/log/lightningd/private_channels
+    The IDs for "peer" channels are stored in the file /var/log/lightningd/peer_channels
+    The IDs AND IPs for "private" channels are stored in the file /var/log/lightningd/private_channels
 
 Useful Commands:
     lncli getinfo                   # See the info' on this node
@@ -54,14 +54,14 @@ Useful Commands:
     lncli withdraw \$ADDRESS \$AMOUNT # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
                                     # The \$AMOUNT (msat, sats [default], btc, or "all") to be withdrawn from the internal on-chain wallet.
                                     # When using "all" for the \$AMOUNT, it will leave the at least min-emergency-msat as change if there are any open (or unsettled) channels.
-	[channels]
-	lncli bkpr-listbalances         # List of all current and historical account balances both on-chain and channel balances
-	lncli listpeerchannels			# Return a list of this node's channels
-	lncli listpeerchannels \$PEER_ID # Filter the list of this node's channels by a connected node's id
-	lncli close \$ID                 # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
-	
-	[payments]
-	lncli pay <bolt11>				# Pay a bolt11 invoice
+    [channels]
+    lncli bkpr-listbalances         # List of all current and historical account balances both on-chain and channel balances
+    lncli listpeerchannels          # Return a list of this node's channels
+    lncli listpeerchannels \$PEER_ID # Filter the list of this node's channels by a connected node's id
+    lncli close \$ID                 # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
+
+    [payments]
+    lncli pay <bolt11>              # Pay a bolt11 invoice
 
 ################################# Some maybe useful stuff todo ############################################
 list Nodes IDs with incomming channel and basic information regarding their channels. Amount and balances.
@@ -69,7 +69,7 @@ list Nodes IDs with incomming channel and basic information regarding their chan
 Goals:
     Generate invoice for a specific amount
     Generate bolt12 invoice for arbitrary amount that can be paid infinite times.
-	Send some money
+    Send some money
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
@@ -164,64 +164,64 @@ elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with 
     fi
 
 elif [[ $1 == "--channel_summary" ]]; then # Produce summary of all the channels
-	echo "Global Connections:"
-	if [[ -f "/var/log/lightningd/global_channels" ]]; then # Check if the file exists
-		# Loop through the file Peer ID by Peer ID
-		while IFS= read -r peer_id; do
-			echo "    $(lncli listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
-			echo "          Peer ID: $peer_id"
-			echo "          Color: $(lncli listnodes $peer_id | jq -r .nodes[0].color)"
+    echo "Global Connections:"
+    if [[ -f "/var/log/lightningd/global_channels" ]]; then # Check if the file exists
+        # Loop through the file Peer ID by Peer ID
+        while IFS= read -r peer_id; do
+            echo "    $($LNCLI listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
+            echo "          Peer ID: $peer_id"
+            echo "          Color: $($LNCLI listnodes $peer_id | jq -r .nodes[0].color)"
 
-			count=$(lncli listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
-			for (( i=0; i<count; i++ )); do # Loop through each channel
-				echo "          Short (Long) Channel ID: $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($(lncli listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
-				echo "              Connected:                $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
-				echo "              Local Funds (msats):      $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
-				echo "              Remote Funds (msats):     $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
-			done
-			echo ""
-		done < "/var/log/lightningd/global_channels"
-	fi
+            count=$($LNCLI listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
+            for (( i=0; i<count; i++ )); do # Loop through each channel
+                echo "          Short (Long) Channel ID: $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($($LNCLI listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
+                echo "              Connected:                $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
+                echo "              Local Funds (msats):      $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
+                echo "              Remote Funds (msats):     $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
+            done
+            echo ""
+        done < "/var/log/lightningd/global_channels"
+    fi
 
-	echo "Peer Connections (w/ Trusted Banks):"
-	if [[ -f "/var/log/lightningd/peer_channels" ]]; then # Check if the file exists
-		# Loop through the file Peer ID by Peer ID
-		while IFS= read -r peer_id; do
-			echo "    $(lncli listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
-			echo "          Peer ID: $peer_id"
-			echo "          Color: $(lncli listnodes $peer_id | jq -r .nodes[0].color)"
-			
-			count=$(lncli listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
-			for (( i=0; i<count; i++ )); do # Loop through each channel
-				echo "          Short (Long) Channel ID: $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($(lncli listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
-				echo "              Connected:                $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
-				echo "              Direction (0=Out; 1=In):  $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .direction)"
-				echo "              Local Funds (msats):      $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
-				echo "              Remote Funds (msats):     $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
-			done
-			echo ""
-		done < "/var/log/lightningd/peer_channels"
-	fi
+    echo "Peer Connections (w/ Trusted Banks):"
+    if [[ -f "/var/log/lightningd/peer_channels" ]]; then # Check if the file exists
+        # Loop through the file Peer ID by Peer ID
+        while IFS= read -r peer_id; do
+            echo "    $($LNCLI listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
+            echo "          Peer ID: $peer_id"
+            echo "          Color: $($LNCLI listnodes $peer_id | jq -r .nodes[0].color)"
 
-	echo "Private Connections:"
-	if [[ -f "/var/log/lightningd/private_channels" ]]; then # Check if the file exists
-		# Loop through the file Peer ID by Peer ID
-		while IFS= read -r peer_id;	do
-			peer_id=$(echo $peer_id | cut -d " " -f 1)
-			echo "    $(lncli listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
-			echo "          Peer ID: $peer_id"
-			echo "          Color: $(lncli listnodes $peer_id | jq -r .nodes[0].color)"
+            count=$($LNCLI listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
+            for (( i=0; i<count; i++ )); do # Loop through each channel
+                echo "          Short (Long) Channel ID: $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($($LNCLI listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
+                echo "              Connected:                $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
+                echo "              Direction (0=Out; 1=In):  $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .direction)"
+                echo "              Local Funds (msats):      $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
+                echo "              Remote Funds (msats):     $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
+            done
+            echo ""
+        done < "/var/log/lightningd/peer_channels"
+    fi
 
-			count=$(lncli listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
-			for (( i=0; i<count; i++ )); do # Loop through each channel
-				echo "          Short (Long) Channel ID: $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($(lncli listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
-				echo "              Connected:                $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
-				echo "              Local Funds (msats):      $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
-				echo "              Remote Funds (msats):     $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
-			done
-			echo ""
-		done < "/var/log/lightningd/private_channels"
-	fi
+    echo "Private Connections:"
+    if [[ -f "/var/log/lightningd/private_channels" ]]; then # Check if the file exists
+        # Loop through the file Peer ID by Peer ID
+        while IFS= read -r peer_id; do
+            peer_id=$(echo $peer_id | cut -d " " -f 1)
+            echo "    $($LNCLI listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
+            echo "          Peer ID: $peer_id"
+            echo "          Color: $($LNCLI listnodes $peer_id | jq -r .nodes[0].color)"
+
+            count=$($LNCLI listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
+            for (( i=0; i<count; i++ )); do # Loop through each channel
+                echo "          Short (Long) Channel ID: $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($($LNCLI listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
+                echo "              Connected:                $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
+                echo "              Local Funds (msats):      $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
+                echo "              Remote Funds (msats):     $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
+            done
+            echo ""
+        done < "/var/log/lightningd/private_channels"
+    fi
 
 elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
     PEER_SHORT_CHANNEL_ID=$2 # This parameter contains the "Short Channel ID", Channel ID, or Peer ID (all channels with this given peer).
@@ -237,5 +237,5 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 
 else
     $0 --help
-    echo "Script Version 0.2"
+    echo "Script Version 0.21"
 fi
