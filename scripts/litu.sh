@@ -27,23 +27,24 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       --help            Display this help message and exit
-      --install         Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
-      --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/litu.env
+      --install         Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/litu.env <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
-      --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): $PEER_ID  $AMOUNT
-      --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): $PEER_ID  $AMOUNT
-      --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT
-      --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
+      --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): \$PEER_ID  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
+      --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): \$PEER_ID  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
+      --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
+	  --channel_summary Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<<	Add filter option??? Probably<<<<
+      --update_fees     Change the channel % fee: [\$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]  \$FEE_RATE (e.g. 1000 = 0.1% fee)
 
 Files: 
-    The ID for "global" channels are stored in the file /var/log/lightningd/global_channels
-	The ID for "peer" channels are ID is stored in the file /var/log/lightningd/peer_channels
-	The ID for "private" channels are ID and IP is stored in the file /var/log/lightningd/private_channels
+    The IDs for "global" channels are stored in the file /var/log/lightningd/global_channels
+	The IDs for "peer" channels are stored in the file /var/log/lightningd/peer_channels
+	The IDs AND IPs for "private" channels are stored in the file /var/log/lightningd/private_channels
 
 Useful Commands:
     lncli getinfo                   # See the info' on this node
     lncli listnodes                 # Show all nodes (and info') on the lightning network
-    lncli listnodes $CONNECTION_ID  # Get info' on another node
+    lncli listnodes \$PEER_ID        # Get info' on another (non-private) node ????????????????????????????????????????????????????? how do we see the private node information?????? It's not exposed to the gossip channel.
     lncli listpeers                 # Show all nodes that share a connection with this node
 
     [on-chain wallet]
@@ -53,47 +54,22 @@ Useful Commands:
     lncli withdraw \$ADDRESS \$AMOUNT # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
                                     # The \$AMOUNT (msat, sats [default], btc, or "all") to be withdrawn from the internal on-chain wallet.
                                     # When using "all" for the \$AMOUNT, it will leave the at least min-emergency-msat as change if there are any open (or unsettled) channels.
+	[channels]
+	lncli bkpr-listbalances         # List of all current and historical account balances both on-chain and channel balances
+	lncli listpeerchannels			# Return a list of this node's channels
+	lncli listpeerchannels \$PEER_ID # Filter the list of this node's channels by a connected node's id
+	lncli close \$ID                 # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
+	
+	[payments]
+	lncli pay <bolt11>				# Pay a bolt11 invoice
 
 ################################# Some maybe useful stuff todo ############################################
-list peers (and information) without channels
-List ALL peers (and information) with channels (I'm still assuming they are always connected) [all all channel information]
-List Local (and information) peers [all all channel information]
-List Global (and information) peers [all all channel information]
-List Unsolicited (and information) peers [all all channel information]  (aka incomming connections)
+list Nodes IDs with incomming channel and basic information regarding their channels. Amount and balances.
 
-    lncli updatechanpolicy --base_fee_msat 100 --fee_rate 0.00001 --time_lock_delta 50 --min_htlc_msat 1000 --chan_point 17ec2d0ac18d953b1dfe2cafa116b0c118020cab4d80c4063fe98debda6df469:1
-
-    lncli openchannel --node_key 021c97a90a411ff2b10dc2a8e32de2f29d2fa49d41bfbb52bd416e460db0747d0d --connect 50.112.125.89:9735 --local_amt 210000000 --remote_max_value_in_flight_msat 105000000000 --max_local_csv 50
-
-    Each channel has its own fee policy. Those fee policies include: Base Fee + % Fee
-    min_htlc_msat
-
-    The waiting period can be defined individually for each channel at its creation using the --max_local_csv
-    --remote_csv_delay flags of lncli openchannel.
-    A large waiting period makes it safer to recover from a failure, but will also lock up funds for longer if a channel closes unilaterally.
-
-
-    How can I put a policy to protect myself?
-
-
-Initial Goals (Level 1):
-    No dual funded or splicing supported yet; Single wallet for balance both on-chain and lighting togethor
-    Policy and methods for lightning nodes to connect with this one.
-        Minimum Amount: 10,000 SATS (default)
-        Maximum Amount: No Maximum
-        They Pay the fee
-        Can I set the fee
-    Channel Observation and management (How to close and open)
-    Lightning Address server
-    Generate invoice for an arbitrary amount
-
+Goals:
     Generate invoice for a specific amount
     Generate bolt12 invoice for arbitrary amount that can be paid infinite times.
-
-
-
-
-
+	Send some money
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
@@ -140,7 +116,7 @@ elif [[ $1 == "--global_channel" ]]; then # Establish a "global" channel to impr
 
     # On success, add the PEER_ID to the global_channels file without duplicates
     if [[ $RESULT != *"code"* ]]; then # If no error "code" was thrown then assume success
-        if ! sudo grep -Fxq $PEER_ID /var/log/lightningd/global_channels; then
+        if ! sudo grep -Fxq $PEER_ID /var/log/lightningd/global_channels 2> /dev/null; then
             echo $PEER_ID | sudo -u lightning tee -a /var/log/lightningd/global_channels
         fi
     fi
@@ -161,7 +137,7 @@ elif [[ $1 == "--peer_channel" ]]; then # Establish a "peer" channel to a truste
 
     # On success, add the PEER_ID to the peer_channels file without duplicates
     if [[ $RESULT != *"code"* ]]; then # If no error "code" was thrown then assume success
-        if ! sudo grep -Fxq $PEER_ID /var/log/lightningd/peer_channels; then
+        if ! sudo grep -Fxq $PEER_ID /var/log/lightningd/peer_channels 2> /dev/null; then
             echo $PEER_ID | sudo -u lightning tee -a /var/log/lightningd/peer_channels
         fi
     fi
@@ -182,10 +158,70 @@ elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with 
 
     # On success, add the PEER_ID to the private_channels file without duplicates
     if [[ $RESULT != *"code"* ]]; then # If no error "code" was thrown then assume success
-        if ! sudo grep -Fxq "$PEER_ID $LOCAL_IP_ADDRESS" /var/log/lightningd/private_channels; then
+        if ! sudo grep -Fxq "$PEER_ID $LOCAL_IP_ADDRESS" /var/log/lightningd/private_channels 2> /dev/null; then
             echo "$PEER_ID $LOCAL_IP_ADDRESS" | sudo -u lightning tee -a /var/log/lightningd/private_channels
         fi
     fi
+
+elif [[ $1 == "--channel_summary" ]]; then # Produce summary of all the channels
+	echo "Global Connections:"
+	if [[ -f "/var/log/lightningd/global_channels" ]]; then # Check if the file exists
+		# Loop through the file Peer ID by Peer ID
+		while IFS= read -r peer_id; do
+			echo "    $(lncli listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
+			echo "          Peer ID: $peer_id"
+			echo "          Color: $(lncli listnodes $peer_id | jq -r .nodes[0].color)"
+
+			count=$(lncli listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
+			for (( i=0; i<count; i++ )); do # Loop through each channel
+				echo "          Short (Long) Channel ID: $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($(lncli listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
+				echo "              Connected:                $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
+				echo "              Local Funds (msats):      $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
+				echo "              Remote Funds (msats):     $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
+			done
+			echo ""
+		done < "/var/log/lightningd/global_channels"
+	fi
+
+	echo "Peer Connections (w/ Trusted Banks):"
+	if [[ -f "/var/log/lightningd/peer_channels" ]]; then # Check if the file exists
+		# Loop through the file Peer ID by Peer ID
+		while IFS= read -r peer_id; do
+			echo "    $(lncli listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
+			echo "          Peer ID: $peer_id"
+			echo "          Color: $(lncli listnodes $peer_id | jq -r .nodes[0].color)"
+			
+			count=$(lncli listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
+			for (( i=0; i<count; i++ )); do # Loop through each channel
+				echo "          Short (Long) Channel ID: $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($(lncli listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
+				echo "              Connected:                $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
+				echo "              Direction (0=Out; 1=In):  $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .direction)"
+				echo "              Local Funds (msats):      $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
+				echo "              Remote Funds (msats):     $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
+			done
+			echo ""
+		done < "/var/log/lightningd/peer_channels"
+	fi
+
+	echo "Private Connections:"
+	if [[ -f "/var/log/lightningd/private_channels" ]]; then # Check if the file exists
+		# Loop through the file Peer ID by Peer ID
+		while IFS= read -r peer_id;	do
+			peer_id=$(echo $peer_id | cut -d " " -f 1)
+			echo "    $(lncli listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
+			echo "          Peer ID: $peer_id"
+			echo "          Color: $(lncli listnodes $peer_id | jq -r .nodes[0].color)"
+
+			count=$(lncli listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
+			for (( i=0; i<count; i++ )); do # Loop through each channel
+				echo "          Short (Long) Channel ID: $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($(lncli listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
+				echo "              Connected:                $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
+				echo "              Local Funds (msats):      $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
+				echo "              Remote Funds (msats):     $(lncli listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
+			done
+			echo ""
+		done < "/var/log/lightningd/private_channels"
+	fi
 
 elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
     PEER_SHORT_CHANNEL_ID=$2 # This parameter contains the "Short Channel ID", Channel ID, or Peer ID (all channels with this given peer).
@@ -201,5 +237,5 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 
 else
     $0 --help
-    echo "Script Version 0.11"
+    echo "Script Version 0.2"
 fi
