@@ -8,6 +8,7 @@
 #    Remove the bitcoind install from this VM Instance (there may be a plugin for this)
 #        Note: The current Core Lightning software (2/18/25) requires a local bitcoind instance running for bitcoin-cli access
 #        (even though it's still connected to this bank's full bitcoin node). On future updates, it may no longer be necessary.
+#    Allow for reserve requirements (on this end) to be 0 for incomming connnections. Implement this on other lightning nodes as well. 
 
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
@@ -30,12 +31,14 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/litu.env
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
       --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): $PEER_ID  $AMOUNT
-                            Note: The ID is stored in the file /var/log/lightningd/global_channels
-      --local_channel   Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): $PEER_ID  $AMOUNT
-                            Note: The ID is stored in the file /var/log/lightningd/peer_channels
+      --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): $PEER_ID  $AMOUNT
       --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT
-                            Note: The ID and IP is stored in the file /var/log/lightningd/private_channels
       --update_fees     Change the channel % fee: [$SHORT_CHANNEL_ID | $CHANNEL_ID | $PEER_ID]  $FEE_RATE (e.g. 1000 = 0.1% fee)
+
+Files: 
+    The ID for "global" channels are stored in the file /var/log/lightningd/global_channels
+	The ID for "peer" channels are ID is stored in the file /var/log/lightningd/peer_channels
+	The ID for "private" channels are ID and IP is stored in the file /var/log/lightningd/private_channels
 
 Useful Commands:
     lncli getinfo                   # See the info' on this node
@@ -58,11 +61,9 @@ List Local (and information) peers [all all channel information]
 List Global (and information) peers [all all channel information]
 List Unsolicited (and information) peers [all all channel information]  (aka incomming connections)
 
-
     lncli updatechanpolicy --base_fee_msat 100 --fee_rate 0.00001 --time_lock_delta 50 --min_htlc_msat 1000 --chan_point 17ec2d0ac18d953b1dfe2cafa116b0c118020cab4d80c4063fe98debda6df469:1
 
     lncli openchannel --node_key 021c97a90a411ff2b10dc2a8e32de2f29d2fa49d41bfbb52bd416e460db0747d0d --connect 50.112.125.89:9735 --local_amt 210000000 --remote_max_value_in_flight_msat 105000000000 --max_local_csv 50
-
 
     Each channel has its own fee policy. Those fee policies include: Base Fee + % Fee
     min_htlc_msat
@@ -144,7 +145,7 @@ elif [[ $1 == "--global_channel" ]]; then # Establish a "global" channel to impr
         fi
     fi
 
-elif [[ $1 == "--local_channel" ]]; then # Establish a "peer" channel to a trusted local bank (w/ 0 reserves): $PEER_ID  $AMOUNT
+elif [[ $1 == "--peer_channel" ]]; then # Establish a "peer" channel to a trusted local bank (w/ 0 reserves): $PEER_ID  $AMOUNT
     PEER_ID=$2; AMOUNT=$3
 
     # Input checking
