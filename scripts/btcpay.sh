@@ -127,11 +127,12 @@ BTCPAY FIDO2 Reset for satoshi@\$YOUR_BANK_DOMAIN.com
 Create (5M SAT) Channel from the bank's primary lightning node
     lncli getinfo | jq -r .id                                                                   # Get BTCPAY's lightning Node ID (\$PEER_ID)
     ip address show | grep "inet " | tail -n 1 | xargs | cut -d " " -f 2 | cut -d "/" -f 1      # Get IP address (\$LOCAL_IP_ADDRESS)
-    litu --btcpay \$PEER_ID \$LOCAL_IP_ADDRESS 5000000                                          # Execute this command on the bank's primary lightning node to open channel
+    ##### Execute these commands on the bank's primary lightning node #####
+	litu --private_channel \$PEER_ID \$LOCAL_IP_ADDRESS 5000000 BTCPAY                            # Execute this command on the bank's primary lightning node to open channel
+    lncli setchannel \$PEER_ID 0 0                                                               # Execute this command on the bank's primary lightning node to reduce all fees to 0
 
 Upgrading Core Lightning:
-    Upgrading your Core Lightning node is the same as installing it. Download the latest binary in the same directory as
-    before. Example:
+    Upgrading your Core Lightning node is the same as installing it. Download the latest binary in the same directory as before. Example:
         sudo systemctl disable lightningd
         lncli stop
         LIGHTNING_CORE_SOURCE="https://github.com/ElementsProject/lightning/releases/download/v24.11/clightning-v24.11-Ubuntu-22.04-amd64.tar.xz"
