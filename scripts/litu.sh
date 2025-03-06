@@ -30,9 +30,9 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --install         Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
       --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/litu.env <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
-      --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): \$PEER_ID  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
-      --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): \$PEER_ID  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
-      --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
+      --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): \$PEER_ID  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000000_000)
+      --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): \$PEER_ID  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000_000)
+      --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000_000)
       --summary         Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<< Add filter option??? Probably<<<<
       --update_fees     Change the channel % fee: [\$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]  \$FEE_RATE (e.g. 1000 = 0.1% fee)
       --msats           Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: \$AMOUNT_MSATS
@@ -113,16 +113,16 @@ elif [[ $1 == "--ip_update" ]]; then # For nodes without a static IP (using dyna
     echo ""
 
 elif [[ $1 == "--global_channel" ]]; then # Establish a "global" channel to improve liquidity world-wide (0 reserve)
-    PEER_ID=$2; AMOUNT=$3
+    PEER_ID=$2; AMOUNT_SATS=$3
 
     # Input checking
-    if [[ -z $PEER_ID || -z $AMOUNT ]]; then
-        echo ""; echo "Error! Not all variables (PEER_ID & AMOUNT) have proper assignments"
+    if [[ -z $PEER_ID || -z $AMOUNT_SATS ]]; then
+        echo ""; echo "Error! Not all variables (PEER_ID & AMOUNT_SATS) have proper assignments"
         exit 1
     fi
 
     $LNCLI connect $PEER_ID; sleep 2
-    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0)
+    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT_SATS reserve=0)
 
     echo $RESULT
 
@@ -133,17 +133,17 @@ elif [[ $1 == "--global_channel" ]]; then # Establish a "global" channel to impr
         fi
     fi
 
-elif [[ $1 == "--peer_channel" ]]; then # Establish a "peer" channel to a trusted local bank (w/ 0 reserves): $PEER_ID  $AMOUNT
-    PEER_ID=$2; AMOUNT=$3
+elif [[ $1 == "--peer_channel" ]]; then # Establish a "peer" channel to a trusted local bank (w/ 0 reserves): $PEER_ID  $AMOUNT_SATS
+    PEER_ID=$2; AMOUNT_SATS=$3
 
     # Input checking
-    if [[ -z $PEER_ID || -z $AMOUNT ]]; then
-        echo ""; echo "Error! Not all variables (PEER_ID & AMOUNT) have proper assignments"
+    if [[ -z $PEER_ID || -z $AMOUNT_SATS ]]; then
+        echo ""; echo "Error! Not all variables (PEER_ID & AMOUNT_SATS) have proper assignments"
         exit 1
     fi
 
     $LNCLI connect $PEER_ID; sleep 2
-    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0)
+    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT_SATS reserve=0)
 
     echo $RESULT
 
@@ -154,17 +154,17 @@ elif [[ $1 == "--peer_channel" ]]; then # Establish a "peer" channel to a truste
         fi
     fi
 
-elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT
-    PEER_ID=$2; LOCAL_IP_ADDRESS=$3; AMOUNT=$4
+elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT_SATS
+    PEER_ID=$2; LOCAL_IP_ADDRESS=$3; AMOUNT_SATS=$4
 
     # Input checking
-    if [[ -z $PEER_ID || -z $LOCAL_IP_ADDRESS || -z $AMOUNT ]]; then
-        echo ""; echo "Error! Not all variables (PEER_ID, LOCAL_IP_ADDRESS, & AMOUNT) have proper assignments"
+    if [[ -z $PEER_ID || -z $LOCAL_IP_ADDRESS || -z $AMOUNT_SATS ]]; then
+        echo ""; echo "Error! Not all variables (PEER_ID, LOCAL_IP_ADDRESS, & AMOUNT_SATS) have proper assignments"
         exit 1
     fi
 
     $LNCLI connect $PEER_ID $LOCAL_IP_ADDRESS; sleep 2
-    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT reserve=0 announce=false)
+    RESULT=$($LNCLI fundchannel -k id=$PEER_ID amount=$AMOUNT_SATS reserve=0 announce=false)
 
     echo $RESULT
 
