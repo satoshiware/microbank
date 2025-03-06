@@ -33,8 +33,9 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): \$PEER_ID  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
       --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): \$PEER_ID  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
       --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT (Note: min-emergency-msat is set to 100000000)
-      --channel_summary Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<< Add filter option??? Probably<<<<
+      --summary         Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<< Add filter option??? Probably<<<<
       --update_fees     Change the channel % fee: [\$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]  \$FEE_RATE (e.g. 1000 = 0.1% fee)
+      --msats           Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: \$AMOUNT_MSATS
 
 Files:
     The IDs for "global" channels are stored in the file /var/log/lightningd/global_channels
@@ -62,6 +63,17 @@ Useful Commands:
 
     [payments]
     lncli pay <bolt11>              # Pay a bolt11 invoice
+
+    [invoices]
+    lncli invoice $AMOUNT_MSAT  $LABEL  $DESCRIPTION # The invoice RPC command creates the
+
+    lncli invoice 1000000 $(date +%s) "Testing"
+
+
+    lncli pay lnbc100n1pnu3u8xsp566guymjqlja26fu3ly45qm88qlazcanlv2l2udyg8ar2sthjlpuspp59p4m5s87upslxskh03uq3p08pg6fk6q9vlk06y39y6kfh30smuesdqv23jhxarfdensxqyjw5qcqpjrzjqfsy87natzv9khg5thj89m2vxvr0cnnjdu57z0ddhyvf6rrcgkfhh5accpaggxg3huqqqqqqqqqqqqqqyg9qxpqysgqed5um0gm3ex7uvmg9nzjnu0msgkt4wv8z20w2447wxkmff4juv3zh6ntud4vyxk2rxrwh92g6tfe7dmwjhcgvzv6ch46nm7famj0p4qp80ug0e
+
+                invoice amount_msat label description [expiry] [fallbacks] [preimage] [exposeprivatechannels] [cltv] [deschashonly]
+
 
 ################################# Some maybe useful stuff todo ############################################
 list Nodes IDs with incomming channel and basic information regarding their channels. Amount and balances.
@@ -163,7 +175,7 @@ elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with 
         fi
     fi
 
-elif [[ $1 == "--channel_summary" ]]; then # Produce summary of all the channels
+elif [[ $1 == "summary" ]]; then # Produce summary of all the channels
     echo "Global Connections:"
     if [[ -f "/var/log/lightningd/global_channels" ]]; then # Check if the file exists
         # Loop through the file Peer ID by Peer ID
@@ -228,14 +240,37 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
     FEE_RATE=$3 # Fee added proportionally (per-millionths) to any routed payment volume (e.g. 1000 = 0.1% fee).
 
     # Input checking
-    if [[ -z $PEER_CHANNEL_ID || $FEE_RATE ]]; then
+    if [[ -z $PEER_CHANNEL_ID || -z $FEE_RATE ]]; then
         echo ""; echo "Error! Insufficient parameters passed to this routine!"
         exit 1
     fi
 
     $LNCLI setchannel -k id=$PEER_SHORT_CHANNEL_ID feeppm=$FEE_RATE
 
+elif [[ $1 == "--msats" ]]; then # Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: $AMOUNT_MSATS
+    AMOUNT_MSATS=$2
+
+    # Input checking
+    if [[ -z $AMOUNT_MSATS ]]; then
+        echo ""; echo "Error! There needs to be a parameter passed to this routine!"
+        exit 1
+    fi
+
+    # Format result to have exactly 11 digits after the decimal
+    result=$(awk "BEGIN {print $AMOUNT_MSATS / 100000000000}")
+    formatted_result=$(printf "%.11f" $result)
+
+    # Split into integer and decimal parts
+    integer_part=$(echo $formatted_result | cut -d '.' -f 1)
+    decimal_part=$(echo $formatted_result | cut -d '.' -f 2)
+
+    # Group the decimal part with underscores
+    grouped_decimal=$(echo $decimal_part | sed 's/\([0-9]\{6\}\)\([0-9]\{3\}\)$/\1_\2/')
+
+    # Combine integer and formatted decimal parts
+    echo "$integer_part.$grouped_decimal"
+
 else
     $0 --help
-    echo "Script Version 0.21"
+    echo "Script Version 0.23"
 fi
