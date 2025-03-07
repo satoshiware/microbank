@@ -284,7 +284,7 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
     total_length=50
 
     # Calculate the percentage as input (between 0 and 100)
-    percent=$((LOCAL_BALANCE * 100 / (LOCAL_BALANCE + TOTAL_BALANCE)))
+    percent=$((LOCAL_BALANCE * 100 / (LOCAL_BALANCE + REMOTE_BALANCE)))
 
     # Validate that the percentage is between 0 and 100
     if (( percent < 0 || percent > 100 )); then
@@ -307,5 +307,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.31"
+    echo "Script Version 0.32"
 fi
