@@ -36,6 +36,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --summary         Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<< Add filter option??? Probably<<<<
       --update_fees     Change the channel % fee: [\$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]  \$FEE_RATE (e.g. 1000 = 0.1% fee)
       --msats           Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: \$AMOUNT_MSATS
+      --ratio           Create a visual representation of the local vs remote balance: \$LOCAL_BALANCE  \$TOTAL_BALANCE
 
 Files:
     The IDs for "global" channels are stored in the file /var/log/lightningd/global_channels
@@ -270,7 +271,41 @@ elif [[ $1 == "--msats" ]]; then # Convert a figure in mSATS and display it in t
     # Combine integer and formatted decimal parts
     echo "$integer_part.$grouped_decimal"
 
+elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local vs remote balance: $LOCAL_BALANCE  $TOTAL_BALANCE
+    LOCAL_BALANCE=$2; TOTAL_BALANCE=$3
+
+    # Input checking
+    if [[ -z $LOCAL_BALANCE || -z $TOTAL_BALANCE ]]; then
+        echo ""; echo "Error! Not all variables (LOCAL_BALANCE & TOTAL_BALANCE) have proper assignments"
+        exit 1
+    fi
+
+    # Total length of the progress bar
+    total_length=50
+
+    # Calculate the percentage as input (between 0 and 100)
+    percent=$((LOCAL_BALANCE * 100 / TOTAL_BALANCE))
+
+    # Validate that the percentage is between 0 and 100
+    if (( percent < 0 || percent > 100 )); then
+        echo "Invalid percentage. \$TOTAL_BALANCE must be greater than \$LOCAL_BALANCE and they both must be positive integers."
+        exit 1
+    fi
+
+    # Calculate the number of 'x' and '-' characters
+    filled_length=$(( percent * total_length / 100 ))
+    empty_length=$(( total_length - filled_length ))
+
+    # Build the progress bar
+    progress_bar="|"
+    progress_bar+=$(printf "%-${filled_length}s" "x" | tr ' ' 'x')  # Add 'x' characters
+    progress_bar+=$(printf "%-${empty_length}s" "-" | tr ' ' '-')  # Add '-' characters
+    progress_bar+="|"
+
+    # Print the progress bar
+    echo "$progress_bar"
+
 else
     $0 --help
-    echo "Script Version 0.23"
+    echo "Script Version 0.30"
 fi
