@@ -292,13 +292,13 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
         exit 1
     fi
 
-    # Calculate the number of 'x' and '-' characters
+    # Calculate the number of 'X' and '-' characters
     filled_length=$(( percent * total_length / 100 ))
     empty_length=$(( total_length - filled_length ))
 
     # Build the progress bar
     progress_bar="|"
-    progress_bar+=$(printf "%-${filled_length}s" "x" | tr ' ' 'x')  # Add 'x' characters
+    progress_bar+=$(printf "%-${filled_length}s" "X" | tr ' ' 'X')  # Add 'X' characters
     progress_bar+=$(printf "%-${empty_length}s" "-" | tr ' ' '-')  # Add '-' characters
     progress_bar+="|"
 
@@ -307,5 +307,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.32"
+    echo "Script Version 0.33"
 fi
