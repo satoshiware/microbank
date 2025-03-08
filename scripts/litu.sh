@@ -32,9 +32,9 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
       --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): \$PEER_ID  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000000_000)
       --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): \$PEER_ID  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000_000)
-      --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000_000)
-      --summary         Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<< Add filter option??? Probably<<<<
+      --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID \$LOCAL_IP_ADDRESS \$AMOUNT_SATS \$ALIAS \$COLOR (Note: min-emergency-msat is set to 0.00100000_000)
       --update_fees     Change the channel % fee: [\$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]  \$FEE_RATE (e.g. 1000 = 0.1% fee)
+      --summary         Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<< Add filter option??? Probably<<<<
       --msats           Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: \$AMOUNT_MSATS
       --ratio           Create a visual representation of the local vs remote balance: \$LOCAL_BALANCE  \$REMOTE_BALANCE
 
@@ -155,12 +155,12 @@ elif [[ $1 == "--peer_channel" ]]; then # Establish a "peer" channel to a truste
         fi
     fi
 
-elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with an internal Core Lightning node: \$PEER_ID  \$LOCAL_IP_ADDRESS  \$AMOUNT_SATS
-    PEER_ID=$2; LOCAL_IP_ADDRESS=$3; AMOUNT_SATS=$4
+elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with an internal Core Lightning node: \$PEER_ID \$LOCAL_IP_ADDRESS \$AMOUNT_SATS \$ALIAS \$COLOR (Note: min-emergency-msat is set to 0.00100000_000)
+    PEER_ID=$2; LOCAL_IP_ADDRESS=$3; AMOUNT_SATS=$4; ALIAS=$5; COLOR=$6
 
     # Input checking
-    if [[ -z $PEER_ID || -z $LOCAL_IP_ADDRESS || -z $AMOUNT_SATS ]]; then
-        echo ""; echo "Error! Not all variables (PEER_ID, LOCAL_IP_ADDRESS, & AMOUNT_SATS) have proper assignments"
+    if [[ -z $PEER_ID || -z $LOCAL_IP_ADDRESS || -z $AMOUNT_SATS || -z $ALIAS || -z $COLOR ]]; then
+        echo ""; echo "Error! Not all variables (PEER_ID, LOCAL_IP_ADDRESS, AMOUNT_SATS, ALIAS, & COLOR) have proper assignments"
         exit 1
     fi
 
@@ -172,7 +172,7 @@ elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with 
     # On success, add the PEER_ID to the private_channels file without duplicates
     if [[ $RESULT != *"code"* ]]; then # If no error "code" was thrown then assume success
         if ! sudo grep -Fxq "$PEER_ID $LOCAL_IP_ADDRESS" /var/log/lightningd/private_channels 2> /dev/null; then
-            echo "$PEER_ID $LOCAL_IP_ADDRESS" | sudo -u lightning tee -a /var/log/lightningd/private_channels
+            echo "$PEER_ID $LOCAL_IP_ADDRESS $(echo $ALIAS | tr ' ' '_') $COLOR" | sudo -u lightning tee -a /var/log/lightningd/private_channels
         fi
     fi
 
@@ -248,6 +248,147 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 
     $LNCLI setchannel -k id=$PEER_SHORT_CHANNEL_ID feeppm=$FEE_RATE
 
+
+
+
+
+
+
+elif [[ $1 == "--summary" ]]; then # ???????????????????????
+    total_channel_msat=0
+    $LNCLI listpeerchannels | jq -c '.channels[]' | while IFS= read -r channel; do
+        state=$(echo "$channel" | jq -r .state)
+        if [[ $state == "ONCHAIN" ]]; then continue; fi # If this channel is closed (ONCHAIN) then skip
+
+        peer_id=$(echo "$channel" | jq -r .peer_id)
+        if grep -q $peer_id "/var/log/lightningd/global_channels"; then peer_type="global"
+        elif grep -q $peer_id "/var/log/lightningd/peer_channels"; then peer_type="trusted-p2p"
+        elif grep -q $peer_id "/var/log/lightningd/private_channels"; then  peer_type="private"
+        else peer_type="anonymous"; fi
+
+        peer_connected=$(echo "$channel" | jq -r .peer_connected)
+        local_fee_base_msat=$(echo "$channel" | jq -r .updates.local.fee_base_msat)
+        local_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.local.fee_proportional_millionths)
+        remote_fee_base_msat=$(echo "$channel" | jq -r .updates.remote.fee_base_msat)
+        remote_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.remote.fee_proportional_millionths)
+        local_funds_msat=$(echo "$channel" | jq -r .funding.local_funds_msat)
+        remote_funds_msat=$(echo "$channel" | jq -r .funding.remote_funds_msat)
+        last_stable_connection=$(echo "$channel" | jq -r .last_stable_connection)
+        short_channel_id=$(echo "$channel" | jq -r .short_channel_id)
+        channel_id=$(echo "$channel" | jq -r .channel_id)
+        private=$(echo "$channel" | jq -r .private)
+        opener=$(echo "$channel" | jq -r .opener)
+        local_balance_msat=$(echo "$channel" | jq -r .to_us_msat)
+        remote_balance_msat=$((($local_funds_msat + $remote_funds_msat - $local_balance_msat))) # Calculated
+        their_reserve_msat=$(echo "$channel" | jq -r .their_reserve_msat)
+        our_reserve_msat=$(echo "$channel" | jq -r .our_reserve_msat)
+        spendable_msat=$(echo "$channel" | jq -r .spendable_msat)
+        receivable_msat=$(echo "$channel" | jq -r .receivable_msat)
+
+        peer_id_info=$($LNCLI listnodes $peer_id)
+        alias=$(echo $peer_id_info | jq -r .nodes[0].alias)
+        color=$(echo $peer_id_info | jq -r .nodes[0].color)
+        if [[ $peer_type == "private" ]]; then # The alias and color for private channels must be read from file
+            captured_line=$(grep -m 1 "$peer_id" "/var/log/lightningd/private_channels")
+            if [[ -n $captured_line ]]; then
+                alias=$(echo $captured_line | cut -d " " -f 3)
+                color=$(echo $captured_line | cut -d " " -f 4)
+            fi
+        fi
+        if [[ $alias == "null" ]]; then alias="hidden"; color="hidden"; fi # Output "hidden" instead of "null"
+
+        local_closing_fees_msat=$((($local_balance_msat - $our_reserve_msat - $spendable_msat)))
+        remote_closing_fees_msat=$((($remote_balance_msat - $their_reserve_msat - $receivable_msat)))
+        if [[ $local_closing_fees_msat -lt 0 ]]; then local_closing_fees_msat=0; fi
+        if [[ $remote_closing_fees_msat -lt 0 ]]; then remote_closing_fees_msat=0; fi
+
+        # Tally "Total Channel Amount" with local balances. Note: the remote balances are included as well for private channels
+        total_channel_msat=$(($total_channel_msat + $local_balance_msat))
+        if [[ $peer_type == "private" ]]; then total_channel_msat=$(($total_channel_msat + $remote_balance_msat)); fi
+
+        echo "Remote's Alias | Color | Type:    $alias | $color | $peer_type"
+        echo "Remote's ID:                      $peer_id"
+        echo "Channel (Short) ID:               $channel_id ($short_channel_id)"
+        echo "Funded (Local | Remote):          $($0 --msats $local_funds_msat) | $($0 --msats $remote_funds_msat)"
+        echo "Local Fees (Base | Percent):      $($0 --msats $local_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $local_fee_proportional_millionths / 10000}")) %"
+        echo "Remote Fees (Base | Percent):     $($0 --msats $remote_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $remote_fee_proportional_millionths / 10000}")) %"
+        echo "Req. Reserve (Local | Remote):    $($0 --msats $our_reserve_msat) | $($0 --msats $their_reserve_msat)"
+        echo "Balance (Local | Remote):         $($0 --msats $local_balance_msat) | $($0 --msats $remote_balance_msat)              $($0 --ratio $local_balance_msat $remote_balance_msat)"
+        echo "Spendable (Local | Remote):       $($0 --msats $spendable_msat) | $($0 --msats $receivable_msat) (Balance - \"Req. Reserve\" - \"Estimated On Chain Closing Fee [If We Opened The Channel]\")"
+        echo "Closing Fees (Local | Remote):    $($0 --msats $local_closing_fees_msat) | $($0 --msats $remote_closing_fees_msat)"
+        echo "Additional Information:           Connected | Who Opened | Private | Last Stable Connection | State"
+        echo -n "                                  "
+        printf "%-10s  " "$peer_connected"; printf "%-11s  " "$opener"; printf "%-8s  " "$private"; printf "%-23s  " "$last_stable_connection"; echo "$state"
+
+        echo ""
+    done
+
+    # Report (non-balance) information about this node
+    this_node_info=$(lncli getinfo)
+    this_id=$(echo $this_node_info | jq -r .id)
+    this_alias=$(echo $this_node_info | jq -r .alias)
+    this_color=$(echo $this_node_info | jq -r .color)
+    num_peers=$(echo $this_node_info | jq -r .num_peers)
+    num_pending_channels=$(echo $this_node_info | jq -r .num_pending_channels)
+    num_active_channels=$(echo $this_node_info | jq -r .num_active_channels)
+    num_inactive_channels=$(echo $this_node_info | jq -r .num_inactive_channels)
+    fees_collected_msat=$(echo $this_node_info | jq -r .fees_collected_msat)
+    our_features_node=$(echo $this_node_info | jq -r .our_features.node)
+
+    echo "################ This Node's Information ################"
+    echo "This Node's Alias (Color):        $this_alias ($this_color)"
+    echo "This Node's ID:                   $this_id"
+    echo "Peer Count:                       $num_peers"
+    echo "Fees collected:                   $($0 --msats $fees_collected_msat)"
+    echo "Channel Information:              $num_pending_channels | $num_active_channels | $num_inactive_channels (Pending | Active | Inactive)"
+    echo "Features:                         $our_features_node"
+    echo ""
+
+    # Report all the balances
+    echo "####################### Balances ########################"
+    echo "On-Chain Balance (Safty Reserve): $($0 --msats $(lncli bkpr-listbalances | jq .accounts[0].balances[0].balance_msat))    ($($0 --msats $(grep -m 1 "min-emergency-msat" "/etc/lightningd.conf" | cut -d "=" -f 2)))"
+    echo "Total Channel Amount: $total_channel_msat" ### <<<<<<<<<<<<<<<<<<<<<<<< It appears to be working, but what about closed channels?? and variable clears after the loop. # private channels are added completly -- Make note!!!)
+
+    # Global Total liquidity balance |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
+    # Unknown Total liquidity balance --- no graphic ----
+
+    # Balance for each peer |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
+    # Balance for each private channel  |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
+
+
+
+
+
+
+
+
+
+### There's got to be a quicker way to process jq queries....
+
+
+
+
+
+#### Work in filters <<<<<<<<<<<<< work in progress
+#         global         # Show OUTGOING global channels
+#         trusted-p2p    # Show trusted p2p OUTGOING & INCOMING channels
+#         private        # Show private OUTGOING channels
+#        anonymous      # Show anonymous INCOMING channels
+#         balance        # Show balance information
+#         info           # Show this node's information
+
+#        $NODE_ID       # Show the channels for a specific node
+#        closed         # Show the closed (ONCHAIN) channels
+
+
+
+
+
+
+
+
+
+
 elif [[ $1 == "--msats" ]]; then # Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: $AMOUNT_MSATS
     AMOUNT_MSATS=$2
 
@@ -307,5 +448,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.33"
+    echo "Script Version 0.40"
 fi
