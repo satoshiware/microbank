@@ -252,6 +252,11 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
     echo ""; echo "####################### Channels ########################"
     total_channel_msat=0
     closed_channels=0 # Running tally of all the closed channels so far
+    local_total_global_msat=0 # Running tally of all the balances on the local side for global connections
+    remote_total_global_msat=0 # Running tally of all the balances on the remote side for global connections
+    local_total_anonymous_msat=0 # Running tally of all the balances on the local side for anonymous connections
+    remote_total_anonymous_msat=0 # Running tally of all the balances on the remote side for anonymous connections
+    total_closing_fees_msat=0 # Running tally of all the local fees required to close all the channels (i.e. put them on-chain)
     channels=$($LNCLI listpeerchannels | jq -c '.channels[]')
     while IFS= read -r channel; do # Loop through the channels and process them
         state=$(echo "$channel" | jq -r .state)
@@ -303,6 +308,22 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
         total_channel_msat=$(($total_channel_msat + $local_balance_msat))
         if [[ $peer_type == "private" ]]; then total_channel_msat=$(($total_channel_msat + $remote_balance_msat)); fi
 
+        # Tally the balances for global connections
+        if [[ $peer_type == "global" ]]; then
+            local_total_global_msat=$(($local_total_global_msat + $local_balance_msat))
+            remote_total_global_msat=$(($remote_total_global_msat + $remote_balance_msat))
+        fi
+
+        # Tally the balances for anonymous connections
+        if [[ $peer_type == "anonymous" ]]; then
+            local_total_anonymous_msat=$(($local_total_anonymous_msat + $local_balance_msat))
+            remote_total_anonymous_msat=$(($remote_total_anonymous_msat + $remote_balance_msat))
+        fi
+
+        # Tally local fees required to close each channel (i.e. put them on-chain)
+        total_closing_fees_msat=$(($local_total_anonymous_msat + $local_fee_base_msat))
+
+        # Show channel report
         echo "Remote's Alias | Color | Type:    $alias | $color | $peer_type"
         echo "Remote's ID:                      $peer_id"
         echo "Channel (Short) ID:               $channel_id ($short_channel_id)"
@@ -344,14 +365,12 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
     # Report all the balances
     echo "####################### Balances ########################"
     echo "On-Chain Balance (Safty Reserve): $($0 --msats $($LNCLI bkpr-listbalances | jq .accounts[0].balances[0].balance_msat))    ($($0 --msats $(grep -m 1 "min-emergency-msat" "/etc/lightningd.conf" | cut -d "=" -f 2)))"
-    echo "Total Channel Amount:             $($0 --msats $total_channel_msat) (Includes the private remote balances)"
-    echo ""
-    # Global Total liquidity balance |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
-    # Unknown Total liquidity balance --- no graphic ----
+    echo "Total Amount in Channels:         $($0 --msats $total_channel_msat) (Includes the private remote balances)"
+    echo "Global Liquidity (Local|Remote):  $($0 --msats $local_total_global_msat) | $($0 --msats $remote_total_global_msat)              $($0 --ratio $local_total_global_msat $remote_total_global_msat)"
+    echo "Anonymous Liquidity (Locl|Remte): $($0 --msats $local_total_anonymous_msat) | $($0 --msats $remote_total_anonymous_msat)              $($0 --ratio $local_total_anonymous_msat $remote_total_anonymous_msat)"
+    echo "Our Total Closing Fees:           $($0 --msats $total_closing_fees_msat)"
 
-    # Balance for each peer |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
-    # Balance for each private channel  |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
-
+#### What are some analytics of interest here?????????????? Do we create it's own???? Do we create one that shows various transactions????  I think we do.
 
 ### There's got to be a quicker way to process jq queries....
 
@@ -425,5 +444,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.43"
+    echo "Script Version 0.44"
 fi
