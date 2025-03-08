@@ -321,7 +321,7 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
         fi
 
         # Tally local fees required to close each channel (i.e. put them on-chain)
-        total_closing_fees_msat=$(($local_total_anonymous_msat + $local_fee_base_msat))
+        total_closing_fees_msat=$(($total_closing_fees_msat + $local_fee_base_msat))
 
         # Show channel report
         echo "Remote's Alias | Color | Type:    $alias | $color | $peer_type"
@@ -369,9 +369,6 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
     echo "Global Liquidity (Local|Remote):  $($0 --msats $local_total_global_msat) | $($0 --msats $remote_total_global_msat)              $($0 --ratio $local_total_global_msat $remote_total_global_msat)"
     echo "Anonymous Liquidity (Locl|Remte): $($0 --msats $local_total_anonymous_msat) | $($0 --msats $remote_total_anonymous_msat)              $($0 --ratio $local_total_anonymous_msat $remote_total_anonymous_msat)"
     echo "Our Total Closing Fees:           $($0 --msats $total_closing_fees_msat)"
-
-
-avoid divide by zero....
 
 #### What are some analytics of interest here?????????????? Do we create it's own???? Do we create one that shows various transactions????  I think we do.
 
@@ -453,5 +450,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.45"
+    echo "Script Version 0.46"
 fi
