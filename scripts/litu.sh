@@ -370,6 +370,9 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
     echo "Anonymous Liquidity (Locl|Remte): $($0 --msats $local_total_anonymous_msat) | $($0 --msats $remote_total_anonymous_msat)              $($0 --ratio $local_total_anonymous_msat $remote_total_anonymous_msat)"
     echo "Our Total Closing Fees:           $($0 --msats $total_closing_fees_msat)"
 
+
+avoid divide by zero....
+
 #### What are some analytics of interest here?????????????? Do we create it's own???? Do we create one that shows various transactions????  I think we do.
 
 ### There's got to be a quicker way to process jq queries....
@@ -420,6 +423,12 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
     # Total length of the progress bar
     total_length=50
 
+    # Exit to avoid dividing by 0
+    if (( LOCAL_BALANCE + REMOTE_BALANCE == 0 )); then
+        echo "| CAN'T DIVIDE BY ZERO |"
+    #   exit 0
+    fi
+
     # Calculate the percentage as input (between 0 and 100)
     percent=$((LOCAL_BALANCE * 100 / (LOCAL_BALANCE + REMOTE_BALANCE)))
 
@@ -444,5 +453,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.44"
+    echo "Script Version 0.45"
 fi
