@@ -321,7 +321,7 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
         fi
 
         # Tally local fees required to close each channel (i.e. put them on-chain)
-        total_closing_fees_msat=$(($total_closing_fees_msat + $local_fee_base_msat))
+        total_closing_fees_msat=$(($total_closing_fees_msat + $local_closing_fees_msat))
 
         # Show channel report
         echo "Remote's Alias | Color | Type:    $alias | $color | $peer_type"
@@ -423,7 +423,7 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
     # Exit to avoid dividing by 0
     if (( LOCAL_BALANCE + REMOTE_BALANCE == 0 )); then
         echo "| CAN'T DIVIDE BY ZERO |"
-    #   exit 0
+        exit 0
     fi
 
     # Calculate the percentage as input (between 0 and 100)
@@ -450,5 +450,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.46"
+    echo "Script Version 0.47"
 fi
