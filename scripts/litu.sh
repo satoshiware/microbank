@@ -248,15 +248,11 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 
     $LNCLI setchannel -k id=$PEER_SHORT_CHANNEL_ID feeppm=$FEE_RATE
 
-
-
-
-
-
-
-elif [[ $1 == "--summary" ]]; then # ???????????????????????
+elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+    echo ""; echo "####################### Channels ########################"
     total_channel_msat=0
-    $LNCLI listpeerchannels | jq -c '.channels[]' | while IFS= read -r channel; do
+    channels=$($LNCLIlistpeerchannels | jq -c '.channels[]')
+    while IFS= read -r channel; do # Loop through the channels and process them
         state=$(echo "$channel" | jq -r .state)
         if [[ $state == "ONCHAIN" ]]; then continue; fi # If this channel is closed (ONCHAIN) then skip
 
@@ -321,10 +317,10 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????
         printf "%-10s  " "$peer_connected"; printf "%-11s  " "$opener"; printf "%-8s  " "$private"; printf "%-23s  " "$last_stable_connection"; echo "$state"
 
         echo ""
-    done
+    done <<< "$channels"
 
     # Report (non-balance) information about this node
-    this_node_info=$(lncli getinfo)
+    this_node_info=$($LNCLI getinfo)
     this_id=$(echo $this_node_info | jq -r .id)
     this_alias=$(echo $this_node_info | jq -r .alias)
     this_color=$(echo $this_node_info | jq -r .color)
@@ -340,15 +336,15 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????
     echo "This Node's ID:                   $this_id"
     echo "Peer Count:                       $num_peers"
     echo "Fees collected:                   $($0 --msats $fees_collected_msat)"
-    echo "Channel Information:              $num_pending_channels | $num_active_channels | $num_inactive_channels (Pending | Active | Inactive)"
+    echo "Channel Information:              $num_pending_channels | $num_active_channels | $num_inactive_channels (Pending | Active | Inactive)" ####<<<<<<<<<<<<< Inactive
     echo "Features:                         $our_features_node"
     echo ""
 
     # Report all the balances
     echo "####################### Balances ########################"
-    echo "On-Chain Balance (Safty Reserve): $($0 --msats $(lncli bkpr-listbalances | jq .accounts[0].balances[0].balance_msat))    ($($0 --msats $(grep -m 1 "min-emergency-msat" "/etc/lightningd.conf" | cut -d "=" -f 2)))"
+    echo "On-Chain Balance (Safty Reserve): $($0 --msats $($LNCLI bkpr-listbalances | jq .accounts[0].balances[0].balance_msat))    ($($0 --msats $(grep -m 1 "min-emergency-msat" "/etc/lightningd.conf" | cut -d "=" -f 2)))"
     echo "Total Channel Amount: $total_channel_msat" ### <<<<<<<<<<<<<<<<<<<<<<<< It appears to be working, but what about closed channels?? and variable clears after the loop. # private channels are added completly -- Make note!!!)
-
+    echo ""
     # Global Total liquidity balance |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
     # Unknown Total liquidity balance --- no graphic ----
 
@@ -356,7 +352,7 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????
     # Balance for each private channel  |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
 
 
-
+#### Inactive includes on-chain channels!!!! we need to show the true inactive amount.
 
 
 
@@ -365,26 +361,13 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????
 
 ### There's got to be a quicker way to process jq queries....
 
-
-
-
-
 #### Work in filters <<<<<<<<<<<<< work in progress
 #         global         # Show OUTGOING global channels
 #         trusted-p2p    # Show trusted p2p OUTGOING & INCOMING channels
 #         private        # Show private OUTGOING channels
 #        anonymous      # Show anonymous INCOMING channels
-#         balance        # Show balance information
-#         info           # Show this node's information
-
 #        $NODE_ID       # Show the channels for a specific node
 #        closed         # Show the closed (ONCHAIN) channels
-
-
-
-
-
-
 
 
 
@@ -448,5 +431,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.40"
+    echo "Script Version 0.42"
 fi
