@@ -251,10 +251,11 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????
     echo ""; echo "####################### Channels ########################"
     total_channel_msat=0
+    closed_channels=0 # Running tally of all the closed channels so far
     channels=$($LNCLI listpeerchannels | jq -c '.channels[]')
     while IFS= read -r channel; do # Loop through the channels and process them
         state=$(echo "$channel" | jq -r .state)
-        if [[ $state == "ONCHAIN" ]]; then continue; fi # If this channel is closed (ONCHAIN) then skip
+        if [[ $state == "ONCHAIN" ]]; then ((closed_channels++)); continue; fi # If this channel is closed (ONCHAIN) then skip
 
         peer_id=$(echo "$channel" | jq -r .peer_id)
         if grep -q $peer_id "/var/log/lightningd/global_channels"; then peer_type="global"
@@ -336,27 +337,20 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
     echo "This Node's ID:                   $this_id"
     echo "Peer Count:                       $num_peers"
     echo "Fees collected:                   $($0 --msats $fees_collected_msat)"
-    echo "Channel Information:              $num_pending_channels | $num_active_channels | $num_inactive_channels (Pending | Active | Inactive)" ####<<<<<<<<<<<<< Inactive
+    echo "Channel Information:              $num_pending_channels | $num_active_channels | $((num_inactive_channels - closed_channels)) | $closed_channels    (Pending | Active | Inactive | Closed)"
     echo "Features:                         $our_features_node"
     echo ""
 
     # Report all the balances
     echo "####################### Balances ########################"
     echo "On-Chain Balance (Safty Reserve): $($0 --msats $($LNCLI bkpr-listbalances | jq .accounts[0].balances[0].balance_msat))    ($($0 --msats $(grep -m 1 "min-emergency-msat" "/etc/lightningd.conf" | cut -d "=" -f 2)))"
-    echo "Total Channel Amount: $total_channel_msat" ### <<<<<<<<<<<<<<<<<<<<<<<< It appears to be working, but what about closed channels?? and variable clears after the loop. # private channels are added completly -- Make note!!!)
+    echo "Total Channel Amount:             $($0 --msats $total_channel_msat) (Includes the private remote balances)"
     echo ""
     # Global Total liquidity balance |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
     # Unknown Total liquidity balance --- no graphic ----
 
     # Balance for each peer |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
     # Balance for each private channel  |xxxxxxxxxxxxxxxxxxxxxxx---------------------------|
-
-
-#### Inactive includes on-chain channels!!!! we need to show the true inactive amount.
-
-
-
-
 
 
 ### There's got to be a quicker way to process jq queries....
