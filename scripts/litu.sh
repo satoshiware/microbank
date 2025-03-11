@@ -343,37 +343,44 @@ elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, 
 
 elif [[ $1 == "--commands" ]]; then # List of some of Core Lightning CMDs that may be of interest
     cat << EOF
-    lncli getinfo                   # See the info' on this node
-    lncli listnodes                 # Show all nodes (and info') on the lightning network
-    lncli listnodes <PEER_ID>       # Get info' on another (non-private) node
-    lncli listpeers                 # Show all nodes that share a connection with this node
+    REMEMBER: Type "lncli" before each of these commands
+
+    getinfo                         # See the info' on this node
+    listnodes                       # Show all nodes (and info') on the lightning network
+    listnodes <PEER_ID>             # Get info' on another (non-private) node
+    listpeers                       # Show all nodes that share a connection with this node
     listforwards (settled|offered)  # Displays all forwarded htlcs that have been settled or are currently offered
 
     [on-chain wallet]
-    lncli newaddr                   # Generates a new address which can subsequently be used to fund channels managed by the Core Lightning node
-    lncli listaddresses             # List of all Bitcoin addresses that have been generated and issued by the Core Lightning node up to the current date
-    lncli withdraw <ADDRESS AMOUNT> # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
+    newaddr                         # Generates a new address which can subsequently be used to fund channels managed by the Core Lightning node
+    listaddresses                   # List of all Bitcoin addresses that have been generated and issued by the Core Lightning node up to the current date
+    withdraw <ADDRESS AMOUNT>       # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
                                     # The \$AMOUNT (msat, sats [default], btc, or "all") to be withdrawn from the internal on-chain wallet.
                                     # When using "all" for the \$AMOUNT, it will leave the at least min-emergency-msat as change if there are any open (or unsettled) channels.
     [channels]
-    lncli listpeerchannels          # Return a list of this node's channels
-    lncli listpeerchannels <PEERID> # Filter the list of this node's channels by a connected node's id
-    lncli close <ID>                # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
+    listpeerchannels                # Return a list of this node's channels
+    listpeerchannels <PEERID>       # Filter the list of this node's channels by a connected node's id
+    close <ID>                      # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
     listhtlcs <CHANNEL_ID>          # List all HTLCs that have ever appeared on a given channel
 
     [balances]
-    lncli bkpr-listbalances         # List of all current and historical account balances both on-chain and channel balances
+    bkpr-listbalances               # List of all current and historical account balances both on-chain and channel balances
     listfunds                       # Displays all funds available, either in unspent outputs (UTXOs) or funds locked in currently open channels
 
     [payments]
-    lncli pay <BOLT_INVOICE>        # Pay a bolt invoice where the amount is embedded inside the invoice
-    lncli pay <BOLT_INVOICE AMOUNT> # Pay a bolt (12) invoice with an arbitrary amount
+    pay <BOLT_INVOICE>              # Pay a bolt invoice where the amount is embedded inside the invoice
+    pay <BOLT_INVOICE AMOUNT>       # Pay a bolt invoice with an arbitrary amount
     listpays null null complete     # Shows the status of all pay commands completed successfully from this node
 
     [invoices]
-    lncli listinvoices              # List all invoices ever created on this node
-    lncli invoice <AMOUNT LABEL DESCRIPTION>
-                                    # Creates an invoice that will be paid to this node. The Amount can be any value (msats) or the keyword or "any"
+    listinvoices                    # List all invoices ever created on this node
+    invoice <AMOUNT LABEL DESCRIPTION>
+                                    # Creates an invoice that will be paid to this node. The Amount can be any value (msats) or the keyword "any"
+	[offers]
+	offer <AMOUNT DESCRIPTION>		# Create an offer. The Amount can be any value (msats) or the keyword "any" 
+	listoffers null active			# List all active offers, or replace "null" with <OFFER_ID>, only the offer with that OFFER_ID (if it exists)
+	enableoffer <OFFER_ID>			# Enables an offer, after it has been disabled
+	disableoffer <OFFER_ID>			# Disables an offer, so that no further invoices will be given out.
 EOF
 
 elif [[ $1 == "--msats" ]]; then # Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: $AMOUNT_MSATS
