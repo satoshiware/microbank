@@ -34,55 +34,10 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): \$PEER_ID  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000_000)
       --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID \$LOCAL_IP_ADDRESS \$AMOUNT_SATS \$ALIAS \$COLOR (Note: min-emergency-msat is set to 0.00100000_000)
       --update_fees     Change the channel % fee: [\$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]  \$FEE_RATE (e.g. 1000 = 0.1% fee)
-      --summary         Produce summary of all the channels <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  Add extra infor to the local file <<<<<<<<<<<<<<<<<<<< What about unsolicited incomming channels??? <<<<<<<<<<<<<<<<<<<<<<< Add filter option??? Probably<<<<
+      --summary         Produce summaries of peer nodes, channels, this node, and balances
+      --commands        List of some of Core Lightning CMDs that may be of interest
       --msats           Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: \$AMOUNT_MSATS
       --ratio           Create a visual representation of the local vs remote balance: \$LOCAL_BALANCE  \$REMOTE_BALANCE
-
-Files:
-    The IDs for "global" channels are stored in the file /var/log/lightningd/global_channels
-    The IDs for "peer" channels are stored in the file /var/log/lightningd/peer_channels
-    The IDs AND IPs for "private" channels are stored in the file /var/log/lightningd/private_channels
-
-Useful Commands:
-    lncli getinfo                   # See the info' on this node
-    lncli listnodes                 # Show all nodes (and info') on the lightning network
-    lncli listnodes \$PEER_ID        # Get info' on another (non-private) node ????????????????????????????????????????????????????? how do we see the private node information?????? It's not exposed to the gossip channel.
-    lncli listpeers                 # Show all nodes that share a connection with this node
-
-    [on-chain wallet]
-    lncli newaddr                   # Generates a new address which can subsequently be used to fund channels managed by the Core Lightning node
-    lncli listaddresses             # List of all Bitcoin addresses that have been generated and issued by the Core Lightning node up to the current date
-    lncli bkpr-listbalances         # List of all current and historical account balances both on-chain and channel balances
-    lncli withdraw \$ADDRESS \$AMOUNT # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
-                                    # The \$AMOUNT (msat, sats [default], btc, or "all") to be withdrawn from the internal on-chain wallet.
-                                    # When using "all" for the \$AMOUNT, it will leave the at least min-emergency-msat as change if there are any open (or unsettled) channels.
-    [channels]
-    lncli bkpr-listbalances         # List of all current and historical account balances both on-chain and channel balances
-    lncli listpeerchannels          # Return a list of this node's channels
-    lncli listpeerchannels \$PEER_ID # Filter the list of this node's channels by a connected node's id
-    lncli close \$ID                 # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
-
-    [payments]
-    lncli pay <bolt11>              # Pay a bolt11 invoice
-
-    [invoices]
-    lncli invoice $AMOUNT_MSAT  $LABEL  $DESCRIPTION # The invoice RPC command creates the
-
-    lncli invoice 1000000 $(date +%s) "Testing"
-
-
-    lncli pay lnbc100n1pnu3u8xsp566guymjqlja26fu3ly45qm88qlazcanlv2l2udyg8ar2sthjlpuspp59p4m5s87upslxskh03uq3p08pg6fk6q9vlk06y39y6kfh30smuesdqv23jhxarfdensxqyjw5qcqpjrzjqfsy87natzv9khg5thj89m2vxvr0cnnjdu57z0ddhyvf6rrcgkfhh5accpaggxg3huqqqqqqqqqqqqqqyg9qxpqysgqed5um0gm3ex7uvmg9nzjnu0msgkt4wv8z20w2447wxkmff4juv3zh6ntud4vyxk2rxrwh92g6tfe7dmwjhcgvzv6ch46nm7famj0p4qp80ug0e
-
-                invoice amount_msat label description [expiry] [fallbacks] [preimage] [exposeprivatechannels] [cltv] [deschashonly]
-
-
-################################# Some maybe useful stuff todo ############################################
-list Nodes IDs with incomming channel and basic information regarding their channels. Amount and balances.
-
-Goals:
-    Generate invoice for a specific amount
-    Generate bolt12 invoice for arbitrary amount that can be paid infinite times.
-    Send some money
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
@@ -248,7 +203,7 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 
     $LNCLI setchannel -k id=$PEER_SHORT_CHANNEL_ID feeppm=$FEE_RATE
 
-elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, this node, and balances
     echo ""; echo "####################### Channels ########################"
     total_channel_msat=0
     closed_channels=0 # Running tally of all the closed channels so far
@@ -369,12 +324,16 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
     echo "Global Liquidity (Local|Remote):  $($0 --msats $local_total_global_msat) | $($0 --msats $remote_total_global_msat)              $($0 --ratio $local_total_global_msat $remote_total_global_msat)"
     echo "Anonymous Liquidity (Locl|Remte): $($0 --msats $local_total_anonymous_msat) | $($0 --msats $remote_total_anonymous_msat)              $($0 --ratio $local_total_anonymous_msat $remote_total_anonymous_msat)"
     echo "Our Total Closing Fees:           $($0 --msats $total_closing_fees_msat)"
+    echo ""
 
-#### What are some analytics of interest here?????????????? Do we create it's own???? Do we create one that shows various transactions????  I think we do.
 
-### There's got to be a quicker way to process jq queries....
 
-#### Work in filters <<<<<<<<<<<<< work in progress
+#Files: why not list this informaiton????
+#    The IDs for "global" channels are stored in the file /var/log/lightningd/global_channels
+#    The IDs for "peer" channels are stored in the file /var/log/lightningd/peer_channels
+#    The IDs AND IPs for "private" channels are stored in the file /var/log/lightningd/private_channels
+
+#### Work in filters <<<<<<<<<<<<< work in progress   ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 #         global         # Show OUTGOING global channels
 #         trusted-p2p    # Show trusted p2p OUTGOING & INCOMING channels
 #         private        # Show private OUTGOING channels
@@ -382,8 +341,40 @@ elif [[ $1 == "--summary" ]]; then # ???????????????????????????????????????????
 #        $NODE_ID       # Show the channels for a specific node
 #        closed         # Show the closed (ONCHAIN) channels
 
+elif [[ $1 == "--commands" ]]; then # List of some of Core Lightning CMDs that may be of interest
+    cat << EOF
+    lncli getinfo                   # See the info' on this node
+    lncli listnodes                 # Show all nodes (and info') on the lightning network
+    lncli listnodes <PEER_ID>       # Get info' on another (non-private) node
+    lncli listpeers                 # Show all nodes that share a connection with this node
+    listforwards (settled|offered)  # Displays all forwarded htlcs that have been settled or are currently offered
 
+    [on-chain wallet]
+    lncli newaddr                   # Generates a new address which can subsequently be used to fund channels managed by the Core Lightning node
+    lncli listaddresses             # List of all Bitcoin addresses that have been generated and issued by the Core Lightning node up to the current date
+    lncli withdraw <ADDRESS AMOUNT> # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
+                                    # The \$AMOUNT (msat, sats [default], btc, or "all") to be withdrawn from the internal on-chain wallet.
+                                    # When using "all" for the \$AMOUNT, it will leave the at least min-emergency-msat as change if there are any open (or unsettled) channels.
+    [channels]
+    lncli listpeerchannels          # Return a list of this node's channels
+    lncli listpeerchannels <PEERID> # Filter the list of this node's channels by a connected node's id
+    lncli close <ID>                # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
+    listhtlcs <CHANNEL_ID>          # List all HTLCs that have ever appeared on a given channel
 
+    [balances]
+    lncli bkpr-listbalances         # List of all current and historical account balances both on-chain and channel balances
+    listfunds                       # Displays all funds available, either in unspent outputs (UTXOs) or funds locked in currently open channels
+
+    [payments]
+    lncli pay <BOLT_INVOICE>        # Pay a bolt invoice where the amount is embedded inside the invoice
+    lncli pay <BOLT_INVOICE AMOUNT> # Pay a bolt (12) invoice with an arbitrary amount
+    listpays null null complete     # Shows the status of all pay commands completed successfully from this node
+
+    [invoices]
+    lncli listinvoices              # List all invoices ever created on this node
+    lncli invoice <AMOUNT LABEL DESCRIPTION>
+                                    # Creates an invoice that will be paid to this node. The Amount can be any value (msats) or the keyword or "any"
+EOF
 
 elif [[ $1 == "--msats" ]]; then # Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: $AMOUNT_MSATS
     AMOUNT_MSATS=$2
@@ -450,5 +441,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.47"
+    echo "Script Version 0.5"
 fi
