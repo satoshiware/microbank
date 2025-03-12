@@ -146,123 +146,123 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, this node, and balances: \$FILTER (optional)
     FILTER=$2
 
-    if [[ ! $FILTER == "other" ]];
-        echo ""; echo "####################### Channels ########################"
-        total_channel_msat=0
-        closed_channels=0 # Running tally of all the closed channels so far
-        local_total_global_msat=0 # Running tally of all the balances on the local side for global connections
-        remote_total_global_msat=0 # Running tally of all the balances on the remote side for global connections
-        local_total_anonymous_msat=0 # Running tally of all the balances on the local side for anonymous connections
-        remote_total_anonymous_msat=0 # Running tally of all the balances on the remote side for anonymous connections
-        total_closing_fees_msat=0 # Running tally of all the local fees required to close all the channels (i.e. put them on-chain)
-        NODE_ID=""; if [[ $FILTER =~ ^[a-f0-9]{66}$ ]]; then NODE_ID=$FILTER; fi # Check to see if the filter contains a 66 digit (lower case) node id number
-        channels=$($LNCLI listpeerchannels $NODE_ID | jq -c '.channels[]')
-        while IFS= read -r channel; do # Loop through the channels and process them
-            state=$(echo "$channel" | jq -r .state)
+    echo ""; echo "####################### Channels ########################"
+    total_channel_msat=0
+    closed_channels=0 # Running tally of all the closed channels so far
+    local_total_global_msat=0 # Running tally of all the balances on the local side for global connections
+    remote_total_global_msat=0 # Running tally of all the balances on the remote side for global connections
+    local_total_anonymous_msat=0 # Running tally of all the balances on the local side for anonymous connections
+    remote_total_anonymous_msat=0 # Running tally of all the balances on the remote side for anonymous connections
+    total_closing_fees_msat=0 # Running tally of all the local fees required to close all the channels (i.e. put them on-chain)
+    NODE_ID=""; if [[ $FILTER =~ ^[a-f0-9]{66}$ ]]; then NODE_ID=$FILTER; fi # Check to see if the filter contains a 66 digit (lower case) node id number
+    channels=$($LNCLI listpeerchannels $NODE_ID | jq -c '.channels[]')
+    while IFS= read -r channel; do # Loop through the channels and process them
+        state=$(echo "$channel" | jq -r .state)
 
-            if [[ $state == "ONCHAIN" ]]; then
-                ((closed_channels++))
-                if [[ ! $FILTER == "closed" ]]; then # If this channel is closed (ONCHAIN) without the "closed" filter then skip
-                    continue
-                fi
-            else
-                if [[ $FILTER == "closed" ]]; then # If this channel is NOT closed (ONCHAIN), but has the "closed" filter turned on then skip
-                    continue
-                fi
+        if [[ $state == "ONCHAIN" ]]; then
+            ((closed_channels++))
+            if [[ ! $FILTER == "closed" ]]; then # If this channel is closed (ONCHAIN) without the "closed" filter then skip
+                continue
             fi
-
-            peer_id=$(echo "$channel" | jq -r .peer_id)
-            if grep -q $peer_id "/var/log/lightningd/global_channels"; then peer_type="global"
-            elif grep -q $peer_id "/var/log/lightningd/peer_channels"; then peer_type="trusted-p2p"
-            elif grep -q $peer_id "/var/log/lightningd/private_channels"; then  peer_type="private"
-            else peer_type="anonymous"; fi
-
-            # Execute private, global, trusted-p2p, and anonymous filters
-            if ! [[ $peer_type == "private" && $FILTER == "private" ]]; then continue; fi # Filter for private
-            if ! [[ $peer_type == "global" && $FILTER == "global" ]]; then continue; fi # Filter for global
-            if ! [[ $peer_type == "trusted-p2p" && $FILTER == "trusted-p2p" ]]; then continue; fi # Filter for trusted-p2p
-            if ! [[ $peer_type == "anonymous" && $FILTER == "anonymous" ]]; then continue; fi # Filter for anonymous
-
-            # Collect data for this channel
-            peer_connected=$(echo "$channel" | jq -r .peer_connected)
-            local_fee_base_msat=$(echo "$channel" | jq -r .updates.local.fee_base_msat)
-            local_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.local.fee_proportional_millionths)
-            remote_fee_base_msat=$(echo "$channel" | jq -r .updates.remote.fee_base_msat)
-            remote_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.remote.fee_proportional_millionths)
-            local_funds_msat=$(echo "$channel" | jq -r .funding.local_funds_msat)
-            remote_funds_msat=$(echo "$channel" | jq -r .funding.remote_funds_msat)
-            last_stable_connection=$(echo "$channel" | jq -r .last_stable_connection)
-            short_channel_id=$(echo "$channel" | jq -r .short_channel_id)
-            channel_id=$(echo "$channel" | jq -r .channel_id)
-            private=$(echo "$channel" | jq -r .private)
-            opener=$(echo "$channel" | jq -r .opener)
-            local_balance_msat=$(echo "$channel" | jq -r .to_us_msat)
-            remote_balance_msat=$((($local_funds_msat + $remote_funds_msat - $local_balance_msat))) # Calculated
-            their_reserve_msat=$(echo "$channel" | jq -r .their_reserve_msat)
-            our_reserve_msat=$(echo "$channel" | jq -r .our_reserve_msat)
-            spendable_msat=$(echo "$channel" | jq -r .spendable_msat)
-            receivable_msat=$(echo "$channel" | jq -r .receivable_msat)
-
-            peer_id_info=$($LNCLI listnodes $peer_id)
-            alias=$(echo $peer_id_info | jq -r .nodes[0].alias)
-            color=$(echo $peer_id_info | jq -r .nodes[0].color)
-            if [[ $peer_type == "private" ]]; then # The alias and color for private channels must be read from file
-                captured_line=$(grep -m 1 "$peer_id" "/var/log/lightningd/private_channels")
-                if [[ -n $captured_line ]]; then
-                    alias=$(echo $captured_line | cut -d " " -f 3)
-                    color=$(echo $captured_line | cut -d " " -f 4)
-                fi
+        else
+            if [[ $FILTER == "closed" ]]; then # If this channel is NOT closed (ONCHAIN), but has the "closed" filter turned on then skip
+                continue
             fi
-            if [[ $alias == "null" ]]; then alias="hidden"; color="hidden"; fi # Output "hidden" instead of "null"
+        fi
 
-            local_closing_fees_msat=$((($local_balance_msat - $our_reserve_msat - $spendable_msat)))
-            remote_closing_fees_msat=$((($remote_balance_msat - $their_reserve_msat - $receivable_msat)))
-            if [[ $local_closing_fees_msat -lt 0 ]]; then local_closing_fees_msat=0; fi
-            if [[ $remote_closing_fees_msat -lt 0 ]]; then remote_closing_fees_msat=0; fi
+        peer_id=$(echo "$channel" | jq -r .peer_id)
+        if grep -q $peer_id "/var/log/lightningd/global_channels"; then peer_type="global"
+        elif grep -q $peer_id "/var/log/lightningd/peer_channels"; then peer_type="trusted-p2p"
+        elif grep -q $peer_id "/var/log/lightningd/private_channels"; then  peer_type="private"
+        else peer_type="anonymous"; fi
 
-            # Tally "Total Channel Amount" with local balances. Note: the remote balances are included as well for private channels
-            total_channel_msat=$(($total_channel_msat + $local_balance_msat))
-            if [[ $peer_type == "private" ]]; then total_channel_msat=$(($total_channel_msat + $remote_balance_msat)); fi
+        # Execute private, global, trusted-p2p, and anonymous filters
+        if [[ $FILTER == "private" || $FILTER == "global" || $FILTER == "trusted-p2p" || $FILTER == "anonymous" ]]; then
+            if ! [[ $peer_type == $FILTER ]]; then continue; fi
+        fi
 
-            # Tally the balances for global connections
-            if [[ $peer_type == "global" ]]; then
-                local_total_global_msat=$(($local_total_global_msat + $local_balance_msat))
-                remote_total_global_msat=$(($remote_total_global_msat + $remote_balance_msat))
+        # Collect data for this channel
+        peer_connected=$(echo "$channel" | jq -r .peer_connected)
+        local_fee_base_msat=$(echo "$channel" | jq -r .updates.local.fee_base_msat)
+        local_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.local.fee_proportional_millionths)
+        remote_fee_base_msat=$(echo "$channel" | jq -r .updates.remote.fee_base_msat)
+        remote_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.remote.fee_proportional_millionths)
+        local_funds_msat=$(echo "$channel" | jq -r .funding.local_funds_msat)
+        remote_funds_msat=$(echo "$channel" | jq -r .funding.remote_funds_msat)
+        last_stable_connection=$(echo "$channel" | jq -r .last_stable_connection)
+        short_channel_id=$(echo "$channel" | jq -r .short_channel_id)
+        channel_id=$(echo "$channel" | jq -r .channel_id)
+        private=$(echo "$channel" | jq -r .private)
+        opener=$(echo "$channel" | jq -r .opener)
+        local_balance_msat=$(echo "$channel" | jq -r .to_us_msat)
+        remote_balance_msat=$((($local_funds_msat + $remote_funds_msat - $local_balance_msat))) # Calculated
+        their_reserve_msat=$(echo "$channel" | jq -r .their_reserve_msat)
+        our_reserve_msat=$(echo "$channel" | jq -r .our_reserve_msat)
+        spendable_msat=$(echo "$channel" | jq -r .spendable_msat)
+        receivable_msat=$(echo "$channel" | jq -r .receivable_msat)
+
+        peer_id_info=$($LNCLI listnodes $peer_id)
+        alias=$(echo $peer_id_info | jq -r .nodes[0].alias)
+        color=$(echo $peer_id_info | jq -r .nodes[0].color)
+        if [[ $peer_type == "private" ]]; then # The alias and color for private channels must be read from file
+            captured_line=$(grep -m 1 "$peer_id" "/var/log/lightningd/private_channels")
+            if [[ -n $captured_line ]]; then
+                alias=$(echo $captured_line | cut -d " " -f 3)
+                color=$(echo $captured_line | cut -d " " -f 4)
             fi
+        fi
+        if [[ $alias == "null" ]]; then alias="hidden"; color="hidden"; fi # Output "hidden" instead of "null"
 
-            # Tally the balances for anonymous connections
-            if [[ $peer_type == "anonymous" ]]; then
-                local_total_anonymous_msat=$(($local_total_anonymous_msat + $local_balance_msat))
-                remote_total_anonymous_msat=$(($remote_total_anonymous_msat + $remote_balance_msat))
-            fi
+        local_closing_fees_msat=$((($local_balance_msat - $our_reserve_msat - $spendable_msat)))
+        remote_closing_fees_msat=$((($remote_balance_msat - $their_reserve_msat - $receivable_msat)))
+        if [[ $local_closing_fees_msat -lt 0 ]]; then local_closing_fees_msat=0; fi
+        if [[ $remote_closing_fees_msat -lt 0 ]]; then remote_closing_fees_msat=0; fi
 
-            # Tally local fees required to close each channel (i.e. put them on-chain)
-            total_closing_fees_msat=$(($total_closing_fees_msat + $local_closing_fees_msat))
+        # Tally "Total Channel Amount" with local balances. Note: the remote balances are included as well for private channels
+        total_channel_msat=$(($total_channel_msat + $local_balance_msat))
+        if [[ $peer_type == "private" ]]; then total_channel_msat=$(($total_channel_msat + $remote_balance_msat)); fi
 
-            # Show channel report
-            echo "Remote's Alias | Color | Type:    $alias | $color | $peer_type"
-            echo "Remote's ID:                      $peer_id"
-            echo "Channel (Short) ID:               $channel_id ($short_channel_id)"
-            echo "Funded (Local | Remote):          $($0 --msats $local_funds_msat) | $($0 --msats $remote_funds_msat)"
-            echo "Local Fees (Base | Percent):      $($0 --msats $local_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $local_fee_proportional_millionths / 10000}")) %"
-            echo "Remote Fees (Base | Percent):     $($0 --msats $remote_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $remote_fee_proportional_millionths / 10000}")) %"
-            echo "Req. Reserve (Local | Remote):    $($0 --msats $our_reserve_msat) | $($0 --msats $their_reserve_msat)"
-            echo "Balance (Local | Remote):         $($0 --msats $local_balance_msat) | $($0 --msats $remote_balance_msat)              $($0 --ratio $local_balance_msat $remote_balance_msat)"
-            echo "Spendable (Local | Remote):       $($0 --msats $spendable_msat) | $($0 --msats $receivable_msat) (Balance - \"Req. Reserve\" - \"Estimated On Chain Closing Fee [If We Opened The Channel]\")"
-            echo "Closing Fees (Local | Remote):    $($0 --msats $local_closing_fees_msat) | $($0 --msats $remote_closing_fees_msat)"
-            echo "Additional Information:           Connected | Who Opened | Private | Last Stable Connection | State"
-            echo -n "                                  "
-            printf "%-10s  " "$peer_connected"; printf "%-11s  " "$opener"; printf "%-8s  " "$private"; printf "%-23s  " "$last_stable_connection"; echo "$state"
+        # Tally the balances for global connections
+        if [[ $peer_type == "global" ]]; then
+            local_total_global_msat=$(($local_total_global_msat + $local_balance_msat))
+            remote_total_global_msat=$(($remote_total_global_msat + $remote_balance_msat))
+        fi
 
-            echo ""
-        done <<< "$channels"
-    fi
+        # Tally the balances for anonymous connections
+        if [[ $peer_type == "anonymous" ]]; then
+            local_total_anonymous_msat=$(($local_total_anonymous_msat + $local_balance_msat))
+            remote_total_anonymous_msat=$(($remote_total_anonymous_msat + $remote_balance_msat))
+        fi
+
+        # Tally local fees required to close each channel (i.e. put them on-chain)
+        total_closing_fees_msat=$(($total_closing_fees_msat + $local_closing_fees_msat))
+
+        # Show channel report
+        echo "Remote's Alias | Color | Type:    $alias | $color | $peer_type"
+        echo "Remote's ID:                      $peer_id"
+        echo "Channel (Short) ID:               $channel_id ($short_channel_id)"
+        echo "Funded (Local | Remote):          $($0 --msats $local_funds_msat) | $($0 --msats $remote_funds_msat)"
+        echo "Local Fees (Base | Percent):      $($0 --msats $local_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $local_fee_proportional_millionths / 10000}")) %"
+        echo "Remote Fees (Base | Percent):     $($0 --msats $remote_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $remote_fee_proportional_millionths / 10000}")) %"
+        echo "Req. Reserve (Local | Remote):    $($0 --msats $our_reserve_msat) | $($0 --msats $their_reserve_msat)"
+        echo "Balance (Local | Remote):         $($0 --msats $local_balance_msat) | $($0 --msats $remote_balance_msat)              $($0 --ratio $local_balance_msat $remote_balance_msat)"
+        echo "Spendable (Local | Remote):       $($0 --msats $spendable_msat) | $($0 --msats $receivable_msat) (Balance - \"Req. Reserve\" - \"Estimated On Chain Closing Fee [If We Opened The Channel]\")"
+        echo "Closing Fees (Local | Remote):    $($0 --msats $local_closing_fees_msat) | $($0 --msats $remote_closing_fees_msat)"
+        echo "Additional Information:           Connected | Who Opened | Private | Last Stable Connection | State"
+        echo -n "                                  "
+        printf "%-10s  " "$peer_connected"; printf "%-11s  " "$opener"; printf "%-8s  " "$private"; printf "%-23s  " "$last_stable_connection"; echo "$state"
+
+        echo ""
+    done <<< "$channels"
+
+    # If a filter is enabled then exit
+    if [[ $FILTER == "private" || $FILTER == "global" || $FILTER == "trusted-p2p" || $FILTER == "anonymous" || $FILTER closed || ! -z $NODE_ID ]]; then exit 0; fi
 
     # Show file location used to distinguish different peers
     echo "File Locations for the three different types of NODE IDs:"
-    echo "    GLOBAL: /var/log/lightningd/global_channels"
-    echo "    TRUSTED-P2P: /var/log/lightningd/peer_channels"
-    echo "    PRIVATE: /var/log/lightningd/private_channels"
+    echo "    GLOBAL:       /var/log/lightningd/global_channels"
+    echo "    TRUSTED-P2P:  /var/log/lightningd/peer_channels"
+    echo "    PRIVATE:      /var/log/lightningd/private_channels"
     echo ""
 
     # Report (non-balance) information about this node
@@ -296,14 +296,15 @@ elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, 
     echo ""
 
     # Show Filters
+    echo "####################### Filters ########################"
     echo "Enter one of the following filters in the command line (e.g. \"lncli --summary global\"):"
     echo "    global         # Show OUTGOING GLOBAL channels"
     echo "    trusted-p2p    # Show TRUSTED P2P OUTGOING & INCOMING channels"
     echo "    private        # Show PRIVATE OUTGOING channels"
     echo "    anonymous      # Show ANONYMOUS INCOMING channels"
-    echo "    \$NODE_ID       # Show the channels for a specific node"
+    echo "    \$NODE_ID       # Show the channels for a specific \$NODE_ID"
     echo "    closed         # Show the closed (ONCHAIN) channels"
-    echo "    other          # Show non-channel information (this node's info, balances, etc.)"
+    echo ""
 
 elif [[ $1 == "--commands" ]]; then # List of some of Core Lightning CMDs that may be of interest
     cat << EOF
