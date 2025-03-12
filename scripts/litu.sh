@@ -34,7 +34,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --peer_channel    Establish a "peer" channel to a "trusted" local bank (w/ 0 reserves): \$PEER_ID  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000_000)
       --private_channel Establish a "private" channel with an internal Core Lightning node: \$PEER_ID \$LOCAL_IP_ADDRESS \$AMOUNT_SATS \$ALIAS \$COLOR (Note: min-emergency-msat is set to 0.00100000_000)
       --update_fees     Change the channel % fee: [\$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]  \$FEE_RATE (e.g. 1000 = 0.1% fee)
-      --summary         Produce summaries of peer nodes, channels, this node, and balances
+      --summary         Produce summaries of peer nodes, channels, this node, and balances: \$FILTER (optional)
       --commands        List of some of Core Lightning CMDs that may be of interest
       --msats           Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: \$AMOUNT_MSATS
       --ratio           Create a visual representation of the local vs remote balance: \$LOCAL_BALANCE  \$REMOTE_BALANCE
@@ -131,66 +131,6 @@ elif [[ $1 == "--private_channel" ]]; then # Establish a "private" channel with 
         fi
     fi
 
-elif [[ $1 == "summary" ]]; then # Produce summary of all the channels
-    echo "Global Connections:"
-    if [[ -f "/var/log/lightningd/global_channels" ]]; then # Check if the file exists
-        # Loop through the file Peer ID by Peer ID
-        while IFS= read -r peer_id; do
-            echo "    $($LNCLI listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
-            echo "          Peer ID: $peer_id"
-            echo "          Color: $($LNCLI listnodes $peer_id | jq -r .nodes[0].color)"
-
-            count=$($LNCLI listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
-            for (( i=0; i<count; i++ )); do # Loop through each channel
-                echo "          Short (Long) Channel ID: $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($($LNCLI listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
-                echo "              Connected:                $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
-                echo "              Local Funds (msats):      $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
-                echo "              Remote Funds (msats):     $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
-            done
-            echo ""
-        done < "/var/log/lightningd/global_channels"
-    fi
-
-    echo "Peer Connections (w/ Trusted Banks):"
-    if [[ -f "/var/log/lightningd/peer_channels" ]]; then # Check if the file exists
-        # Loop through the file Peer ID by Peer ID
-        while IFS= read -r peer_id; do
-            echo "    $($LNCLI listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
-            echo "          Peer ID: $peer_id"
-            echo "          Color: $($LNCLI listnodes $peer_id | jq -r .nodes[0].color)"
-
-            count=$($LNCLI listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
-            for (( i=0; i<count; i++ )); do # Loop through each channel
-                echo "          Short (Long) Channel ID: $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($($LNCLI listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
-                echo "              Connected:                $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
-                echo "              Direction (0=Out; 1=In):  $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .direction)"
-                echo "              Local Funds (msats):      $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
-                echo "              Remote Funds (msats):     $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
-            done
-            echo ""
-        done < "/var/log/lightningd/peer_channels"
-    fi
-
-    echo "Private Connections:"
-    if [[ -f "/var/log/lightningd/private_channels" ]]; then # Check if the file exists
-        # Loop through the file Peer ID by Peer ID
-        while IFS= read -r peer_id; do
-            peer_id=$(echo $peer_id | cut -d " " -f 1)
-            echo "    $($LNCLI listnodes $peer_id | jq -r .nodes[0].alias) (ALIAS):"
-            echo "          Peer ID: $peer_id"
-            echo "          Color: $($LNCLI listnodes $peer_id | jq -r .nodes[0].color)"
-
-            count=$($LNCLI listpeerchannels $peer_id | jq '.channels | length') # Get the number of channels
-            for (( i=0; i<count; i++ )); do # Loop through each channel
-                echo "          Short (Long) Channel ID: $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .short_channel_id) ($($LNCLI listpeerchannels $peer_id | jq .channels[0] | jq -r .channel_id))"
-                echo "              Connected:                $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .peer_connected)"
-                echo "              Local Funds (msats):      $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.local_funds_msat)"
-                echo "              Remote Funds (msats):     $($LNCLI listpeerchannels $peer_id | jq .channels[$i] | jq -r .funding.remote_funds_msat)"
-            done
-            echo ""
-        done < "/var/log/lightningd/private_channels"
-    fi
-
 elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
     PEER_SHORT_CHANNEL_ID=$2 # This parameter contains the "Short Channel ID", Channel ID, or Peer ID (all channels with this given peer).
     FEE_RATE=$3 # Fee added proportionally (per-millionths) to any routed payment volume (e.g. 1000 = 0.1% fee).
@@ -203,98 +143,127 @@ elif [[ $1 == "--update_fees" ]]; then # Change the fee of a channel
 
     $LNCLI setchannel -k id=$PEER_SHORT_CHANNEL_ID feeppm=$FEE_RATE
 
-elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, this node, and balances
-    echo ""; echo "####################### Channels ########################"
-    total_channel_msat=0
-    closed_channels=0 # Running tally of all the closed channels so far
-    local_total_global_msat=0 # Running tally of all the balances on the local side for global connections
-    remote_total_global_msat=0 # Running tally of all the balances on the remote side for global connections
-    local_total_anonymous_msat=0 # Running tally of all the balances on the local side for anonymous connections
-    remote_total_anonymous_msat=0 # Running tally of all the balances on the remote side for anonymous connections
-    total_closing_fees_msat=0 # Running tally of all the local fees required to close all the channels (i.e. put them on-chain)
-    channels=$($LNCLI listpeerchannels | jq -c '.channels[]')
-    while IFS= read -r channel; do # Loop through the channels and process them
-        state=$(echo "$channel" | jq -r .state)
-        if [[ $state == "ONCHAIN" ]]; then ((closed_channels++)); continue; fi # If this channel is closed (ONCHAIN) then skip
+elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, this node, and balances: \$FILTER (optional)
+    FILTER=$2
 
-        peer_id=$(echo "$channel" | jq -r .peer_id)
-        if grep -q $peer_id "/var/log/lightningd/global_channels"; then peer_type="global"
-        elif grep -q $peer_id "/var/log/lightningd/peer_channels"; then peer_type="trusted-p2p"
-        elif grep -q $peer_id "/var/log/lightningd/private_channels"; then  peer_type="private"
-        else peer_type="anonymous"; fi
+    if [[ ! $FILTER == "other" ]];
+        echo ""; echo "####################### Channels ########################"
+        total_channel_msat=0
+        closed_channels=0 # Running tally of all the closed channels so far
+        local_total_global_msat=0 # Running tally of all the balances on the local side for global connections
+        remote_total_global_msat=0 # Running tally of all the balances on the remote side for global connections
+        local_total_anonymous_msat=0 # Running tally of all the balances on the local side for anonymous connections
+        remote_total_anonymous_msat=0 # Running tally of all the balances on the remote side for anonymous connections
+        total_closing_fees_msat=0 # Running tally of all the local fees required to close all the channels (i.e. put them on-chain)
+        NODE_ID=""; if [[ $FILTER =~ ^[a-f0-9]{66}$ ]]; then NODE_ID=$FILTER; fi # Check to see if the filter contains a 66 digit (lower case) node id number
+        channels=$($LNCLI listpeerchannels $NODE_ID | jq -c '.channels[]')
+        while IFS= read -r channel; do # Loop through the channels and process them
+            state=$(echo "$channel" | jq -r .state)
 
-        peer_connected=$(echo "$channel" | jq -r .peer_connected)
-        local_fee_base_msat=$(echo "$channel" | jq -r .updates.local.fee_base_msat)
-        local_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.local.fee_proportional_millionths)
-        remote_fee_base_msat=$(echo "$channel" | jq -r .updates.remote.fee_base_msat)
-        remote_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.remote.fee_proportional_millionths)
-        local_funds_msat=$(echo "$channel" | jq -r .funding.local_funds_msat)
-        remote_funds_msat=$(echo "$channel" | jq -r .funding.remote_funds_msat)
-        last_stable_connection=$(echo "$channel" | jq -r .last_stable_connection)
-        short_channel_id=$(echo "$channel" | jq -r .short_channel_id)
-        channel_id=$(echo "$channel" | jq -r .channel_id)
-        private=$(echo "$channel" | jq -r .private)
-        opener=$(echo "$channel" | jq -r .opener)
-        local_balance_msat=$(echo "$channel" | jq -r .to_us_msat)
-        remote_balance_msat=$((($local_funds_msat + $remote_funds_msat - $local_balance_msat))) # Calculated
-        their_reserve_msat=$(echo "$channel" | jq -r .their_reserve_msat)
-        our_reserve_msat=$(echo "$channel" | jq -r .our_reserve_msat)
-        spendable_msat=$(echo "$channel" | jq -r .spendable_msat)
-        receivable_msat=$(echo "$channel" | jq -r .receivable_msat)
-
-        peer_id_info=$($LNCLI listnodes $peer_id)
-        alias=$(echo $peer_id_info | jq -r .nodes[0].alias)
-        color=$(echo $peer_id_info | jq -r .nodes[0].color)
-        if [[ $peer_type == "private" ]]; then # The alias and color for private channels must be read from file
-            captured_line=$(grep -m 1 "$peer_id" "/var/log/lightningd/private_channels")
-            if [[ -n $captured_line ]]; then
-                alias=$(echo $captured_line | cut -d " " -f 3)
-                color=$(echo $captured_line | cut -d " " -f 4)
+            if [[ $state == "ONCHAIN" ]]; then
+                ((closed_channels++))
+                if [[ ! $FILTER == "closed" ]]; then # If this channel is closed (ONCHAIN) without the "closed" filter then skip
+                    continue
+                fi
+            else
+                if [[ $FILTER == "closed" ]]; then # If this channel is NOT closed (ONCHAIN), but has the "closed" filter turned on then skip
+                    continue
+                fi
             fi
-        fi
-        if [[ $alias == "null" ]]; then alias="hidden"; color="hidden"; fi # Output "hidden" instead of "null"
 
-        local_closing_fees_msat=$((($local_balance_msat - $our_reserve_msat - $spendable_msat)))
-        remote_closing_fees_msat=$((($remote_balance_msat - $their_reserve_msat - $receivable_msat)))
-        if [[ $local_closing_fees_msat -lt 0 ]]; then local_closing_fees_msat=0; fi
-        if [[ $remote_closing_fees_msat -lt 0 ]]; then remote_closing_fees_msat=0; fi
+            peer_id=$(echo "$channel" | jq -r .peer_id)
+            if grep -q $peer_id "/var/log/lightningd/global_channels"; then peer_type="global"
+            elif grep -q $peer_id "/var/log/lightningd/peer_channels"; then peer_type="trusted-p2p"
+            elif grep -q $peer_id "/var/log/lightningd/private_channels"; then  peer_type="private"
+            else peer_type="anonymous"; fi
 
-        # Tally "Total Channel Amount" with local balances. Note: the remote balances are included as well for private channels
-        total_channel_msat=$(($total_channel_msat + $local_balance_msat))
-        if [[ $peer_type == "private" ]]; then total_channel_msat=$(($total_channel_msat + $remote_balance_msat)); fi
+            # Execute private, global, trusted-p2p, and anonymous filters
+            if ! [[ $peer_type == "private" && $FILTER == "private" ]]; then continue; fi # Filter for private
+            if ! [[ $peer_type == "global" && $FILTER == "global" ]]; then continue; fi # Filter for global
+            if ! [[ $peer_type == "trusted-p2p" && $FILTER == "trusted-p2p" ]]; then continue; fi # Filter for trusted-p2p
+            if ! [[ $peer_type == "anonymous" && $FILTER == "anonymous" ]]; then continue; fi # Filter for anonymous
 
-        # Tally the balances for global connections
-        if [[ $peer_type == "global" ]]; then
-            local_total_global_msat=$(($local_total_global_msat + $local_balance_msat))
-            remote_total_global_msat=$(($remote_total_global_msat + $remote_balance_msat))
-        fi
+            # Collect data for this channel
+            peer_connected=$(echo "$channel" | jq -r .peer_connected)
+            local_fee_base_msat=$(echo "$channel" | jq -r .updates.local.fee_base_msat)
+            local_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.local.fee_proportional_millionths)
+            remote_fee_base_msat=$(echo "$channel" | jq -r .updates.remote.fee_base_msat)
+            remote_fee_proportional_millionths=$(echo "$channel" | jq -r .updates.remote.fee_proportional_millionths)
+            local_funds_msat=$(echo "$channel" | jq -r .funding.local_funds_msat)
+            remote_funds_msat=$(echo "$channel" | jq -r .funding.remote_funds_msat)
+            last_stable_connection=$(echo "$channel" | jq -r .last_stable_connection)
+            short_channel_id=$(echo "$channel" | jq -r .short_channel_id)
+            channel_id=$(echo "$channel" | jq -r .channel_id)
+            private=$(echo "$channel" | jq -r .private)
+            opener=$(echo "$channel" | jq -r .opener)
+            local_balance_msat=$(echo "$channel" | jq -r .to_us_msat)
+            remote_balance_msat=$((($local_funds_msat + $remote_funds_msat - $local_balance_msat))) # Calculated
+            their_reserve_msat=$(echo "$channel" | jq -r .their_reserve_msat)
+            our_reserve_msat=$(echo "$channel" | jq -r .our_reserve_msat)
+            spendable_msat=$(echo "$channel" | jq -r .spendable_msat)
+            receivable_msat=$(echo "$channel" | jq -r .receivable_msat)
 
-        # Tally the balances for anonymous connections
-        if [[ $peer_type == "anonymous" ]]; then
-            local_total_anonymous_msat=$(($local_total_anonymous_msat + $local_balance_msat))
-            remote_total_anonymous_msat=$(($remote_total_anonymous_msat + $remote_balance_msat))
-        fi
+            peer_id_info=$($LNCLI listnodes $peer_id)
+            alias=$(echo $peer_id_info | jq -r .nodes[0].alias)
+            color=$(echo $peer_id_info | jq -r .nodes[0].color)
+            if [[ $peer_type == "private" ]]; then # The alias and color for private channels must be read from file
+                captured_line=$(grep -m 1 "$peer_id" "/var/log/lightningd/private_channels")
+                if [[ -n $captured_line ]]; then
+                    alias=$(echo $captured_line | cut -d " " -f 3)
+                    color=$(echo $captured_line | cut -d " " -f 4)
+                fi
+            fi
+            if [[ $alias == "null" ]]; then alias="hidden"; color="hidden"; fi # Output "hidden" instead of "null"
 
-        # Tally local fees required to close each channel (i.e. put them on-chain)
-        total_closing_fees_msat=$(($total_closing_fees_msat + $local_closing_fees_msat))
+            local_closing_fees_msat=$((($local_balance_msat - $our_reserve_msat - $spendable_msat)))
+            remote_closing_fees_msat=$((($remote_balance_msat - $their_reserve_msat - $receivable_msat)))
+            if [[ $local_closing_fees_msat -lt 0 ]]; then local_closing_fees_msat=0; fi
+            if [[ $remote_closing_fees_msat -lt 0 ]]; then remote_closing_fees_msat=0; fi
 
-        # Show channel report
-        echo "Remote's Alias | Color | Type:    $alias | $color | $peer_type"
-        echo "Remote's ID:                      $peer_id"
-        echo "Channel (Short) ID:               $channel_id ($short_channel_id)"
-        echo "Funded (Local | Remote):          $($0 --msats $local_funds_msat) | $($0 --msats $remote_funds_msat)"
-        echo "Local Fees (Base | Percent):      $($0 --msats $local_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $local_fee_proportional_millionths / 10000}")) %"
-        echo "Remote Fees (Base | Percent):     $($0 --msats $remote_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $remote_fee_proportional_millionths / 10000}")) %"
-        echo "Req. Reserve (Local | Remote):    $($0 --msats $our_reserve_msat) | $($0 --msats $their_reserve_msat)"
-        echo "Balance (Local | Remote):         $($0 --msats $local_balance_msat) | $($0 --msats $remote_balance_msat)              $($0 --ratio $local_balance_msat $remote_balance_msat)"
-        echo "Spendable (Local | Remote):       $($0 --msats $spendable_msat) | $($0 --msats $receivable_msat) (Balance - \"Req. Reserve\" - \"Estimated On Chain Closing Fee [If We Opened The Channel]\")"
-        echo "Closing Fees (Local | Remote):    $($0 --msats $local_closing_fees_msat) | $($0 --msats $remote_closing_fees_msat)"
-        echo "Additional Information:           Connected | Who Opened | Private | Last Stable Connection | State"
-        echo -n "                                  "
-        printf "%-10s  " "$peer_connected"; printf "%-11s  " "$opener"; printf "%-8s  " "$private"; printf "%-23s  " "$last_stable_connection"; echo "$state"
+            # Tally "Total Channel Amount" with local balances. Note: the remote balances are included as well for private channels
+            total_channel_msat=$(($total_channel_msat + $local_balance_msat))
+            if [[ $peer_type == "private" ]]; then total_channel_msat=$(($total_channel_msat + $remote_balance_msat)); fi
 
-        echo ""
-    done <<< "$channels"
+            # Tally the balances for global connections
+            if [[ $peer_type == "global" ]]; then
+                local_total_global_msat=$(($local_total_global_msat + $local_balance_msat))
+                remote_total_global_msat=$(($remote_total_global_msat + $remote_balance_msat))
+            fi
+
+            # Tally the balances for anonymous connections
+            if [[ $peer_type == "anonymous" ]]; then
+                local_total_anonymous_msat=$(($local_total_anonymous_msat + $local_balance_msat))
+                remote_total_anonymous_msat=$(($remote_total_anonymous_msat + $remote_balance_msat))
+            fi
+
+            # Tally local fees required to close each channel (i.e. put them on-chain)
+            total_closing_fees_msat=$(($total_closing_fees_msat + $local_closing_fees_msat))
+
+            # Show channel report
+            echo "Remote's Alias | Color | Type:    $alias | $color | $peer_type"
+            echo "Remote's ID:                      $peer_id"
+            echo "Channel (Short) ID:               $channel_id ($short_channel_id)"
+            echo "Funded (Local | Remote):          $($0 --msats $local_funds_msat) | $($0 --msats $remote_funds_msat)"
+            echo "Local Fees (Base | Percent):      $($0 --msats $local_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $local_fee_proportional_millionths / 10000}")) %"
+            echo "Remote Fees (Base | Percent):     $($0 --msats $remote_fee_base_msat) | $(printf "%.4f" $(awk "BEGIN {print $remote_fee_proportional_millionths / 10000}")) %"
+            echo "Req. Reserve (Local | Remote):    $($0 --msats $our_reserve_msat) | $($0 --msats $their_reserve_msat)"
+            echo "Balance (Local | Remote):         $($0 --msats $local_balance_msat) | $($0 --msats $remote_balance_msat)              $($0 --ratio $local_balance_msat $remote_balance_msat)"
+            echo "Spendable (Local | Remote):       $($0 --msats $spendable_msat) | $($0 --msats $receivable_msat) (Balance - \"Req. Reserve\" - \"Estimated On Chain Closing Fee [If We Opened The Channel]\")"
+            echo "Closing Fees (Local | Remote):    $($0 --msats $local_closing_fees_msat) | $($0 --msats $remote_closing_fees_msat)"
+            echo "Additional Information:           Connected | Who Opened | Private | Last Stable Connection | State"
+            echo -n "                                  "
+            printf "%-10s  " "$peer_connected"; printf "%-11s  " "$opener"; printf "%-8s  " "$private"; printf "%-23s  " "$last_stable_connection"; echo "$state"
+
+            echo ""
+        done <<< "$channels"
+    fi
+
+    # Show file location used to distinguish different peers
+    echo "File Locations for the three different types of NODE IDs:"
+    echo "    GLOBAL: /var/log/lightningd/global_channels"
+    echo "    TRUSTED-P2P: /var/log/lightningd/peer_channels"
+    echo "    PRIVATE: /var/log/lightningd/private_channels"
+    echo ""
 
     # Report (non-balance) information about this node
     this_node_info=$($LNCLI getinfo)
@@ -326,61 +295,82 @@ elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, 
     echo "Our Total Closing Fees:           $($0 --msats $total_closing_fees_msat)"
     echo ""
 
-
-
-#Files: why not list this informaiton????
-#    The IDs for "global" channels are stored in the file /var/log/lightningd/global_channels
-#    The IDs for "peer" channels are stored in the file /var/log/lightningd/peer_channels
-#    The IDs AND IPs for "private" channels are stored in the file /var/log/lightningd/private_channels
-
-#### Work in filters <<<<<<<<<<<<< work in progress   ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????
-#         global         # Show OUTGOING global channels
-#         trusted-p2p    # Show trusted p2p OUTGOING & INCOMING channels
-#         private        # Show private OUTGOING channels
-#        anonymous      # Show anonymous INCOMING channels
-#        $NODE_ID       # Show the channels for a specific node
-#        closed         # Show the closed (ONCHAIN) channels
+    # Show Filters
+    echo "Enter one of the following filters in the command line (e.g. \"lncli --summary global\"):"
+    echo "    global         # Show OUTGOING GLOBAL channels"
+    echo "    trusted-p2p    # Show TRUSTED P2P OUTGOING & INCOMING channels"
+    echo "    private        # Show PRIVATE OUTGOING channels"
+    echo "    anonymous      # Show ANONYMOUS INCOMING channels"
+    echo "    \$NODE_ID       # Show the channels for a specific node"
+    echo "    closed         # Show the closed (ONCHAIN) channels"
+    echo "    other          # Show non-channel information (this node's info, balances, etc.)"
 
 elif [[ $1 == "--commands" ]]; then # List of some of Core Lightning CMDs that may be of interest
     cat << EOF
     REMEMBER: Type "lncli" before each of these commands
 
+    [basic]
     getinfo                         # See the info' on this node
-    listnodes                       # Show all nodes (and info') on the lightning network
-    listnodes <PEER_ID>             # Get info' on another (non-private) node
+    listfunds                       # Displays all funds available, either in unspent outputs (UTXOs) or funds locked in currently open channels
+    listnodes PEER_ID               # Get info' on another (non-private) node
     listpeers                       # Show all nodes that share a connection with this node
     listforwards (settled|offered)  # Displays all forwarded htlcs that have been settled or are currently offered
+
+    [maintence]
+    autoclean-once <SUBSYSTEM> 3600 # Do a single sweep to delete (3600 Sec.)old entries. [SUBSYSTEM = succeededforwards | failedforwards | succeededpays | failedpays | paidinvoices | expiredinvoices]
+    autoclean-status                # Tells you about the status of the autoclean plugin
+    delforward CH_ID HTL_ID STATUS  # Delete a forward
+    delpay PAYMENT_HASH STATUS      # Deletes a payment with the given PAYMENT_HASH
+    delinvoice LABEL STATUS         # Removes an invoice with STATUS as given in listinvoices
 
     [on-chain wallet]
     newaddr                         # Generates a new address which can subsequently be used to fund channels managed by the Core Lightning node
     listaddresses                   # List of all Bitcoin addresses that have been generated and issued by the Core Lightning node up to the current date
-    withdraw <ADDRESS AMOUNT>       # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
+    listtransactions                # Returns transactions tracked in the wallet. This includes deposits, withdrawals and transactions related to channels
+    withdraw ADDRESS AMOUNT         # Send funds from Core Lightning's internal on-chain wallet to a given \$ADDRESS.
                                     # The \$AMOUNT (msat, sats [default], btc, or "all") to be withdrawn from the internal on-chain wallet.
                                     # When using "all" for the \$AMOUNT, it will leave the at least min-emergency-msat as change if there are any open (or unsettled) channels.
     [channels]
     listpeerchannels                # Return a list of this node's channels
-    listpeerchannels <PEERID>       # Filter the list of this node's channels by a connected node's id
-    close <ID>                      # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
-    listhtlcs <CHANNEL_ID>          # List all HTLCs that have ever appeared on a given channel
+    listpeerchannels PEER_ID        # Filter the list of this node's channels by a connected node's id
+    close ID                        # Attempts to close the channel cooperatively or unilaterally after unilateraltimeout (default: 48 hours) [\$ID = \$SHORT_CHANNEL_ID | \$CHANNEL_ID | \$PEER_ID]
+    listhtlcs CHANNEL_ID            # List all HTLCs that have ever appeared on a given channel
 
-    [balances]
+    [bookkeeper]
     bkpr-listbalances               # List of all current and historical account balances both on-chain and channel balances
-    listfunds                       # Displays all funds available, either in unspent outputs (UTXOs) or funds locked in currently open channels
+    bkpr-channelsapy START END      # lists stats on routing income, leasing income, and various calculated APYs for channel routed funds in a given time frame (UNIX Time Stamps)
+    bkpr-dumpincomecsv quickbooks /var/lib/lightningd/bitcoin true START END    # Create a csv file in a given time frame (UNIX Time Stamps)
+    bkpr-listincome true START END  # list of all income impacting events recorded for this node in a given time frame (UNIX Time Stamps)
 
     [payments]
     pay <BOLT_INVOICE>              # Pay a bolt invoice where the amount is embedded inside the invoice
-    pay <BOLT_INVOICE AMOUNT>       # Pay a bolt invoice with an arbitrary amount
+    pay <BOLT_INVOICE AMOUNT>       # Pay a bolt "any" invoice with an arbitrary amount
     listpays null null complete     # Shows the status of all pay commands completed successfully from this node
+    getroute PEER_ID AMOUNT 0       # Attempts to find the best route for the payment of AMOUNT (msats) to lightning node PEER_ID with a risk factor of 0
+    keysend PEER_ID AMOUNT          # Send the specified AMOUNT (msats) without an invoice (as a consequence, there is not proof-of-payment) to a given PEER_ID
 
     [invoices]
     listinvoices                    # List all invoices ever created on this node
-    invoice <AMOUNT LABEL DESCRIPTION>
-                                    # Creates an invoice that will be paid to this node. The Amount can be any value (msats) or the keyword "any"
-	[offers]
-	offer <AMOUNT DESCRIPTION>		# Create an offer. The Amount can be any value (msats) or the keyword "any" 
-	listoffers null active			# List all active offers, or replace "null" with <OFFER_ID>, only the offer with that OFFER_ID (if it exists)
-	enableoffer <OFFER_ID>			# Enables an offer, after it has been disabled
-	disableoffer <OFFER_ID>			# Disables an offer, so that no further invoices will be given out.
+    invoice <AMOUNT LABEL DESCR.>   # Creates an invoice that will be paid to this node. The Amount can be any value (msats) or the keyword "any"
+
+
+
+
+
+????????????????????????????????????????????????????????????????????????????????????????????????????
+
+
+    [offers]
+    offer <AMOUNT DESCRIPTION>      # Create an offer. The Amount can be any value (msats) or the keyword "any"
+    listoffers null true            # List all active offers, or replace "null" with <OFFER_ID>, only the offer with that OFFER_ID (if it exists)
+    enableoffer <OFFER_ID>          # Enables an offer, after it has been disabled
+    disableoffer <OFFER_ID>         # Disables an offer, so that no further invoices will be given out.
+
+
+    invoicerequest
+
+
+
 EOF
 
 elif [[ $1 == "--msats" ]]; then # Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: $AMOUNT_MSATS
@@ -448,5 +438,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.5"
+    echo "Script Version 0.6"
 fi
