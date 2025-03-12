@@ -256,7 +256,7 @@ elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, 
     done <<< "$channels"
 
     # If a filter is enabled then exit
-    if [[ $FILTER == "private" || $FILTER == "global" || $FILTER == "trusted-p2p" || $FILTER == "anonymous" || $FILTER closed || ! -z $NODE_ID ]]; then exit 0; fi
+    if [[ $FILTER == "private" || $FILTER == "global" || $FILTER == "trusted-p2p" || $FILTER == "anonymous" || $FILTER == "closed" || ! -z $NODE_ID ]]; then exit 0; fi
 
     # Show file location used to distinguish different peers
     echo "File Locations for the three different types of NODE IDs:"
@@ -439,5 +439,5 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
 
 else
     $0 --help
-    echo "Script Version 0.6"
+    echo "Script Version 0.61"
 fi
