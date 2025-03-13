@@ -478,10 +478,14 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
     # Get the NODE_ID of the payee
     if [[ $ID_INV_OFFR_REQ =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter already a NODE_ID
         NODE_ID=$ID_INV_OFFR_REQ
+        echo ""; echo "NODE ID: $NODE_ID"
     else
-        payee=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .payee)
-        offer_issuer_id=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .offer_issuer_id)
-        invreq_payer_id=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .invreq_payer_id)
+        DECODED=$($LNCLI decode $ID_INV_OFFR_REQ)
+        echo ""; echo $DECODED | jq
+
+        payee=$(echo $DECODED | jq -r .payee)
+        offer_issuer_id=$(echo $DECODED | jq -r .offer_issuer_id)
+        invreq_payer_id=$(echo $DECODED | jq -r .invreq_payer_id)
         if [[ $payee =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice
             NODE_ID=$payee
             if [[ ! -z $AMOUNT ]]; then
