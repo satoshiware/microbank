@@ -40,7 +40,8 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --ratio           Create a visual representation of the local vs remote balance: \$LOCAL_BALANCE  \$REMOTE_BALANCE
       --clean           Cleanup (delete) forwards, pays, and invoices that are more than two days old
       --empty           Empties (sends) all the spendable msats over a private channel. Routine only works on private lightning nodes /w a single channel
-      --path            Find the shortest path & fee to send a given amount: (PEER_ID|INVOICE|OFFER|REQUEST) <AMOUNT_MSATS=1000>
+      --path            Find the shortest path & fee to send a given amount: (\$PEER_ID|\$INVOICE|\$OFFER|\$REQUEST) <\$AMOUNT_MSATS=1000>
+      --chan-adjust     Route SATS through two channels connected to this node (1 in and 1 out): \$START_SHORT_CHANNEL  \$END_SHORT_CHANNEL  \$AMOUNT_MSATS  <\$SEND_NOW=false>
 
 EOF
 
@@ -388,8 +389,7 @@ elif [[ $1 == "--msats" ]]; then # Convert a figure in mSATS and display it in t
     fi
 
     # Format result to have exactly 11 digits after the decimal
-    result=$(awk "BEGIN {print $AMOUNT_MSATS / 100000000000}")
-    formatted_result=$(printf "%.11f" $result)
+    formatted_result=$(echo $AMOUNT_MSATS | awk '{printf "%.11f\n", $1 / 100000000000}')
 
     # Split into integer and decimal parts
     integer_part=$(echo $formatted_result | cut -d '.' -f 1)
@@ -466,7 +466,7 @@ elif [[ $1 == "--empty" ]]; then # Empties (sends) all the spendable msats over 
         echo "This routine is for private lightning nodes only with a single channel"
     fi
 
-elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given amount: (PEER_ID|INVOICE|OFFER|REQUEST) <AMOUNT_MSATS=1000>
+elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given amount: ($PEER_ID|$INVOICE|$OFFER|$REQUEST) <$AMOUNT_MSATS=1000>
     ID_INV_OFFR_REQ=$2; AMOUNT=$3
 
     # Input checking
@@ -492,17 +492,17 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
         invreq_payer_id=$(echo $DECODED | jq -r .invreq_payer_id)
         if [[ $payee =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice
             NODE_ID=$payee
-            if [[ ! -z $AMOUNT ]]; then
+            if [[ -z $AMOUNT ]]; then
                 AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .amount_msat)
             fi
         elif [[ $offer_issuer_id =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning offer
             NODE_ID=$offer_issuer_id
-            if [[ ! -z $AMOUNT ]]; then
+            if [[ -z $AMOUNT ]]; then
                 AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .offer_amount_msat)
             fi
         elif [[ $invreq_payer_id =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice request
             NODE_ID=$invreq_payer_id
-            if [[ ! -z $AMOUNT ]]; then
+            if [[ -z $AMOUNT ]]; then
                 AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .invreq_amount_msat)
             fi
         else
@@ -521,7 +521,7 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
     # Show the final FEE to SEND that would be paid
     amount_sent=$(echo $routes | jq .route[0].amount_msat) # The amount in the first element
     amount_received=$(echo $routes | jq -r '.route[-1]' | jq .amount_msat) # The amount in the last element
-    echo "Send Fee Required: $($0 --msats $((amount_sent - amount_received)))"; echo ""
+    echo "Send Fee Required: $($0 --msats $((amount_sent - amount_received)))"
 
     # Find and show the best route to RECEIVE
     routes=$($LNCLI getroute $THIS_NODE_ID $AMOUNT 0 null $NODE_ID)
@@ -532,7 +532,83 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
     amount_received=$(echo $routes | jq -r '.route[-1]' | jq .amount_msat) # The amount in the last element
     echo "SENDER's Fee Required: $($0 --msats $((amount_sent - amount_received)))"; echo ""
 
+elif [[ $1 == "--chan-adjust" ]]; then # Route SATS through two channels connected to this node (1 in and 1 out): \$START_SHORT_CHANNEL  \$END_SHORT_CHANNEL  \$AMOUNT_MSATS  <\$SEND_NOW=false>
+    START_SHORT_CHANNEL=$2; END_SHORT_CHANNEL=$3; AMOUNT=$4; SEND_NOW=$5
+
+    START_SHORT_CHANNEL="886467x899x0" ############### Debugging HERE
+    END_SHORT_CHANNEL="886822x2118x0"
+    AMOUNT=9478868000
+
+    # Input checking
+    if [[ -z $START_SHORT_CHANNEL || -z $END_SHORT_CHANNEL || -z $AMOUNT ]]; then
+        echo ""; echo "Error! Not all variables (START_CHANNEL, END_CHANNEL, and/or AMOUNT) have a proper assignments!"
+        exit 1
+    fi
+
+    # Make sure AMOUNT is a number and greater than 1000 mSATS
+    if [[ ! $AMOUNT =~ ^-?[0-9]+$ || $AMOUNT -lt 1000 ]]; then
+        echo "Error! \$AMOUNT must be an integer (msats) greater than 1000 mSATS!"
+        exit 1
+    fi
+
+    # Get the START_NODE_ID, END_NODE_ID, spendable, receivable, and an array of all the active channels (except START_NODE_ID)
+    channels_array="[" # Add a start bracket for the array
+    channels=$($LNCLI listpeerchannels | jq -c '.channels[]')
+    while IFS= read -r channel; do # Loop through the channels and process them
+        state=$(echo "$channel" | jq -r .state)
+
+        short_channel_id=$(echo "$channel" | jq -r .short_channel_id)
+        if [[ $short_channel_id == "$START_SHORT_CHANNEL" ]]; then # Get the first node on the payment route
+            if [[ ! $state == "CHANNELD_NORMAL" ]]; then echo "Error! Start channel is not active!"; fi
+            start_node_id=$(echo "$channel" | jq -r .peer_id)
+            spendable_msat=$(echo "$channel" | jq -r .spendable_msat)
+        else
+            # Get the last node before this one on the payment route
+            if [[ $short_channel_id == "$END_SHORT_CHANNEL" ]]; then
+                if [[ ! $state == "CHANNELD_NORMAL" ]]; then echo "Error! End channel is not active!"; fi
+                end_node_id=$(echo "$channel" | jq -r .peer_id)
+                receivable_msat=$(echo "$channel" | jq -r .receivable_msat)
+            fi
+
+            # Build an array of all the active channels except the $START_SHORT_CHANNEL
+            if [[ $state == "CHANNELD_NORMAL" ]]; then
+                channels_array="$channels_array'$short_channel_id/$(echo "$channel" | jq -r .direction)',"
+            fi
+        fi
+    done <<< "$channels"
+    channels_array="${channels_array%?}]" # Remove the last comma and add an end cap ']' for the array
+
+    # Make sure the channels (connected to our node) can handle that size of payment
+    if [[ $AMOUNT -gt $receivable_msat || $AMOUNT -gt $spendable_msat ]]; then
+        echo "Error! Cannot send that many mSATS!"
+        exit 1
+    fi
+
+
+#############################################
+
+    echo "Amount:               $(litu --msats $AMOUNT)"
+    echo "Amount:               $AMOUNT"
+    echo ""
+    echo "Start Node ID:        $start_node_id"
+    echo "Sendable (mSATS):     $(litu --msats $spendable_msat)"
+    echo ""
+    echo "End Node ID:          $end_node_id"
+    echo "Receivable (mSATS):   $(litu --msats $receivable_msat)"
+    echo "Receivable (mSATS):   $receivable_msat"
+    echo ""
+
+    echo $channels_array
+
+
+
+
+
+
+
+
+
 else
     $0 --help
-    echo "Script Version 0.92"
+    echo "Script Version 0.93"
 fi
