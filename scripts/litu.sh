@@ -27,7 +27,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
     cat << EOF
     Options:
       --help            Display this help message and exit
-      --install         Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      --install         Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
       --generate        (Re)Generate(s) the environment file (w/ needed constants) for this utility in /etc/default/litu.env <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
       --ip_update       For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node. !!!!!!!!!! Not done yet !!!!!!!!!!!!!!!!!!!!!!!
       --global_channel  Establish a "global" channel to improve liquidity world-wide (w/ 0 reserves): \$PEER_ID  \$AMOUNT_SATS (Note: min-emergency-msat is set to 0.00100000000_000)
@@ -38,6 +38,10 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --commands        List of some of Core Lightning CMDs that may be of interest
       --msats           Convert a figure in mSATS and display it in the form of BTC.SATS_mSATS: \$AMOUNT_MSATS
       --ratio           Create a visual representation of the local vs remote balance: \$LOCAL_BALANCE  \$REMOTE_BALANCE
+      --clean           Cleanup (delete) forwards, pays, and invoices that are more than two days old
+      --empty           Empties (sends) all the spendable msats over a private channel. Routine only works on private lightning nodes /w a single channel
+      --decode          Add a peer_id, invoice, offer, ivoice_request and the best route will be found????????????????????????????
+
 EOF
 
 elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (litu) in /usr/local/sbin (/satoshiware/microbank/scripts/litu.sh)
@@ -59,11 +63,10 @@ elif [[ $1 == "--install" ]]; then # Install (or upgrade) this script (litu) in 
     sudo cat $0 | sudo tee /usr/local/sbin/litu > /dev/null
     sudo chmod +x /usr/local/sbin/litu
 
-    ## Install cron jobs here: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        # during the install, create cronjob that sends summery (e.g. analytics, channel balances, etc.)
-            # Would the bookkeeper or accounting plugin help??
-        # during the install, create cronjob that checks balances and sends alerts when balances become low
-        # during the install, create cronjob that tries to balance channels.
+    # Make sure the node id files exist to distinguish the different types of peers and the channels we share
+    sudo -u lightning touch /var/log/lightningd/global_channels
+    sudo -u lightning touch /var/log/lightningd/peer_channels
+    sudo -u lightning touch /var/log/lightningd/private_channels
 
 elif [[ $1 == "--ip_update" ]]; then # For nodes without a static IP (using dynamic DNS), this will update the ip that's announced by the lightning node.
     echo ""
@@ -159,6 +162,7 @@ elif [[ $1 == "--summary" ]]; then # Produce summaries of peer nodes, channels, 
     while IFS= read -r channel; do # Loop through the channels and process them
         state=$(echo "$channel" | jq -r .state)
 
+        # Filter where only closed (non-deleted) channels are shown
         if [[ $state == "ONCHAIN" ]]; then
             ((closed_channels++))
             if [[ ! $FILTER == "closed" ]]; then # If this channel is closed (ONCHAIN) without the "closed" filter then skip
@@ -317,7 +321,7 @@ elif [[ $1 == "--commands" ]]; then # List of some of Core Lightning CMDs that m
     listpeers                       # Show all nodes that share a connection with this node
     listforwards (settled|offered)  # Displays all forwarded htlcs that have been settled or are currently offered
 
-    [maintence]
+    [clean-up]
     autoclean-once <SUBSYSTEM> 3600 # Do a single sweep to delete (3600 Sec.)old entries. [SUBSYSTEM = succeededforwards | failedforwards | succeededpays | failedpays | paidinvoices | expiredinvoices]
     autoclean-status                # Tells you about the status of the autoclean plugin
     delforward CH_ID HTL_ID STATUS  # Delete a forward
@@ -347,7 +351,6 @@ elif [[ $1 == "--commands" ]]; then # List of some of Core Lightning CMDs that m
     pay <BOLT_INVOICE>              # Pay a bolt invoice where the amount is embedded inside the invoice
     pay <BOLT_INVOICE AMOUNT>       # Pay a bolt "any" invoice with an arbitrary amount
     listpays null null complete     # Shows the status of all pay commands completed successfully from this node
-    getroute PEER_ID AMOUNT 0       # Attempts to find the best route for the payment of AMOUNT (msats) to lightning node PEER_ID with a risk factor of 0
     keysend PEER_ID AMOUNT          # Send the specified AMOUNT (msats) without an invoice (as a consequence, there is not proof-of-payment) to a given PEER_ID
 
     [invoices]
@@ -355,7 +358,8 @@ elif [[ $1 == "--commands" ]]; then # List of some of Core Lightning CMDs that m
     invoice <AMOUNT LABEL DESCR.>   # Creates an invoice that will be paid to this node. The Amount can be any value (msats) or the keyword "any"
 
 
-
+    getroute PEER_ID AMOUNT 0       # Attempts to find the best route for the payment of AMOUNT (msats) to lightning node PEER_ID with a risk factor of 0
+    decode <INVOICE????OR SOMETHING>                            # Checks and parses (decodes) invoices, offers, invoice requests, and other formats
 
 
 ????????????????????????????????????????????????????????????????????????????????????????????????????
@@ -367,7 +371,7 @@ elif [[ $1 == "--commands" ]]; then # List of some of Core Lightning CMDs that m
     enableoffer <OFFER_ID>          # Enables an offer, after it has been disabled
     disableoffer <OFFER_ID>         # Disables an offer, so that no further invoices will be given out.
 
-
+    [invoice_requests]
     invoicerequest
 
 
@@ -437,7 +441,75 @@ elif [[ $1 == "--ratio" ]]; then # Create a visual representation of the local v
     # Print the progress bar
     echo "$progress_bar"
 
+elif [[ $1 == "--clean" ]]; then # Cleanup (delete) forwards, pays, and invoices that are more than two days old
+    $LNCLI autoclean-once succeededforwards 172800
+    $LNCLI autoclean-once failedforwards 172800
+    $LNCLI autoclean-once succeededpays 172800
+    $LNCLI autoclean-once failedpays 172800
+    $LNCLI autoclean-once paidinvoices 172800
+    $LNCLI autoclean-once expiredinvoices 172800
+
+elif [[ $1 == "--empty" ]]; then # Empties (sends) all the spendable msats over a private channel. Routine only works on private lightning nodes /w a single channel
+    # Example, Empty an amount from my private node:
+    if [[ $($LNCLI listpeerchannels | jq '.channels | length') -eq 1 ]]; then # Verify that it only has 1 channel open
+        peer_id=$($LNCLI listpeerchannels | jq -r .channels[0].peer_id)
+        if grep -q $peer_id "/var/log/lightningd/private_channels"; then
+            spendable_msat=$($LNCLI listpeerchannels | jq -r .channels[0].spendable_msat)
+            spendable_msat=$((spendable_msat-1)) # Deduct 1 msat in order for it to send the maximum amount (bug workaround I guess)
+            $LNCLI keysend $peer_id $spendable_msat
+        else
+            echo "Error! This routine is for private lightning nodes only!"
+            echo "The node, where you are sending all your sats, must be owned by you with its peer_id appearing in the file /var/log/lightningd/private_channels"
+        fi
+    else
+        echo "Error! Is there more than 1 channel?!"
+        echo "This routine is for private lightning nodes only with a single channel"
+    fi
+
+elif [[ $1 == "--decode" ]]; then # Empties (sends) all the spendable msats over a private channel. Routine only works on private lightning nodes /w a single channel
+    ID_INV_OFFR_REQ=$2
+
+    # Input checking
+    if [[ -z $ID_INV_OFFR_REQ ]]; then
+        echo ""; echo "Error! Not all variable (ID_INV_OFFR_REQ) does not have a proper assignment!"
+        exit 1
+    fi
+
+    # Get the NODE_ID of the payee
+    if [[ $ID_INV_OFFR_REQ =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter already a NODE_ID
+        NODE_ID=$ID_INV_OFFR_REQ
+    else
+        payee=$(lncli decode $ID_INV_OFFR_REQ | jq -r .payee)
+        offer_issuer_id=$(lncli decode $ID_INV_OFFR_REQ | jq -r .offer_issuer_id)
+        invreq_payer_id=$(lncli decode $ID_INV_OFFR_REQ | jq -r .invreq_payer_id)
+        if [[ $payee =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice
+            NODE_ID=$payee
+            AMOUNT=$(lncli decode $ID_INV_OFFR_REQ | jq -r .amount_msat)
+        elif [[ $offer_issuer_id =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning offer
+            NODE_ID=$offer_issuer_id
+            AMOUNT=$(lncli decode $ID_INV_OFFR_REQ | jq -r .offer_amount_msat)
+        elif [[ $invreq_payer_id =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice request
+            NODE_ID=$invreq_payer_id
+            AMOUNT=$(lncli decode $ID_INV_OFFR_REQ | jq -r .invreq_amount_msat)
+        else
+            echo ""; echo "Error! The passed parameter is not a NODE_ID, INVOICE, OFFER, or INVOICE REQUEST!"
+            exit 1
+        fi
+    fi
+
+    # Find the best route
+    echo ""
+    if [[ ! -z $AMOUNT ]]; then
+        if [[ $AMOUNT -lt 1000 ]]; then AMOUNT=1000; fi # If less than 1000 mSATS (1 SAT) then make it at least 1000 mSATS (1 SAT)
+        echo "Best Route ($AMOUNT mSATS): "
+        lncli getroute $NODE_ID $AMOUNT 0 | jq .route[]
+    else # If no amount is available, find it for 1000 mSATS
+        echo "Best Route (1000 mSATS): "
+        lncli getroute $NODE_ID 1000 0 | jq .route[]
+    fi
+    echo ""
+
 else
     $0 --help
-    echo "Script Version 0.61"
+    echo "Script Version 0.8"
 fi
