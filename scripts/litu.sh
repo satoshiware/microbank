@@ -475,10 +475,14 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
         exit 1
     fi
 
+    # Get and show this node's ID
+    THIS_NODE_ID=$($LNCLI getinfo | jq -r .id)
+    echo ""; echo "##### THIS NODE'S ID: $THIS_NODE_ID"
+
     # Get the NODE_ID of the payee
     if [[ $ID_INV_OFFR_REQ =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter already a NODE_ID
         NODE_ID=$ID_INV_OFFR_REQ
-        echo ""; echo "##### NODE ID: $NODE_ID"
+        echo ""; echo "##### REMOTE NODE ID: $NODE_ID"
     else
         DECODED=$($LNCLI decode $ID_INV_OFFR_REQ)
         echo ""; echo "##### DECODED (PEER_ID|INVOICE|OFFER|REQUEST) #####"; echo $DECODED | jq
@@ -510,16 +514,25 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
     # If non-existent or less than 1000 mSATS (1 SAT) then set AMOUNT to 1000 mSATS (1 SAT)
     if [[ -z $AMOUNT || $AMOUNT -lt 1000 ]]; then AMOUNT=1000; fi
 
-    # Find and show the best route
+    # Find and show the best route to SEND
     routes=$($LNCLI getroute $NODE_ID $AMOUNT 0)
-    echo ""; echo "##### Shortest Route For $($0 --msats $AMOUNT) BTC.SATS_mSATS #####"; echo $routes | jq; echo ""
+    echo ""; echo "##### Shortest SEND Route For $($0 --msats $AMOUNT) BTC.SATS_mSATS #####"; echo $routes | jq; echo ""
 
-    # Show the final fee that would be paid
+    # Show the final FEE to SEND that would be paid
     amount_sent=$(echo $routes | jq .route[0].amount_msat) # The amount in the first element
     amount_received=$(echo $routes | jq -r '.route[-1]' | jq .amount_msat) # The amount in the last element
-    echo "Fee Required: $($0 --msats $((amount_sent - amount_received)))"; echo ""
+    echo "Send Fee Required: $($0 --msats $((amount_sent - amount_received)))"; echo ""
+
+    # Find and show the best route to RECEIVE
+    routes=$($LNCLI getroute $THIS_NODE_ID $AMOUNT 0 null $NODE_ID)
+    echo ""; echo "##### Shortest RECEIVE Route For $($0 --msats $AMOUNT) BTC.SATS_mSATS #####"; echo $routes | jq; echo ""
+
+    # Show the final FEE the sender would pay (RECEIVE)
+    amount_sent=$(echo $routes | jq .route[0].amount_msat) # The amount in the first element
+    amount_received=$(echo $routes | jq -r '.route[-1]' | jq .amount_msat) # The amount in the last element
+    echo "SENDER's Fee Required: $($0 --msats $((amount_sent - amount_received)))"; echo ""
 
 else
     $0 --help
-    echo "Script Version 0.91"
+    echo "Script Version 0.92"
 fi
