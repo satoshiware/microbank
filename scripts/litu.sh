@@ -40,7 +40,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --ratio           Create a visual representation of the local vs remote balance: \$LOCAL_BALANCE  \$REMOTE_BALANCE
       --clean           Cleanup (delete) forwards, pays, and invoices that are more than two days old
       --empty           Empties (sends) all the spendable msats over a private channel. Routine only works on private lightning nodes /w a single channel
-      --path            Find the shortest path & fee to send a given amount: (PEER_ID|INVOICE|OFFER|REQUEST) <AMOUNT>
+      --path            Find the shortest path & fee to send a given amount: (PEER_ID|INVOICE|OFFER|REQUEST) <AMOUNT_MSATS=1000>
 
 EOF
 
@@ -466,7 +466,7 @@ elif [[ $1 == "--empty" ]]; then # Empties (sends) all the spendable msats over 
         echo "This routine is for private lightning nodes only with a single channel"
     fi
 
-elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given amount: (PEER_ID|INVOICE|OFFER|REQUEST) <AMOUNT>
+elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given amount: (PEER_ID|INVOICE|OFFER|REQUEST) <AMOUNT_MSATS=1000>
     ID_INV_OFFR_REQ=$2; AMOUNT=$3
 
     # Input checking
@@ -478,10 +478,10 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
     # Get the NODE_ID of the payee
     if [[ $ID_INV_OFFR_REQ =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter already a NODE_ID
         NODE_ID=$ID_INV_OFFR_REQ
-        echo ""; echo "NODE ID: $NODE_ID"
+        echo ""; echo "##### NODE ID: $NODE_ID"
     else
         DECODED=$($LNCLI decode $ID_INV_OFFR_REQ)
-        echo ""; echo $DECODED | jq
+        echo ""; echo "##### DECODED (PEER_ID|INVOICE|OFFER|REQUEST) #####"; echo $DECODED | jq
 
         payee=$(echo $DECODED | jq -r .payee)
         offer_issuer_id=$(echo $DECODED | jq -r .offer_issuer_id)
@@ -512,7 +512,7 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
 
     # Find and show the best route
     routes=$($LNCLI getroute $NODE_ID $AMOUNT 0)
-    echo ""; echo $routes | jq; echo ""
+    echo ""; echo "##### Shortest Route For $($0 --msats $AMOUNT) BTC.SATS_mSATS #####"; echo $routes | jq; echo ""
 
     # Show the final fee that would be paid
     amount_sent=$(echo $routes | jq .route[0].amount_msat) # The amount in the first element
@@ -521,5 +521,5 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
 
 else
     $0 --help
-    echo "Script Version 0.9"
+    echo "Script Version 0.91"
 fi
