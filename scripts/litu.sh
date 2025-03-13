@@ -40,7 +40,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --ratio           Create a visual representation of the local vs remote balance: \$LOCAL_BALANCE  \$REMOTE_BALANCE
       --clean           Cleanup (delete) forwards, pays, and invoices that are more than two days old
       --empty           Empties (sends) all the spendable msats over a private channel. Routine only works on private lightning nodes /w a single channel
-      --decode          Add a peer_id, invoice, offer, ivoice_request and the best route will be found????????????????????????????
+      --path            Find the shortest path & fee to send a given amount: (PEER_ID|INVOICE|OFFER|REQUEST) <AMOUNT>
 
 EOF
 
@@ -466,8 +466,8 @@ elif [[ $1 == "--empty" ]]; then # Empties (sends) all the spendable msats over 
         echo "This routine is for private lightning nodes only with a single channel"
     fi
 
-elif [[ $1 == "--decode" ]]; then # Empties (sends) all the spendable msats over a private channel. Routine only works on private lightning nodes /w a single channel
-    ID_INV_OFFR_REQ=$2
+elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given amount: (PEER_ID|INVOICE|OFFER|REQUEST) <AMOUNT>
+    ID_INV_OFFR_REQ=$2; AMOUNT=$3
 
     # Input checking
     if [[ -z $ID_INV_OFFR_REQ ]]; then
@@ -484,32 +484,38 @@ elif [[ $1 == "--decode" ]]; then # Empties (sends) all the spendable msats over
         invreq_payer_id=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .invreq_payer_id)
         if [[ $payee =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice
             NODE_ID=$payee
-            AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .amount_msat)
+            if [[ ! -z $AMOUNT ]]; then
+                AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .amount_msat)
+            fi
         elif [[ $offer_issuer_id =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning offer
             NODE_ID=$offer_issuer_id
-            AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .offer_amount_msat)
+            if [[ ! -z $AMOUNT ]]; then
+                AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .offer_amount_msat)
+            fi
         elif [[ $invreq_payer_id =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice request
             NODE_ID=$invreq_payer_id
-            AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .invreq_amount_msat)
+            if [[ ! -z $AMOUNT ]]; then
+                AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .invreq_amount_msat)
+            fi
         else
             echo ""; echo "Error! The passed parameter is not a NODE_ID, INVOICE, OFFER, or INVOICE REQUEST!"
             exit 1
         fi
     fi
 
-    # Find the best route
-    echo ""
-    if [[ ! -z $AMOUNT ]]; then
-        if [[ $AMOUNT -lt 1000 ]]; then AMOUNT=1000; fi # If less than 1000 mSATS (1 SAT) then make it at least 1000 mSATS (1 SAT)
-        echo "Best Route ($AMOUNT mSATS): "
-        $LNCLI getroute $NODE_ID $AMOUNT 0 | jq .route[]
-    else # If no amount is available, find it for 1000 mSATS
-        echo "Best Route (1000 mSATS): "
-        $LNCLI getroute $NODE_ID 1000 0 | jq .route[]
-    fi
-    echo ""
+    # If non-existent or less than 1000 mSATS (1 SAT) then set AMOUNT to 1000 mSATS (1 SAT)
+    if [[ -z $AMOUNT || $AMOUNT -lt 1000 ]]; then AMOUNT=1000; fi
+
+    # Find and show the best route
+    routes=$($LNCLI getroute $NODE_ID $AMOUNT 0)
+    echo ""; echo $routes | jq; echo ""
+
+    # Show the final fee that would be paid
+    amount_sent=$(echo $routes | jq .route[0].amount_msat) # The amount in the first element
+    amount_received=$(echo $routes | jq -r '.route[-1]' | jq .amount_msat) # The amount in the last element
+    echo "Fee Required: $($0 --msats $((amount_sent - amount_received)))"; echo ""
 
 else
     $0 --help
-    echo "Script Version 0.81"
+    echo "Script Version 0.9"
 fi
