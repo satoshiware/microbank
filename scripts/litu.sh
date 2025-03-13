@@ -479,18 +479,18 @@ elif [[ $1 == "--decode" ]]; then # Empties (sends) all the spendable msats over
     if [[ $ID_INV_OFFR_REQ =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter already a NODE_ID
         NODE_ID=$ID_INV_OFFR_REQ
     else
-        payee=$(lncli decode $ID_INV_OFFR_REQ | jq -r .payee)
-        offer_issuer_id=$(lncli decode $ID_INV_OFFR_REQ | jq -r .offer_issuer_id)
-        invreq_payer_id=$(lncli decode $ID_INV_OFFR_REQ | jq -r .invreq_payer_id)
+        payee=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .payee)
+        offer_issuer_id=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .offer_issuer_id)
+        invreq_payer_id=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .invreq_payer_id)
         if [[ $payee =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice
             NODE_ID=$payee
-            AMOUNT=$(lncli decode $ID_INV_OFFR_REQ | jq -r .amount_msat)
+            AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .amount_msat)
         elif [[ $offer_issuer_id =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning offer
             NODE_ID=$offer_issuer_id
-            AMOUNT=$(lncli decode $ID_INV_OFFR_REQ | jq -r .offer_amount_msat)
+            AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .offer_amount_msat)
         elif [[ $invreq_payer_id =~ ^[a-f0-9]{66}$ ]]; then # Is the passed parameter a lightning invoice request
             NODE_ID=$invreq_payer_id
-            AMOUNT=$(lncli decode $ID_INV_OFFR_REQ | jq -r .invreq_amount_msat)
+            AMOUNT=$($LNCLI decode $ID_INV_OFFR_REQ | jq -r .invreq_amount_msat)
         else
             echo ""; echo "Error! The passed parameter is not a NODE_ID, INVOICE, OFFER, or INVOICE REQUEST!"
             exit 1
@@ -502,14 +502,14 @@ elif [[ $1 == "--decode" ]]; then # Empties (sends) all the spendable msats over
     if [[ ! -z $AMOUNT ]]; then
         if [[ $AMOUNT -lt 1000 ]]; then AMOUNT=1000; fi # If less than 1000 mSATS (1 SAT) then make it at least 1000 mSATS (1 SAT)
         echo "Best Route ($AMOUNT mSATS): "
-        lncli getroute $NODE_ID $AMOUNT 0 | jq .route[]
+        $LNCLI getroute $NODE_ID $AMOUNT 0 | jq .route[]
     else # If no amount is available, find it for 1000 mSATS
         echo "Best Route (1000 mSATS): "
-        lncli getroute $NODE_ID 1000 0 | jq .route[]
+        $LNCLI getroute $NODE_ID 1000 0 | jq .route[]
     fi
     echo ""
 
 else
     $0 --help
-    echo "Script Version 0.8"
+    echo "Script Version 0.81"
 fi
