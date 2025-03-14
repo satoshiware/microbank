@@ -593,7 +593,7 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
     route="$route,$last_hop" # Add the route with the last hop seperated by a comma
 
     # Create an invoice with "any" amount that will be used to receive the funds back in the end channel
-    invoice=$(LNCLI invoice any "loop $(date +%s)" "Send $AMOUNT msats in a loop: START_SHORT_CHANNEL=$start_node_id, END_SHORT_CHANNEL=$end_node_id")
+    invoice=$($LNCLI invoice any "loop $(date +%s)" "Send $AMOUNT msats in a loop: START_SHORT_CHANNEL=$start_node_id, END_SHORT_CHANNEL=$end_node_id")
     payment_hash=$(echo $invoice | jq .payment_hash)
     payment_secret=$(echo $invoice | jq .payment_secret)
 
@@ -602,9 +602,11 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
     echo "    This Node's ID:       $this_node_id"
     echo "    Amount:               $($0 --msats $AMOUNT)"
     echo "    Total Fee:            $($0 --msats $total_fee)"
+    echo "    Start Node Alias:     $($LNCLI listnodes $start_node_id | jq -r .nodes[0].alias)"
     echo "    Start Node ID:        $start_node_id"
     echo "    Start Node Channel:   $START_SHORT_CHANNEL"
     echo "    Sendable (mSATS):     $($0 --msats $spendable_msat)"
+    echo "    End Node Alias:       $($LNCLI listnodes $end_node_id | jq -r .nodes[0].alias)"
     echo "    End Node ID:          $end_node_id"
     echo "    End Node Channel:     $END_SHORT_CHANNEL"
     echo "    Receivable (mSATS):   $($0 --msats $receivable_msat)"
@@ -636,5 +638,5 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
 
 else
     $0 --help
-    echo "Script Version 1.00"
+    echo "Script Version 1.01"
 fi
