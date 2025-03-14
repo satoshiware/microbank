@@ -41,7 +41,7 @@ if [[ $1 = "--help" ]]; then # Show all possible paramters
       --clean           Cleanup (delete) forwards, pays, and invoices that are more than two days old
       --empty           Empties (sends) all the spendable msats over a private channel. Routine only works on private lightning nodes /w a single channel
       --path            Find the shortest path & fee to send a given amount: (\$PEER_ID|\$INVOICE|\$OFFER|\$REQUEST) <\$AMOUNT_MSATS=1000>
-      --chan-adjust     Route SATS through two channels connected to this node (1 in and 1 out): \$START_SHORT_CHANNEL  \$END_SHORT_CHANNEL  \$AMOUNT_MSATS  <\$SEND_NOW=false>
+      --loop            Route SATS through two channels connected to this node (1 in and 1 out): \$START_SHORT_CHANNEL  \$END_SHORT_CHANNEL  \$AMOUNT_MSATS  <\$SEND_NOW=false>
 
 EOF
 
@@ -532,12 +532,8 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
     amount_received=$(echo $routes | jq -r '.route[-1]' | jq .amount_msat) # The amount in the last element
     echo "SENDER's Fee Required: $($0 --msats $((amount_sent - amount_received)))"; echo ""
 
-elif [[ $1 == "--chan-adjust" ]]; then # Route SATS through two channels connected to this node (1 in and 1 out): \$START_SHORT_CHANNEL  \$END_SHORT_CHANNEL  \$AMOUNT_MSATS  <\$SEND_NOW=false>
+elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to this node (1 in and 1 out): \$START_SHORT_CHANNEL  \$END_SHORT_CHANNEL  \$AMOUNT_MSATS  <\$SEND_NOW=false>
     START_SHORT_CHANNEL=$2; END_SHORT_CHANNEL=$3; AMOUNT=$4; SEND_NOW=$5
-
-    START_SHORT_CHANNEL="886467x899x0" ############### Debugging HERE
-    END_SHORT_CHANNEL="886822x2118x0"
-    AMOUNT=9478868000
 
     # Input checking
     if [[ -z $START_SHORT_CHANNEL || -z $END_SHORT_CHANNEL || -z $AMOUNT ]]; then
@@ -550,6 +546,9 @@ elif [[ $1 == "--chan-adjust" ]]; then # Route SATS through two channels connect
         echo "Error! \$AMOUNT must be an integer (msats) greater than 1000 mSATS!"
         exit 1
     fi
+
+    # Get and show this node's ID
+    this_node_id=$($LNCLI getinfo | jq -r .id)
 
     # Get the START_NODE_ID, END_NODE_ID, spendable, receivable, and an array of all the active channels (except START_NODE_ID)
     channels_array="[" # Add a start bracket for the array
@@ -572,43 +571,70 @@ elif [[ $1 == "--chan-adjust" ]]; then # Route SATS through two channels connect
 
             # Build an array of all the active channels except the $START_SHORT_CHANNEL
             if [[ $state == "CHANNELD_NORMAL" ]]; then
-                channels_array="$channels_array'$short_channel_id/$(echo "$channel" | jq -r .direction)',"
+                channels_array="$channels_array$short_channel_id/$(echo "$channel" | jq -r .direction),"
             fi
         fi
     done <<< "$channels"
     channels_array="${channels_array%?}]" # Remove the last comma and add an end cap ']' for the array
 
-    # Make sure the channels (connected to our node) can handle that size of payment
-    if [[ $AMOUNT -gt $receivable_msat || $AMOUNT -gt $spendable_msat ]]; then
+    # Make sure the channels (connected to this node) can handle the full $AMOUNT transferred
+    if [[ $AMOUNT -gt $(( $receivable_msat - 1 )) || $AMOUNT -gt $(( $spendable_msat - 1)) ]]; then # Possible bug... doesn't send unless it is 1 mSAT under
         echo "Error! Cannot send that many mSATS!"
         exit 1
     fi
 
+    # Calculate the route for this loop and the total fee to transfer the desired amount
+    route=$($LNCLI getroute -k "id"="$end_node_id" "amount_msat"=$AMOUNT "riskfactor"=0 "exclude"=$channels_array)
+    final_hop_amount=$(echo $route | jq .route[-1].amount_msat)
+    route=$(echo $route | jq .route | tr -d '[:space:]') # Remove "route" structure from the json data and remove all spaces
+    route="${route%?}" # Remove the ending bracket
+    last_hop=$($LNCLI getroute -k "id"="$this_node_id" "amount_msat"=$final_hop_amount "riskfactor"=0 "fromid"="$end_node_id" | jq .route[] | tr -d '[:space:]')]
+    total_fee=$(( $AMOUNT - $(echo ${last_hop%?} | jq .amount_msat) )) # Calculate the total fee
+    route="$route,$last_hop" # Add the route with the last hop seperated by a comma
 
-#############################################
+    # Create an invoice with "any" amount that will be used to receive the funds back in the end channel
+    invoice=$(LNCLI invoice any "loop $(date +%s)" "Send $AMOUNT msats in a loop: START_SHORT_CHANNEL=$start_node_id, END_SHORT_CHANNEL=$end_node_id")
+    payment_hash=$(echo $invoice | jq .payment_hash)
+    payment_secret=$(echo $invoice | jq .payment_secret)
 
-    echo "Amount:               $(litu --msats $AMOUNT)"
-    echo "Amount:               $AMOUNT"
-    echo ""
-    echo "Start Node ID:        $start_node_id"
-    echo "Sendable (mSATS):     $(litu --msats $spendable_msat)"
-    echo ""
-    echo "End Node ID:          $end_node_id"
-    echo "Receivable (mSATS):   $(litu --msats $receivable_msat)"
-    echo "Receivable (mSATS):   $receivable_msat"
-    echo ""
+    # Print Summary
+    echo ""; echo "Summary:"
+    echo "    This Node's ID:       $this_node_id"
+    echo "    Amount:               $($0 --msats $AMOUNT)"
+    echo "    Total Fee:            $($0 --msats $total_fee)"
+    echo "    Start Node ID:        $start_node_id"
+    echo "    Start Node Channel:   $START_SHORT_CHANNEL"
+    echo "    Sendable (mSATS):     $($0 --msats $spendable_msat)"
+    echo "    End Node ID:          $end_node_id"
+    echo "    End Node Channel:     $END_SHORT_CHANNEL"
+    echo "    Receivable (mSATS):   $($0 --msats $receivable_msat)"
+    echo "    Excluded Channels:    $channels_array"
 
-    echo $channels_array
+    # Print Invoice
+    echo ""; echo "Invoice:"
+    echo $invoice
 
+    # Print Route
+    echo ""; echo "Route:"
+    echo $route | jq
 
+    # Print Aliases
+    echo ""; echo "Alias:"
+    nodes=$($LNCLI listpeerchannels | jq -c '.[]')
+    while IFS= read -r node; do # Loop through the channels and process them
+        echo "    $($LNCLI listnodes $(echo $node | jq -r .id) | jq -r .nodes[0].alias)"
+    done <<< "$nodes"
 
+    # If SEND_NOW is not equal to true ask user if they want to send
+    if [[ ! $SEND_NOW == "true" ]]; then
+        read -p "Do you want to continue with the transfer? (yes/no): " user_input
+        if ! [[ "$user_input" == "yes" || "$user_input" == "y" ]]; then exit 1; fi
+    fi
 
-
-
-
-
+    # Make the transfer
+    lncli sendpay -k "route"=$route "payment_hash"=$payment_hash "payment_secret"=$payment_secret
 
 else
     $0 --help
-    echo "Script Version 0.93"
+    echo "Script Version 1.00"
 fi
