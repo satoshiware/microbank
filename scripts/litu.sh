@@ -561,12 +561,22 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
             if [[ ! $state == "CHANNELD_NORMAL" ]]; then echo "Error! Start channel is not active!"; fi
             start_node_id=$(echo "$channel" | jq -r .peer_id)
             spendable_msat=$(echo "$channel" | jq -r .spendable_msat)
+
+            local_funds_msat=$(echo "$channel" | jq -r .funding.local_funds_msat)
+            remote_funds_msat=$(echo "$channel" | jq -r .funding.remote_funds_msat)
+            start_local_balance_msat=$(echo "$channel" | jq -r .to_us_msat)
+            start_remote_balance_msat=$((($local_funds_msat + $remote_funds_msat - $start_local_balance_msat)))
         else
             # Get the last node before this one on the payment route
             if [[ $short_channel_id == "$END_SHORT_CHANNEL" ]]; then
                 if [[ ! $state == "CHANNELD_NORMAL" ]]; then echo "Error! End channel is not active!"; fi
                 end_node_id=$(echo "$channel" | jq -r .peer_id)
                 receivable_msat=$(echo "$channel" | jq -r .receivable_msat)
+
+                local_funds_msat=$(echo "$channel" | jq -r .funding.local_funds_msat)
+                remote_funds_msat=$(echo "$channel" | jq -r .funding.remote_funds_msat)
+                end_local_balance_msat=$(echo "$channel" | jq -r .to_us_msat)
+                end_remote_balance_msat=$((($local_funds_msat + $remote_funds_msat - $end_local_balance_msat)))
             fi
 
             # Build an array of all the active channels except the $START_SHORT_CHANNEL
@@ -602,19 +612,22 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
     echo "    This Node's ID:       $this_node_id"
     echo "    Amount:               $($0 --msats $AMOUNT)"
     echo "    Total Fee:            $($0 --msats $total_fee)"
-    echo "    Start Node Alias:     $($LNCLI listnodes $start_node_id | jq -r .nodes[0].alias)"
+
+    echo ""; echo "    Start Node Alias:     $($LNCLI listnodes $start_node_id | jq -r .nodes[0].alias)"
     echo "    Start Node ID:        $start_node_id"
-    echo "    Start Node Channel:   $START_SHORT_CHANNEL"
+    echo "    Start Node Channel:   $START_SHORT_CHANNEL        $($0 --ratio $start_local_balance_msat $start_remote_balance_msat)"
     echo "    Sendable (mSATS):     $($0 --msats $spendable_msat)"
-    echo "    End Node Alias:       $($LNCLI listnodes $end_node_id | jq -r .nodes[0].alias)"
+
+    echo ""; echo "    End Node Alias:       $($LNCLI listnodes $end_node_id | jq -r .nodes[0].alias)"
     echo "    End Node ID:          $end_node_id"
-    echo "    End Node Channel:     $END_SHORT_CHANNEL"
+    echo "    End Node Channel:     $END_SHORT_CHANNEL        $($0 --ratio $end_local_balance_msat $end_remote_balance_msat)"
     echo "    Receivable (mSATS):   $($0 --msats $receivable_msat)"
-    echo "    Excluded Channels:    $channels_array"
+
+    echo ""; echo "    Excluded Channels:    $channels_array"
 
     # Print Invoice
     echo ""; echo "Invoice:"
-    echo $invoice
+    echo $invoice | jq
 
     # Print Route
     echo ""; echo "Route:"
@@ -638,5 +651,5 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
 
 else
     $0 --help
-    echo "Script Version 1.01"
+    echo "Script Version 1.02"
 fi
