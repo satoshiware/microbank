@@ -535,10 +535,6 @@ elif [[ $1 == "--path" ]]; then # Find the shortest path & fee to send a given a
 elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to this node (1 in and 1 out): \$START_SHORT_CHANNEL  \$END_SHORT_CHANNEL  \$AMOUNT_MSATS  <\$SEND_NOW=false>
     START_SHORT_CHANNEL=$2; END_SHORT_CHANNEL=$3; AMOUNT=$4; SEND_NOW=$5
 
-START_SHORT_CHANNEL=886467x899x0
-END_SHORT_CHANNEL=886822x2118x0
-AMOUNT=5000
-
     # Input checking
     if [[ -z $START_SHORT_CHANNEL || -z $END_SHORT_CHANNEL || -z $AMOUNT ]]; then
         echo ""; echo "Error! Not all variables (START_CHANNEL, END_CHANNEL, and/or AMOUNT) have a proper assignments!"
@@ -650,7 +646,7 @@ AMOUNT=5000
         if ! [[ "$user_input" == "yes" || "$user_input" == "y" ]]; then exit 1; fi
     fi
 
-    # Make the transfer (payment)
+    # Make the transfer (payment) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  We should put a max fee on this just in case !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     echo ""; echo "Payment:"
     $LNCLI sendpay -k "route"=$route "payment_hash"=$payment_hash "payment_secret"=$payment_secret
 
@@ -661,5 +657,5 @@ AMOUNT=5000
 
 else
     $0 --help
-    echo "Script Version 1.04"
+    echo "Script Version 1.05"
 fi
