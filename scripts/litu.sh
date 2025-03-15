@@ -585,7 +585,7 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
             fi
         fi
     done <<< "$channels"
-    channels_array="${channels_array%?}]" # Remove the last comma and add an end cap ']' for the array
+	channels_array="${channels_array%?}]" # Remove the last comma and add an end cap ']' for the array
 
     # Make sure the channels (connected to this node) can handle the full $AMOUNT transferred
     if [[ $AMOUNT -gt $(( $receivable_msat - 1 )) || $AMOUNT -gt $(( $spendable_msat - 1)) ]]; then # Possible bug... doesn't send unless it is 1 mSAT under
@@ -603,7 +603,7 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
     route="$route,$last_hop" # Add the route with the last hop seperated by a comma
 
     # Create an invoice with "any" amount that will be used to receive the funds back in the end channel
-    invoice=$($LNCLI invoice any "loop $(date +%s)" "Send $AMOUNT msats in a loop: START_SHORT_CHANNEL=$start_node_id, END_SHORT_CHANNEL=$end_node_id")
+    invoice=$($LNCLI invoice any "loop $(date +%s)" "Send $AMOUNT msats in a loop: START=$START_SHORT_CHANNEL, END=$END_SHORT_CHANNEL")
     payment_hash=$(echo $invoice | jq .payment_hash)
     payment_secret=$(echo $invoice | jq .payment_secret)
 
