@@ -585,7 +585,7 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
             fi
         fi
     done <<< "$channels"
-	channels_array="${channels_array%?}]" # Remove the last comma and add an end cap ']' for the array
+    channels_array="${channels_array%?}]" # Remove the last comma and add an end cap ']' for the array
 
     # Make sure the channels (connected to this node) can handle the full $AMOUNT transferred
     if [[ $AMOUNT -gt $(( $receivable_msat - 1 )) || $AMOUNT -gt $(( $spendable_msat - 1)) ]]; then # Possible bug... doesn't send unless it is 1 mSAT under
@@ -598,7 +598,7 @@ elif [[ $1 == "--loop" ]]; then # Route SATS through two channels connected to t
     final_hop_amount=$(echo $route | jq .route[-1].amount_msat) # Get the final amount that will be used for the last hop
     route=$(echo $route | jq .route | jq 'map(.delay += 9)' | tr -d '[:space:]') # Remove the "route" structure, add 9 to each delay, and remove all spaces
     route="${route%?}" # Remove the ending bracket
-    last_hop=$($LNCLI getroute -k "id"="$this_node_id" "amount_msat"=$final_hop_amount "riskfactor"=0 "fromid"="$end_node_id" | jq .route[] | tr -d '[:space:]')]
+    last_hop=$($LNCLI getroute -k "id"="$this_node_id" "amount_msat"=$final_hop_amount "riskfactor"=0 "fromid"="$end_node_id" | jq .route[] | tr -d '[:space:]')] ###################### need to exclude them all again!!!!!!!!!!!! Maybe we don't need to
     total_fee=$(( $AMOUNT - $(echo ${last_hop%?} | jq .amount_msat) )) # Calculate the total fee
     route="$route,$last_hop" # Add the route with the last hop seperated by a comma
 
