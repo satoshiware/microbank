@@ -24,6 +24,7 @@ administrator.
 Network & Post Configuration:
     Port 9735 is only accessible from the local network only. It is not exposed to the internet.
     send_messages --generate # (Re)Generate(s) the environment file (w/ needed constants) for the send_messages utility
+    Add the Bank's main lightning node's ID to the file /var/log/lightningd/private_channels
 
 Log locations:
     Bitcoin: /var/log/bitcoin/debug.log
@@ -127,7 +128,7 @@ Create (5M SAT) Channel from the bank's primary lightning node
     lncli getinfo | jq -r .id                                                                   # Get BTCPAY's lightning Node ID (\$PEER_ID)
     ip address show | grep "inet " | tail -n 1 | xargs | cut -d " " -f 2 | cut -d "/" -f 1      # Get IP address (\$LOCAL_IP_ADDRESS)
     ##### Execute these commands on the bank's primary lightning node #####
-	litu --private_channel \$PEER_ID \$LOCAL_IP_ADDRESS 5000000 BTCPAY                            # Execute this command on the bank's primary lightning node to open channel
+    litu --private_channel \$PEER_ID \$LOCAL_IP_ADDRESS 5000000 BTCPAY                            # Execute this command on the bank's primary lightning node to open channel
     lncli setchannel \$PEER_ID 0 0                                                               # Execute this command on the bank's primary lightning node to reduce all fees to 0
 
 Upgrading Core Lightning:
