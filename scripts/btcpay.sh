@@ -18,13 +18,12 @@ There are 4 programs installed in order to make the btcpay server operate: Core 
 Because the Core Lightning software still requires access to the bitcoin-cli utility, the BTC Pruned Node is also installed.
 It may very well be removed in the future. The NBXplorer is similar to the electrum server, but has been optimized for
 extended public keys; perhaps this software isn't necessary either and with future Electrum Server upgrades, it can also be
-removed. The bpayu utility aids in creating bolt12 invoices, sending funds to the main lightning node, and notifying the
+removed. The litu utility aids in creating bolt12 invoices, sending funds to the main lightning node, and notifying the
 administrator.
 
 Network & Post Configuration:
     Port 9735 is only accessible from the local network only. It is not exposed to the internet.
     send_messages --generate # (Re)Generate(s) the environment file (w/ needed constants) for the send_messages utility
-    bpayu --generate # (Re)Generate(s) the environment file (w/ needed constants) for the bpayu utility
 
 Log locations:
     Bitcoin: /var/log/bitcoin/debug.log
@@ -594,8 +593,8 @@ sudo systemctl enable nbxplorer
 sudo systemctl enable btcpay
 sudo systemctl enable lightningd
 
-##### Install btcpay node utilities #####
-bash ~/microbank/scripts/bpayu.sh --install
+##### Install lightning node utilities #####
+bash ~/microbank/scripts/litu.sh --install
 bash ~/microbank/scripts/send_messages.sh --install
 
 # Create links (for backup purposes) to all critical files needed to restore this node
@@ -604,7 +603,6 @@ sudo ln -s /var/lib/lightningd/bitcoin/hsm_secret ~/backup # HD wallet seed for 
 sudo ln -s /var/lib/lightningd/bitcoin/emergency.recover ~/backup # Each time a new channel is created, this file will need to be backed up anew.
     # Note: Static channel recovery file that requires cooperation with peers and should only be used as a last resort!
 sudo ln -s /var/lib/lightningd/bitcoin/lightningd.sqlite3.backup ~/backup # Lightning daemon database backup
-sudo ln -s /etc/default/bpayu.env ~/backup # Environment file for the bpayu utility
 sudo ln -s /etc/default/send_messages.env ~/backup # Environment file for the send_messages utility
 
 # If "~/restore" folder is present then restore all pertinent files; assumes all files are present
@@ -614,14 +612,12 @@ if [[ -d ~/restore ]]; then
     sudo chown lightning:lightning ~/restore/emergency.recover
     sudo chown lightning:lightning ~/restore/lightningd.sqlite3.backup
     sudo chown satoshi:satoshi ~/restore/postgres_dump.sql.gz
-    sudo chown root:root ~/restore/bpayu.env
     sudo chown root:root ~/restore/send_messages.env
 
     # Move files to their correct locations
     sudo mv ~/restore/hsm_secret /var/lib/lightningd/bitcoin/hsm_secret
     sudo mv ~/restore/emergency.recover /var/lib/lightningd/bitcoin/emergency.recover
     sudo mv ~/restore/lightningd.sqlite3.backup /var/lib/lightningd/bitcoin/lightningd.sqlite3.backup
-    sudo mv ~/restore/bpayu.env /etc/default/bpayu.env
     sudo mv ~/restore/send_messages.env /etc/default/send_messages.env
 
     echo ""
