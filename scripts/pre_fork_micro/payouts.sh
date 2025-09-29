@@ -1013,8 +1013,8 @@ EOF
             '<tr>',
             '<td>' || (SELECT first_name || ' ' || COALESCE(last_name, '')) || '</td>',
             '<td>' || email || '</td>',
-            '<td>' || phone || '</td>',
-            '<td>' || COALESCE(((SELECT SUM(quantity) FROM sales WHERE status != 0 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
+            '<td>' || COALESCE(phone, '') || '</td>',
+            '<td>' || COALESCE(((SELECT SUM(quantity) FROM contracts WHERE status != 0 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
             '<td>' || COALESCE((SELECT micro_address FROM contracts WHERE active = 1 AND account_id = accounts.account_id), '') || '</td>',
             '</tr>'
         FROM accounts
