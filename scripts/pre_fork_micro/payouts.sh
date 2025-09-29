@@ -82,7 +82,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                         Parameters: USER_EMAIL  QTY
       --update-sale     Update sale status
                         Parameters: USER_EMAIL  SALE_ID  STATUS
-                            Note: STATUS  =  0 or NULL (Disabled),  1 (Active),  2 (Trial Run)
+                            Note: STATUS  =  0 or NULL (Disabled),  1 (Active)
       --add-contr       Add a contract
                         Parameters: USER_EMAIL  SALE_ID  QTY  MICRO_ADDRESS
       --disable-contr   Disable a contract
@@ -192,7 +192,7 @@ elif [[ $1 = "-b" || $1 = "--database" ]]; then # Creates an sqlite3 DB and then
         account_id INTEGER NOT NULL, /* This is who is/was accountable for the payment; it may vary from the account_id on the corresponding contracts. */
         time INTEGER NOT NULL,
         quantity INTEGER NOT NULL,
-        status INTEGER, /* DISABLED = 0 or NULL; ACTIVE = 1; TRIAL = 2 */
+        status INTEGER, /* DISABLED = 0 or NULL; ACTIVE = 1 */
         FOREIGN KEY (account_id) REFERENCES accounts (account_id) ON DELETE CASCADE);
     CREATE TABLE contracts (
         contract_id INTEGER PRIMARY KEY,
@@ -725,7 +725,7 @@ elif [[ $1 = "-a" || $1 = "--accounts" ]]; then # Show all accounts
 
 elif [[ $1 = "-l" || $1 = "--sales" ]]; then # Show all sales
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales"
-    echo ""; echo "Status: DISABLED = 0 or NULL; ACTIVE = 1; TRIAL = 2"
+    echo ""; echo "Status: DISABLED = 0 or NULL; ACTIVE = 1"
     echo ""; echo "Note: The contract owners and contract buyers don't have to match."
     echo "Example: Someone may buy extra contracts for a friend."; echo ""
 
@@ -864,8 +864,7 @@ elif [[ $1 = "--update-sale" ]]; then # Update sale status
         echo "Error! Status code is not a number!";
         exit 1
     elif [[ $STATUS == "0" ]]; then echo "Update to \"Disabled\""
-    elif [[ $STATUS == "1" ]]; then echo "Update to \"Active\""
-    elif [[ $STATUS == "2" ]]; then echo "Update to \"Trial Run\""; else
+    elif [[ $STATUS == "1" ]]; then echo "Update to \"Active\""; else
         echo "Error! Invalid status code!";
         exit 1
     fi
@@ -970,7 +969,7 @@ elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme ca
     fi
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administrator and manager
+elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administrator and manager  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
     MESSAGE="$MESSAGE<br><i>Note: <br>"
@@ -982,14 +981,18 @@ elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administra
     MESSAGE="Hi Satoshi,<br><br>Here is a summary about each teller.<br><br>"
     MESSAGE="${MESSAGE}<i>Note: Any unsold hashpower by the Teller(s) is paid out to their Payout Address(es).<br>"
     MESSAGE="${MESSAGE}Unutilized core-customer-purchased hashpower is counted as unsold and will also be paid out to the(se) same address(es).</i><br>"
-    MESSAGE="$MESSAGE<br><hr><br><b>Unpaid:</b><br><table border="1"><tr><th>Name</th><th>Email</th><th>Sale ID</th><th>Mining Power (GH/s)</th><th>Time (Established)</th></tr>"
+
+
+
+    MESSAGE="$MESSAGE<br><hr><br><b>Contracts:</b><br><table border="1"><tr><th>Name</th><th>Email</th><th>Phone</th><th>Mining Power (GH/s)</th><th>Time (Established)</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
         SELECT
             '<tr>',
             '<td>' || (SELECT first_name || ' ' || COALESCE(last_name, '') FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
             '<td>' || (SELECT email FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
-            '<td>' || sale_id || '</td>',
+            '<td>' || (SELECT phone FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
+
             '<td>' || (quantity * $HASHESPERCONTRACT / 1000000000)  || '</td>',
             '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
             '</tr>'
@@ -998,22 +1001,24 @@ elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administra
 EOF
     );  MESSAGE="$MESSAGE</table>"
 
-    # Some details about each teller
-    MESSAGE="$MESSAGE<br><br><b>Basic Information:</b>"
-    MESSAGE="$MESSAGE<table border="1"><tr><th>Name</th><th>Email</th><th>TOTAL Mining Power (GH/s)</th><th>SOLD Mining Power (GH/s)</th><th>Total Customers</th><th>Payout Address</th></tr>"
+
+
+
+    # Details about each account
+    MESSAGE="$MESSAGE<br><br><b>Account Information:</b>"
+    MESSAGE="$MESSAGE<table border="1"><tr><th>Name</th><th>Email</th><th>Phone</th><th>Mining Power (GH/s)</th><th>Payout Address</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
         SELECT
             '<tr>',
             '<td>' || (SELECT first_name || ' ' || COALESCE(last_name, '')) || '</td>',
             '<td>' || email || '</td>',
-            '<td>' || COALESCE(((SELECT SUM(quantity) FROM teller_sales WHERE status != 3 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
-            '<td>' || ((SELECT SUM(quantity) FROM contracts WHERE active = 1 AND EXISTS(SELECT * FROM accounts sub WHERE account_id = contracts.account_id AND contact = accounts.account_id)) * $HASHESPERCONTRACT / 1000000000)  || '</td>',
-            '<td>' || (SELECT COUNT(*) FROM accounts sub WHERE contact = accounts.account_id) || '</td>',
-            '<td>' || COALESCE((SELECT micro_address FROM teller_address_book WHERE active = 1 AND account_id = accounts.account_id), '') || '</td>',
+            '<td>' || phone || '</td>',
+            '<td>' || COALESCE(((SELECT SUM(quantity) FROM sales WHERE status != 0 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
+            '<td>' || COALESCE((SELECT micro_address FROM contracts WHERE active = 1 AND account_id = accounts.account_id), '') || '</td>',
             '</tr>'
         FROM accounts
-        WHERE disabled = 0 AND EXISTS(SELECT * FROM accounts sub WHERE contact = accounts.account_id)
+        WHERE disabled = 0
 EOF
     ); MESSAGE="$MESSAGE</table>"
 
@@ -1068,14 +1073,6 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
         exit 1
     fi
 
-    # Find out if the user has a trial mode sale and encourage him/her to make it official
-    STATUS=$(sqlite3 $SQ3DBNAME "SELECT status FROM sales WHERE (SELECT account_id FROM accounts WHERE email = '$EMAIL') = account_id AND status = 2 ORDER BY status ASC LIMIT 1")
-    if [[ -z $STATUS ]]; then
-        STATUS=""
-    elif [[ $STATUS -eq 2 ]]; then
-        STATUS="<br>Also, a quick reminder that this mining contract is in trial mode. Reach out today and let's make it official! Thank You!<br>"
-    fi
-
     # There may be an added suffix to the address to indicate its status
     ADDRESSES=${ADDRESSES//./<br>}
     ADDRESSES=${ADDRESSES//_0/ -- Deprecated}
@@ -1099,7 +1096,6 @@ elif [[ $1 = "--email-core-customer" ]]; then # Send a payout email to a core cu
 
             Notice! Always ensure the key(s) associated with this/these address(es) are in your possession!!
             Please reach out ASAP if you need a new savings card!<br>
-            ${STATUS}
             <br><hr><br>
 
             <b><u>Market Data</u></b>
