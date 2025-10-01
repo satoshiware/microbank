@@ -76,7 +76,7 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                         Parameters: USER_EMAIL  USER_PHONE**  FIRST_NAME  LAST_NAME*  MASTER_EMAIL*
                             Note*: LAST_NAME and MASTER_EMAIL are options
                             Note**: USER_PHONE is optional if MASTER_EMAIL was provided
-      --disable-user    Disable an account (also disables associated contracts, but not the sales)
+      --disable-user    Disable an account (also disables associated sales and contracts)
                         Parameter: USER_EMAIL
       --add-sale        Add a sale (defaults to "Trial Run")
                         Parameters: USER_EMAIL  QTY
@@ -90,6 +90,13 @@ if [[ $1 = "-h" || $1 = "--help" ]]; then # Show all possible paramters
                             Note: Set CONTRACT_ID to "0" and all contracts matching MICRO_ADDRESS will be disabled
       --modify          Modify a value in the DB. Use with extreme care!
                         Parameters: TABLE  COLUMN  REFERENCE_COLUMN  UNIQUE_REFERENCE_ROW  VALUE
+
+----- Managing Accounts --------------------------------------------------------------------------------------------------
+      --add-full-user   Add a new account with contracts - Parameters: FIRST_NAME  LAST_NAME  USER_EMAIL  USER_PHONE  QTY  MICRO_ADDRESS
+      --add-full-contr  Add contracts to preexisting user - Parameters: USER_EMAIL  QTY  MICRO_ADDRESS (Optional)
+                            Note: If MICRO_ADDRESS is not provided, the most recent active address will be used
+      --change-payout   Change ALL the payout addresses (that be the SAME) for a given user - Parameters:  USER_EMAIL  NEW_ADDRESS  OLD_ADDRESS (Optional)
+                            Note: If OLD_ADDRESS is not provided, the most recent active address will be changed
 
 ----- Messaging -------------------------------------------------------------------------------------------------------------
       --email-banker-summary    Send summary to the administrator (Satoshi) and manager (Bitcoin CEO)
@@ -816,10 +823,12 @@ elif [[ $1 = "--disable-user" ]]; then # Disable an account (i.e. marks an accou
 
     # Update the DB
     sudo sqlite3 $SQ3DBNAME "UPDATE accounts SET disabled = 1 WHERE email = '${USER_EMAIL,,}'"
+    sudo sqlite3 $SQ3DBNAME "UPDATE sales SET status = 0 WHERE account_id = $account_id"
     sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE account_id = $account_id"
 
     # Query the DB
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM accounts WHERE email = '${USER_EMAIL,,}'"
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM sales WHERE account_id = $account_id"
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE account_id = $account_id"
 
 elif [[ $1 = "--add-sale" ]]; then # Add a sale (defaults to "Trial Run")
@@ -967,6 +976,102 @@ elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme ca
     else
         sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM $TABLE WHERE $REFERENCE_COLUMN = '$UNIQUE_REFERENCE_ROW'"
     fi
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Managing Accounts ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+elif [[ $1 = "--add-full-user" ]]; then # Add a new account with contracts - Parameters: FIRST_NAME  LAST_NAME  USER_EMAIL  USER_PHONE  QTY  MICRO_ADDRESS
+    FIRST_NAME=$2; LAST_NAME=$3; EMAIL=$4; PHONE=$5; QUANTITY=$6; ADDRESS=$7
+
+    # Very basic input checking
+    if [[ -z $FIRST_NAME || -z $LAST_NAME || -z $EMAIL || -z $PHONE || -z $QUANTITY || -z $ADDRESS ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    fi
+
+    echo ""; echo "Adding New User"
+    $0 --add-user $EMAIL $PHONE $FIRST_NAME $LAST_NAME null
+
+    echo ""; echo "Adding New Sale"
+    $SALE_ID=$($0 --add-sale $EMAIL $QUANTITY)
+
+    echo ""; echo "Updating Sale to Active"
+    $0 --update-sale $EMAIL $SALE_ID 1
+
+    echo ""; echo "Adding Contract"
+    $0 --add-contr $EMAIL $SALE_ID $QUANTITY $ADDRESS
+
+    echo ""; echo "IMPORTANT: VERIFY NEW USER /w CONTRACTS WERE ADDED SUCCESSFULLY"
+    echo "Any problems/errors will have to be fixed manually"
+
+elif [[ $1 = "--add-full-contr" ]]; then # Add contracts to preexisting user - Parameters: USER_EMAIL  QTY  MICRO_ADDRESS (Optional)
+    EMAIL=$2; QUANTITY=$3; ADDRESS=$4 # Note: If MICRO_ADDRESS is not provided, the most recent active address will be used
+
+    # Very basic input checking
+    if [[ -z $EMAIL || -z $QUANTITY ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    elif [[ -z $ADDRESS ]]; then # If there was no micro address provided, query the latest active address (if there is one)
+         ADDRESS=$(sqlite3 $SQ3DBNAME "SELECT micro_address FROM contracts INNER JOIN accounts ON accounts.account_id = contracts.account_id WHERE email = '$EMAIL' AND active !=0 ORDER BY contract_id DESC LIMIT 1")
+        if [[ -z $ADDRESS ]]; then # Make sure there was an active address available
+            echo "Error! You need to provide a payout address. This user doesn't have an active payout address!"
+            exit 1
+        fi
+    fi
+
+    echo ""; echo "Adding New Sale"
+    $SALE_ID=$($0 --add-sale $EMAIL $QUANTITY)
+
+    echo ""; echo "Updating Sale to Active"
+    $0 --update-sale $EMAIL $SALE_ID 1
+
+    echo ""; echo "Adding Contract"
+    $0 --add-contr $EMAIL $SALE_ID $QUANTITY $ADDRESS
+
+    echo ""; echo "IMPORTANT: VERIFY CONTRACTS WERE ADDED SUCCESSFULLY"
+    echo "Any problems/errors will have to be fixed manually"
+
+elif [[ $1 = "--change-payout" ]]; then # Change ALL the payout addresses (that be the SAME) for a given user - Parameters:  USER_EMAIL  NEW_ADDRESS  OLD_ADDRESS (Optional)
+    EMAIL=$2; NEW_ADDRESS=$3; OLD_ADDRESS=$4 # Note: If OLD_ADDRESS is not provided, the most recent active address will be changed
+
+    # Very basic input checking
+    if [[ -z $EMAIL || -z $NEW_ADDRESS ]]; then
+        echo "Error! Insufficient Parameters!"
+        exit 1
+    elif [[ -z $OLD_ADDRESS ]]; then # If there was no old micro address provided to be replaced, query the latest active address (if there is one)
+         OLD_ADDRESS=$(sqlite3 $SQ3DBNAME "SELECT micro_address FROM contracts INNER JOIN accounts ON accounts.account_id = contracts.account_id WHERE email = '$EMAIL' AND active !=0 ORDER BY contract_id DESC LIMIT 1")
+        if [[ -z $OLD_ADDRESS ]]; then # Make sure there was an active address available
+            echo "Error! There are no active contracts available!"
+            exit 1
+        fi
+    fi
+
+    # Discover how many contracts PER SALE_ID are freed upon disabling all those that are ACTIVE with the GIVEN ADDRESS (OLD_ADDRESS) for the GIVEN USER
+    mapfile -t SALE_IDS < <(sqlite3 $SQ3DBNAME "SELECT sale_id AS quantity FROM contracts WHERE active != 0 AND micro_address = '$OLD_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL') GROUP BY micro_address, sale_id")
+    mapfile -t QUANTITIES < <(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) AS quantity FROM contracts WHERE active != 0 AND micro_address = '$OLD_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL') GROUP BY micro_address, sale_id")
+
+    # Disable all contracts with the GIVEN ADDRESS (of $OLD_ADDRESS) for a GIVEN USER
+    echo ""; echo "Contracts with payout addresses equal to OLD_ADDRESS that ARE deactivated and also those that WILL BE deactivated!"
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '$OLD_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL')"
+
+    sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE micro_address = '$OLD_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL')"
+
+    echo ""; echo "Contracts with payout addresses equal to OLD_ADDRESS that ARE deactivated!"
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '$OLD_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL')"
+
+    # Add contracts for each sale_id
+    echo ""; echo "Adding contracts for each sale_id..."
+    for i in "${!SALE_IDS[@]}"; do
+        echo "        Adding ${QUANTITIES[$i]} contracts for sale_id ${SALE_IDS[$i]}"
+        $0 --add-contr $EMAIL ${SALE_IDS[$i]} ${QUANTITIES[$i]} $NEW_ADDRESS
+    done
+
+    echo ""; echo "Show all Contracts that are active with the payout address of $NEW_ADDRESS for the given user"
+    sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE active != 0 AND micro_address = '$NEW_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL')"
+
+elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme care!
+    TABLE=$2; COLUMN=$3; REFERENCE_COLUMN=$4; UNIQUE_REFERENCE_ROW=$5; VALUE=$6
+
+    echo ""; echo "IMPORTANT: VERIFY NEW USER /w CONTRACT WAS ADDED SUCCESSFULLY"
+    echo "Any problems/errors will have to be fixed manually"
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administrator and manager
@@ -1141,5 +1246,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.2"
+    echo "Script Version 1.21"
 fi
