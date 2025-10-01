@@ -969,58 +969,47 @@ elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme ca
     fi
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Emails ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administrator and manager  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-    MESSAGE="$MESSAGE<br><i>Note: <br>"
-    MESSAGE="${MESSAGE}Also, there are <b><u>$(awk -v hashes_per_contract=$HASHESPERCONTRACT 'BEGIN {printf "%.f\n", hashes_per_contract / 1000000000}') GH/s</u></b> per Contract "
-    MESSAGE="${MESSAGE}and your Teller account will autobuy <b><u>$TELLERBULKPURCHASE</u></b> of these Contracts as soon as you oversell all your current hashpower.<br><br><hr>"
-
-
-
-    MESSAGE="Hi Satoshi,<br><br>Here is a summary about each teller.<br><br>"
-    MESSAGE="${MESSAGE}<i>Note: Any unsold hashpower by the Teller(s) is paid out to their Payout Address(es).<br>"
-    MESSAGE="${MESSAGE}Unutilized core-customer-purchased hashpower is counted as unsold and will also be paid out to the(se) same address(es).</i><br>"
-
-
-
-    MESSAGE="$MESSAGE<br><hr><br><b>Contracts:</b><br><table border="1"><tr><th>Name</th><th>Email</th><th>Phone</th><th>Mining Power (GH/s)</th><th>Time (Established)</th></tr>"
-    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
-.separator ''
-        SELECT
-            '<tr>',
-            '<td>' || (SELECT first_name || ' ' || COALESCE(last_name, '') FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
-            '<td>' || (SELECT email FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
-            '<td>' || (SELECT phone FROM accounts WHERE account_id = teller_sales.account_id) || '</td>',
-
-            '<td>' || (quantity * $HASHESPERCONTRACT / 1000000000)  || '</td>',
-            '<td>' || DATETIME(time, 'unixepoch', 'localtime') || '</td>',
-            '</tr>'
-        FROM teller_sales
-        WHERE status IS NULL OR status = 0
-EOF
-    );  MESSAGE="$MESSAGE</table>"
-
-
-
+elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administrator and manager
+    MESSAGE="Hi Satoshi,<br><br>Here is a summary about each contract holder.<br><br>"
 
     # Details about each account
-    MESSAGE="$MESSAGE<br><br><b>Account Information:</b>"
-    MESSAGE="$MESSAGE<table border="1"><tr><th>Name</th><th>Email</th><th>Phone</th><th>Mining Power (GH/s)</th><th>Payout Address</th></tr>"
+    MESSAGE="$MESSAGE<br><b>Account Information:</b>"
+    MESSAGE="$MESSAGE<table border="1"><tr><th>Name</th><th>Email</th><th>Phone</th><th>GH/s</th><th>Address</th><th>Amount (Coins)</th><th>Opened</th><th>Start Date</th><th>Master</th></tr>"
     MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
 .separator ''
         SELECT
             '<tr>',
-            '<td>' || (SELECT first_name || ' ' || COALESCE(last_name, '')) || '</td>',
-            '<td>' || email || '</td>',
-            '<td>' || COALESCE(phone, '') || '</td>',
-            '<td>' || COALESCE(((SELECT SUM(quantity) FROM contracts WHERE status != 0 AND account_id = accounts.account_id) * $HASHESPERCONTRACT / 1000000000), '')  || '</td>',
-            '<td>' || COALESCE((SELECT micro_address FROM contracts WHERE active = 1 AND account_id = accounts.account_id), '') || '</td>',
+            '<td>' || (SELECT first_name FROM accounts WHERE account_id = contracts.account_id) || ' ' || COALESCE((SELECT last_name FROM accounts WHERE account_id = contracts.account_id), '')  || '</td>',
+            '<td>' || (SELECT email FROM accounts WHERE account_id = contracts.account_id) || '</td>',
+            '<td>' || COALESCE((SELECT phone FROM accounts WHERE account_id = contracts.account_id), '')  || '</td>',
+            '<td>' || (IIF(active = 2, SUM(quantity), SUM(quantity * active)) * $HASHESPERCONTRACT / 1000000000) || '</td>',
+            '<td>' || micro_address || '</td>',
+            '<td>' || (SUM(amount) / 100000000) || '</td>',
+            '<td>' || IIF(MAX(active) = 2, 'Opened', '') || '</td>',
+            '<td>' || DATE(time, 'unixepoch') || '</td>',
+            '<td>' || (SELECT first_name || ' ' || last_name FROM accounts WHERE account_id = (SELECT master FROM accounts WHERE account_id = contracts.account_id))  || '</td>',
             '</tr>'
-        FROM accounts
-        WHERE disabled = 0
+        FROM contracts
+        INNER JOIN (SELECT contract_id, SUM(amount) AS amount FROM txs GROUP BY contract_id) AS txs ON txs.contract_id = contracts.contract_id
+        GROUP BY micro_address
+        ORDER BY account_id
 EOF
-    ); MESSAGE="$MESSAGE</table>"
+    ); MESSAGE="$MESSAGE</table>Note: Does not account for hashrate (Mining Contracts) that have yet to receive a payout!"
+
+    MESSAGE="$MESSAGE<br><br><b>Unassisgned Hashrate:</b>" # Report any "unclaimed" hashrate Sold hashrate that doesn't have an assigned contract with payout address.
+    MESSAGE="$MESSAGE<table border="1"><tr><th>Sale ID</th><th>Account ID</th><th>Time</th><th>Quantity</th><th>status</th></tr>"
+    MESSAGE="$MESSAGE"$(sqlite3 $SQ3DBNAME << EOF
+.separator ''
+        SELECT
+            '<tr>',
+            '<td>' || sale_id || '</td>',
+            '<td>' || account_id || '</td>',
+            '<td>' || time  || '</td>',
+            '<td>' || quantity || '</td>',
+            '</tr>'
+        FROM sales WHERE status = 1 AND quantity != (SELECT SUM(quantity) FROM contracts WHERE sale_id = sales.sale_id AND active != 0)
+EOF
+    );
 
     /usr/local/sbin/send_messages --email "Satoshi" "${ADMINISTRATOREMAIL}" "Banker Report" "$MESSAGE"
     /usr/local/sbin/send_messages --email "Bitcoin CEO" "${MANAGER_EMAIL}" "Banker Report" "$MESSAGE"
@@ -1050,7 +1039,7 @@ EOF
             '<td>' || (SELECT CAST(SUM(txs.amount) as REAL) / 100000000 FROM txs WHERE contract_id = contracts.contract_id) || '</td>',
             '</tr>'
         FROM contracts
-        WHERE active = 1 AND (SELECT master FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${MASTER_EMAIL,,}')
+        WHERE active != 0 AND (SELECT master FROM accounts WHERE account_id = contracts.account_id) = (SELECT account_id FROM accounts WHERE email = '${MASTER_EMAIL,,}')
 EOF
 );  MESSAGE="$MESSAGE</table>"
 
@@ -1152,5 +1141,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.161"
+    echo "Script Version 1.2"
 fi
