@@ -991,7 +991,8 @@ elif [[ $1 = "--add-full-user" ]]; then # Add a new account with contracts - Par
     $0 --add-user $EMAIL $PHONE $FIRST_NAME $LAST_NAME null
 
     echo ""; echo "Adding New Sale"
-    $SALE_ID=$($0 --add-sale $EMAIL $QUANTITY)
+    $0 --add-sale $EMAIL $QUANTITY
+    SALE_ID=$(sqlite3 $SQ3DBNAME "SELECT sale_id FROM sales ORDER BY sale_id DESC LIMIT 1")
 
     echo ""; echo "Updating Sale to Active"
     $0 --update-sale $EMAIL $SALE_ID 1
@@ -1018,7 +1019,8 @@ elif [[ $1 = "--add-full-contr" ]]; then # Add contracts to preexisting user - P
     fi
 
     echo ""; echo "Adding New Sale"
-    $SALE_ID=$($0 --add-sale $EMAIL $QUANTITY)
+    $0 --add-sale $EMAIL $QUANTITY
+    SALE_ID=$(sqlite3 $SQ3DBNAME "SELECT sale_id FROM sales ORDER BY sale_id DESC LIMIT 1")
 
     echo ""; echo "Updating Sale to Active"
     $0 --update-sale $EMAIL $SALE_ID 1
@@ -1049,9 +1051,10 @@ elif [[ $1 = "--change-payout" ]]; then # Change ALL the payout addresses (that 
     mapfile -t QUANTITIES < <(sqlite3 $SQ3DBNAME "SELECT SUM(quantity) AS quantity FROM contracts WHERE active != 0 AND micro_address = '$OLD_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL') GROUP BY micro_address, sale_id")
 
     # Disable all contracts with the GIVEN ADDRESS (of $OLD_ADDRESS) for a GIVEN USER
-    echo ""; echo "Contracts with payout addresses equal to OLD_ADDRESS that ARE deactivated and also those that WILL BE deactivated!"
+    echo ""; echo "All contracts with payout addresses equal to OLD_ADDRESS (including deactivated contracts)"
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE micro_address = '$OLD_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL')"
 
+    echo ""; echo "Deactivating all active contracts..."
     sudo sqlite3 $SQ3DBNAME "UPDATE contracts SET active = 0 WHERE micro_address = '$OLD_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL')"
 
     echo ""; echo "Contracts with payout addresses equal to OLD_ADDRESS that ARE deactivated!"
@@ -1060,11 +1063,10 @@ elif [[ $1 = "--change-payout" ]]; then # Change ALL the payout addresses (that 
     # Add contracts for each sale_id
     echo ""; echo "Adding contracts for each sale_id..."
     for i in "${!SALE_IDS[@]}"; do
-        echo "        Adding ${QUANTITIES[$i]} contracts for sale_id ${SALE_IDS[$i]}"
         $0 --add-contr $EMAIL ${SALE_IDS[$i]} ${QUANTITIES[$i]} $NEW_ADDRESS
     done
 
-    echo ""; echo "Show all Contracts that are active with the payout address of $NEW_ADDRESS for the given user"
+    echo ""; echo "Show all Contracts that are active with the new payout address of $NEW_ADDRESS"
     sqlite3 $SQ3DBNAME ".mode columns" "SELECT * FROM contracts WHERE active != 0 AND micro_address = '$NEW_ADDRESS' AND account_id = (SELECT account_id FROM accounts WHERE email = '$EMAIL')"
 
 elif [[ $1 = "--modify" ]]; then # Modify a value in the DB. Use with extreme care!
@@ -1246,5 +1248,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.21"
+    echo "Script Version 1.23"
 fi
