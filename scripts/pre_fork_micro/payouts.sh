@@ -1,16 +1,12 @@
 #!/bin/bash
 
-# We don't have anything the checks for the database being installed.
-# --email-banker-summary Needs some work!!!!!!!!
-
-##################################################################################################
-# Make a backup - rsync onto node level 3's.
-# This script is the interface.
-#sms env file has keys and not secure.
-# Add text messaging. What about the ability to see market rates asap! This would be cool.
+##### TODOS ########
+# Make a backup of DB - rsync onto node level 3's.
+# sms env file has keys and not secure.???
+# Add text messaging notifications.
 # Making payouts crashes when utxos are low.
-
-
+# Make routine to make it easier to change account information
+# make a routine to see if there is any annasigned hash rate
 
 # Make sure we are not running as root, but that we have sudo privileges.
 if [ "$(id -u)" = "0" ]; then
@@ -1091,7 +1087,7 @@ elif [[ $1 = "--email-banker-summary" ]]; then # Sends summary to the administra
             '<td>' || COALESCE((SELECT phone FROM accounts WHERE account_id = contracts.account_id), '')  || '</td>',
             '<td>' || (IIF(active = 2, SUM(quantity), SUM(quantity * active)) * $HASHESPERCONTRACT / 1000000000) || '</td>',
             '<td>' || micro_address || '</td>',
-            '<td>' || (SUM(amount) / 100000000) || '</td>',
+            '<td>' || (SUM(amount) / CAST(100000000 AS REAL)) || '</td>',
             '<td>' || IIF(MAX(active) = 2, 'Opened', '') || '</td>',
             '<td>' || DATE(time, 'unixepoch') || '</td>',
             '<td>' || (SELECT first_name || ' ' || last_name FROM accounts WHERE account_id = (SELECT master FROM accounts WHERE account_id = contracts.account_id))  || '</td>',
@@ -1248,5 +1244,5 @@ EOF
 
 else
     $0 --help
-    echo "Script Version 1.23"
+    echo "Script Version 1.24"
 fi
